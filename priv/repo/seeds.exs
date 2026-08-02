@@ -10,11 +10,81 @@
 # We recommend using the bang functions (`insert!`, `update!`
 # and so on) as they will fail if something goes wrong.
 
+Logger.configure(level: :info)
+
 alias Detective.Cases
 alias Detective.Cases.CaseFile
+alias Detective.Cases.CaseVersion
 alias Detective.Repo
 
 slug = "signal-at-midnight"
+
+map_locations = [
+  %{
+    "id" => "central-precinct",
+    "name" => "Central Precinct",
+    "type" => "police_station",
+    "district_ids" => ["civic"],
+    "x" => 0.3,
+    "y" => 0.42
+  },
+  %{
+    "id" => "meridian-array",
+    "name" => "Meridian Array",
+    "type" => "standard",
+    "district_ids" => ["observatory"],
+    "x" => 0.42,
+    "y" => 0.23
+  },
+  %{
+    "id" => "northlight-boarding-house",
+    "name" => "Northlight Boarding House",
+    "type" => "standard",
+    "district_ids" => ["observatory", "civic"],
+    "x" => 0.39,
+    "y" => 0.34
+  },
+  %{
+    "id" => "city-archive",
+    "name" => "City Archive",
+    "type" => "standard",
+    "district_ids" => ["civic"],
+    "x" => 0.35,
+    "y" => 0.5
+  },
+  %{
+    "id" => "telegraph-exchange",
+    "name" => "Telegraph Exchange",
+    "type" => "standard",
+    "district_ids" => ["civic", "harbor"],
+    "x" => 0.55,
+    "y" => 0.55
+  },
+  %{
+    "id" => "harbor-precinct",
+    "name" => "Harbor Precinct",
+    "type" => "police_station",
+    "district_ids" => ["harbor"],
+    "x" => 0.68,
+    "y" => 0.61
+  },
+  %{
+    "id" => "breakwater-relay",
+    "name" => "Breakwater Relay",
+    "type" => "standard",
+    "district_ids" => ["harbor"],
+    "x" => 0.79,
+    "y" => 0.71
+  },
+  %{
+    "id" => "mariner-social-club",
+    "name" => "Mariner Social Club",
+    "type" => "mob_joint",
+    "district_ids" => ["harbor"],
+    "x" => 0.65,
+    "y" => 0.72
+  }
+]
 
 {:ok, _result} =
   Repo.transaction(fn ->
@@ -31,6 +101,7 @@ slug = "signal-at-midnight"
 
         content = %{
           "locale" => "en",
+          "max_days" => 6,
           "briefing" =>
             "At 00:17, Dr. Mara Venn sent a broken distress call from Meridian Array. By sunrise she was dead, the station log had been altered, and an unknown ship had vanished beyond the breakwater. Determine who killed her, what was used, and why the midnight signal had to be silenced.",
           "case_cards" => [
@@ -82,26 +153,7 @@ slug = "signal-at-midnight"
               "initially_known" => true
             }
           ],
-          "locations" => [
-            %{
-              "id" => "meridian-array",
-              "name" => "Meridian Array",
-              "x" => 0.24,
-              "y" => 0.31
-            },
-            %{
-              "id" => "breakwater-relay",
-              "name" => "Breakwater Relay",
-              "x" => 0.78,
-              "y" => 0.68
-            },
-            %{
-              "id" => "northlight-boarding-house",
-              "name" => "Northlight Boarding House",
-              "x" => 0.46,
-              "y" => 0.82
-            }
-          ],
+          "locations" => map_locations,
           "response_matrix" => %{
             "iona-pike" => %{
               "mara-venn" => %{
@@ -192,6 +244,26 @@ slug = "signal-at-midnight"
         version
 
       case_file ->
-        case_file
+        case Repo.get_by(CaseVersion, case_id: case_file.id, version: 2) do
+          nil ->
+            legacy_version = Repo.get_by!(CaseVersion, case_id: case_file.id, version: 1)
+
+            upgraded_content =
+              legacy_version.content
+              |> Map.put("max_days", 6)
+              |> Map.put("locations", map_locations)
+
+            {:ok, version} =
+              Cases.create_version(case_file, %{
+                version: 2,
+                content: upgraded_content,
+                published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+              })
+
+            version
+
+          version ->
+            version
+        end
     end
   end)

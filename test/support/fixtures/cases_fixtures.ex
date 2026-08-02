@@ -26,6 +26,34 @@ defmodule Detective.CasesFixtures do
         published_at: DateTime.utc_now(:second),
         content: %{
           "briefing" => "An original test mystery.",
+          "max_days" => 3,
+          "locations" => [
+            %{
+              "id" => "central-precinct",
+              "name" => "Central Precinct",
+              "type" => "police_station",
+              "district_ids" => ["central"],
+              "x" => 0.25,
+              "y" => 0.35
+            },
+            %{
+              "id" => "canal-gate",
+              "name" => "Canal Gate",
+              "type" => "standard",
+              "district_ids" => ["central", "harbor"],
+              "x" => 0.5,
+              "y" => 0.5
+            },
+            %{
+              "id" => "pier-club",
+              "name" => "Pier Club",
+              "type" => "mob_joint",
+              "district_ids" => ["harbor"],
+              "x" => 0.75,
+              "y" => 0.7
+            }
+          ],
+          "suspects" => [],
           "response_matrix" => %{},
           "solution" => %{}
         }

@@ -12,5 +12,13 @@ defmodule Detective.Games.LobbyBroadcaster do
     })
   end
 
+  def broadcast_game_started(lobby) do
+    Endpoint.broadcast(topic(lobby.id), "game_started", %{
+      game_id: lobby.id,
+      path: "/games/#{lobby.id}",
+      version: lobby.current_version
+    })
+  end
+
   defp topic(game_id), do: "lobby:#{game_id}"
 end

@@ -7,7 +7,19 @@ defmodule Detective.Games do
 
   alias Detective.Accounts.Scope
   alias Detective.Cases
-  alias Detective.Games.{Game, GamePlayer}
+  alias Detective.Cases.CaseVersion
+
+  alias Detective.Games.{
+    Engine,
+    Game,
+    GamePlayer,
+    LobbyBroadcaster,
+    Persistence,
+    Projections,
+    Session,
+    SessionSupervisor
+  }
+
   alias Detective.Invitations
   alias Detective.Invitations.GameInvite
   alias Detective.Repo
@@ -162,6 +174,66 @@ defmodule Detective.Games do
   def set_ready(%Scope{}, _game_id, _expected_version, _ready),
     do: {:error, :invalid_command}
 
+  def start_game(scope, game_id, command_id, expected_version, opts \\ [])
+
+  def start_game(
+        %Scope{user: user} = scope,
+        game_id,
+        command_id,
+        expected_version,
+        opts
+      )
+      when is_integer(expected_version) and expected_version >= 0 do
+    now = Keyword.get(opts, :now, DateTime.utc_now(:second))
+
+    with {:ok, game_id} <- cast_game_id(game_id),
+         {:ok, command_id} <- cast_command_id(command_id),
+         :new <- start_command_status(game_id, user.id, command_id),
+         {:ok, _changes} <-
+           Repo.transact(start_game_multi(user.id, game_id, command_id, expected_version, now)),
+         {:ok, _pid} <- SessionSupervisor.ensure_session(game_id),
+         {:ok, lobby} <- get_lobby(scope, game_id) do
+      :ok = LobbyBroadcaster.broadcast_game_started(lobby)
+      {:ok, %{event: :game_started, duplicate: false, lobby: lobby}}
+    else
+      :duplicate ->
+        with {:ok, lobby} <- get_lobby(scope, game_id) do
+          {:ok, %{event: :game_started, duplicate: true, lobby: lobby}}
+        end
+
+      :conflict ->
+        {:error, :command_id_conflict}
+
+      :error ->
+        {:error, :invalid_command}
+
+      {:error, operation, reason, _changes}
+      when operation in [:locked_game, :players, :case_version, :initial_state] ->
+        {:error, reason}
+
+      {:error, :start_command, _changeset, _changes} ->
+        {:error, :duplicate_command}
+
+      {:error, _operation, reason, _changes} ->
+        {:error, reason}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  def start_game(%Scope{}, _game_id, _command_id, _expected_version, _opts),
+    do: {:error, :invalid_command}
+
+  def game_projection(%Scope{user: user} = scope, game_id) do
+    with {:ok, lobby} <- get_lobby(scope, game_id),
+         :ok <- validate_active_game(lobby),
+         {:ok, state} <- Session.get_state(lobby.id),
+         {:ok, projection} <- Projections.for_user(state, user.id) do
+      {:ok, projection}
+    end
+  end
+
   defp parse_invite_hours(attrs) do
     case value(attrs, :invite_hours) do
       hours when is_integer(hours) -> hours
@@ -276,11 +348,126 @@ defmodule Detective.Games do
   defp validate_version(%Game{current_version: version}, version), do: :ok
   defp validate_version(%Game{}, _expected_version), do: {:error, :stale_version}
 
+  defp validate_active_game(%{status: "active"}), do: :ok
+  defp validate_active_game(_lobby), do: {:error, :game_not_active}
+
   defp cast_game_id(game_id) do
     case Ecto.UUID.cast(game_id) do
       {:ok, cast_id} -> {:ok, cast_id}
       :error -> :error
     end
+  end
+
+  defp cast_command_id(command_id) do
+    case Ecto.UUID.cast(command_id) do
+      {:ok, cast_id} -> {:ok, cast_id}
+      :error -> :error
+    end
+  end
+
+  defp start_command_status(game_id, actor_id, command_id) do
+    case Persistence.lookup_command(game_id, command_id) do
+      nil ->
+        :new
+
+      record ->
+        if record.actor_id == actor_id and record.command_type == "start_game" and
+             record.payload_digest == Persistence.payload_digest(%{}) do
+          :duplicate
+        else
+          :conflict
+        end
+    end
+  end
+
+  defp start_game_multi(actor_id, game_id, command_id, expected_version, now) do
+    Multi.new()
+    |> Multi.run(:locked_game, fn repo, _changes ->
+      game =
+        Game
+        |> where([game], game.id == ^game_id)
+        |> lock("FOR UPDATE")
+        |> repo.one()
+
+      cond do
+        game == nil -> {:error, :game_not_found}
+        game.status != "waiting" or game.phase != "lobby" -> {:error, :game_not_waiting}
+        game.current_version != expected_version -> {:error, :stale_version}
+        game.host_user_id != actor_id -> {:error, :not_chisel}
+        true -> {:ok, game}
+      end
+    end)
+    |> Multi.run(:players, fn repo, %{locked_game: game} ->
+      players =
+        GamePlayer
+        |> where([player], player.game_id == ^game.id and player.status == "active")
+        |> order_by([player], asc: player.role, asc: player.seat)
+        |> lock("FOR UPDATE")
+        |> preload(:user)
+        |> repo.all()
+
+      detectives = Enum.filter(players, &(&1.role == "detective"))
+      chisels = Enum.filter(players, &(&1.role == "chisel"))
+
+      cond do
+        length(chisels) != 1 -> {:error, :invalid_chisel_count}
+        detectives == [] -> {:error, :no_detectives}
+        Enum.any?(detectives, &(not &1.ready)) -> {:error, :detectives_not_ready}
+        true -> {:ok, players}
+      end
+    end)
+    |> Multi.run(:case_version, fn repo, %{locked_game: game} ->
+      case repo.get(CaseVersion, game.case_version_id) do
+        %CaseVersion{published_at: published_at} = version when not is_nil(published_at) ->
+          {:ok, version}
+
+        _version ->
+          {:error, :case_version_not_published}
+      end
+    end)
+    |> Multi.run(:initial_state, fn _repo,
+                                    %{
+                                      locked_game: game,
+                                      players: players,
+                                      case_version: case_version
+                                    } ->
+      engine_players =
+        Enum.map(players, fn player ->
+          %{
+            id: player.id,
+            user_id: player.user_id,
+            display_name: player.user.display_name,
+            role: player.role,
+            seat: player.seat
+          }
+        end)
+
+      case Engine.new(game, engine_players, case_version.content) do
+        {:ok, state} ->
+          {:ok, %{state | version: game.current_version + 1}}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end)
+    |> Multi.update(:started_game, fn %{locked_game: game, initial_state: state} ->
+      Game.transition_changeset(game, %{
+        status: "active",
+        phase: "detective_turn",
+        current_version: state.version,
+        started_at: now
+      })
+    end)
+    |> Multi.merge(fn %{initial_state: state} ->
+      Persistence.initial_records_multi(
+        Multi.new(),
+        game_id,
+        actor_id,
+        command_id,
+        expected_version,
+        state
+      )
+    end)
   end
 
   defp generate_room_code do
