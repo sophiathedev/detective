@@ -12,6 +12,10 @@
   let connectionState = $state("connecting")
   let commandPending = $state(false)
   let commandError = $state(null)
+  let startCommandId = null
+
+  let detectives = $derived(room.players.filter((player) => player.role === "detective"))
+  let canStart = $derived(detectives.length > 0 && detectives.every((player) => player.ready))
 
   function applyLobby(nextLobby, version = nextLobby.current_version) {
     if (version < room.current_version) return
@@ -81,6 +85,39 @@
       })
   }
 
+  function startGame() {
+    if (!channel || commandPending || !canStart) return
+
+    startCommandId ??= crypto.randomUUID()
+    commandPending = true
+    commandError = null
+
+    channel
+      .push("start_game", {
+        command_id: startCommandId,
+        expected_version: room.current_version,
+      })
+      .receive("ok", ({ path }) => {
+        window.location.assign(path)
+      })
+      .receive("error", ({ code }) => {
+        commandPending = false
+
+        if (code !== "stale_version") startCommandId = null
+
+        commandError =
+          code === "detectives_not_ready"
+            ? "Every Detective must be ready."
+            : code === "stale_version"
+              ? "Room changed. State refreshed; try again."
+              : "Game could not start."
+      })
+      .receive("timeout", () => {
+        commandPending = false
+        commandError = "Start is still unconfirmed. Retry safely."
+      })
+  }
+
   onMount(() => {
     const socket = window.getGameSocket?.()
     if (!socket) {
@@ -92,6 +129,7 @@
     channel.on("lobby_state", ({ lobby: nextLobby, version }) => applyLobby(nextLobby, version))
     channel.on("presence_state", syncPresenceState)
     channel.on("presence_diff", syncPresenceDiff)
+    channel.on("game_started", ({ path }) => window.location.assign(path))
 
     channel
       .join()
@@ -229,12 +267,13 @@
           </button>
         {:else}
           <button
-            id="lobby-start-pending"
+            id="lobby-start-game"
             type="button"
-            disabled
-            class="w-full border border-white/15 px-4 py-3 text-sm font-semibold text-stone-500"
+            disabled={connectionState !== "online" || commandPending || !canStart}
+            onclick={startGame}
+            class="w-full cursor-pointer bg-[#e06a5b] px-4 py-3 text-sm font-semibold text-[#0b0d0e] transition hover:bg-[#ef7a6a] disabled:cursor-not-allowed disabled:bg-stone-700 disabled:text-stone-400"
           >
-            Waiting for the briefing engine
+            {commandPending ? "Opening casebook…" : canStart ? "Start briefing" : "Waiting for Detectives"}
           </button>
         {/if}
 

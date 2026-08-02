@@ -42,8 +42,33 @@ defmodule DetectiveWeb.LobbyChannel do
     update_ready(socket, expected_version, false)
   end
 
+  def handle_in(
+        "start_game",
+        %{"command_id" => command_id, "expected_version" => expected_version},
+        socket
+      ) do
+    case Games.start_game(
+           socket.assigns.current_scope,
+           socket.assigns.game_id,
+           command_id,
+           expected_version
+         ) do
+      {:ok, %{lobby: lobby}} ->
+        {:reply,
+         {:ok,
+          %{
+            path: "/games/#{lobby.id}",
+            version: lobby.current_version
+          }}, socket}
+
+      {:error, reason} ->
+        {:reply, {:error, %{code: error_code(reason)}}, socket}
+    end
+  end
+
   def handle_in("ready", _payload, socket), do: invalid_command(socket)
   def handle_in("unready", _payload, socket), do: invalid_command(socket)
+  def handle_in("start_game", _payload, socket), do: invalid_command(socket)
 
   defp update_ready(socket, expected_version, ready) do
     case Games.set_ready(
@@ -69,9 +94,15 @@ defmodule DetectiveWeb.LobbyChannel do
               :invalid_game_id,
               :not_a_member,
               :not_detective,
+              :not_chisel,
               :game_not_waiting,
               :stale_version,
-              :invalid_command
+              :invalid_command,
+              :no_detectives,
+              :detectives_not_ready,
+              :command_id_conflict,
+              :duplicate_command,
+              :invalid_initial_state
             ],
        do: Atom.to_string(reason)
 

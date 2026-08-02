@@ -49,6 +49,7 @@ defmodule DetectiveWeb.Router do
       live "/dashboard", DashboardLive, :index
       live "/games/new", GameNewLive, :new
       live "/games/:id/lobby", LobbyLive, :show
+      live "/games/:id", GameLive, :show
       live "/invites/:token", InviteLive, :show
       live "/users/settings", UserLive.Settings, :edit
       live "/users/settings/confirm-email/:token", UserLive.Settings, :confirm_email

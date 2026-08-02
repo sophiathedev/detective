@@ -6,6 +6,8 @@ defmodule DetectiveWeb.UserSocket do
   alias DetectiveWeb.UserAuth
 
   channel "lobby:*", DetectiveWeb.LobbyChannel
+  channel "game:*", DetectiveWeb.GameChannel
+  channel "user:*", DetectiveWeb.UserChannel
 
   @impl true
   def connect(_params, socket, %{session: %{"user_token" => token}}) do
