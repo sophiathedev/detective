@@ -4,10 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
-    <.live_title default="Detective" suffix=" · Phoenix Framework" phx-no-format>{assigns[:page_title]}</.live_title>
-    <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
-    <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
-    </script>
+    <.live_title default="Detective" suffix=" · Detective" phx-no-format>{assigns[:page_title]}</.live_title>
+    <PhoenixVite.Components.assets
+      names={["js/app.js", "css/app.css"]}
+      manifest={{:detective, "priv/static/.vite/manifest.json"}}
+      dev_server={PhoenixVite.Components.has_vite_watcher?(DetectiveWeb.Endpoint)}
+      to_url={fn path -> static_url(@conn, path) end}
+    />
   </head>
   <body class="min-h-screen bg-white text-zinc-950 antialiased">
     {@inner_content}

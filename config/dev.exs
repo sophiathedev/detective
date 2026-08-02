@@ -24,10 +24,14 @@ config :detective, DetectiveWeb.Endpoint,
   code_reloader: true,
   debug_errors: true,
   secret_key_base: "LvPfWwEndTH1gKH0TLosm5r6SuRzVmS2GQ7MUmXprd5ON9+MQ8jjtZKr2ItNyfRo",
+  static_url: [host: "localhost", port: 5173],
   watchers: [
-    esbuild: {Esbuild, :install_and_run, [:detective, ~w(--sourcemap=inline --watch)]},
-    tailwind: {Tailwind, :install_and_run, [:detective, ~w(--watch)]}
+    vite: {PhoenixVite.Npm, :run, [:vite, ~w(dev)]}
   ]
+
+config :live_svelte,
+  ssr_module: LiveSvelte.SSR.ViteJS,
+  vite_host: "http://localhost:5173"
 
 # ## SSL Support
 #

@@ -83,6 +83,7 @@ defmodule DetectiveWeb do
       use Gettext, backend: DetectiveWeb.Gettext
 
       # HTML escaping functionality
+      import LiveSvelte
       import Phoenix.HTML
       # Core UI components
       import DetectiveWeb.CoreComponents

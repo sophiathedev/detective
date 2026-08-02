@@ -23,13 +23,15 @@ import "phoenix_html"
 import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/detective"
-import topbar from "../vendor/topbar"
+import topbar from "topbar"
+import {getHooks} from "live_svelte"
+import Components from "virtual:live-svelte-components"
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks},
+  hooks: {...colocatedHooks, ...getHooks(Components)},
 })
 
 // Show progress bar on live navigation and form submits
@@ -80,4 +82,3 @@ if (process.env.NODE_ENV === "development") {
     window.liveReloader = reloader
   })
 }
-

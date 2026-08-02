@@ -3,6 +3,7 @@
 
 @source "../css";
 @source "../js";
+@source "../svelte/**/*.svelte";
 @source "../../lib/detective_web";
 @source "../../_build/dev/phoenix-colocated/detective/*/";
 

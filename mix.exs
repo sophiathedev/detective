@@ -49,8 +49,8 @@ defmodule Detective.MixProject do
       {:phoenix_live_view, "~> 1.2.0"},
       {:lazy_html, ">= 0.1.0", only: :test},
       {:phoenix_live_dashboard, "~> 0.8.3"},
-      {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
-      {:tailwind, "~> 0.5", runtime: Mix.env() == :dev},
+      {:live_svelte, "~> 0.18.0"},
+      {:phoenix_vite, "~> 0.5.0"},
       {:heroicons,
        github: "tailwindlabs/heroicons",
        tag: "v2.2.0",
@@ -81,14 +81,19 @@ defmodule Detective.MixProject do
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
-      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      "assets.build": ["compile", "tailwind detective", "esbuild detective"],
-      "assets.deploy": [
-        "tailwind detective --minify",
-        "esbuild detective --minify",
-        "phx.digest"
+      "assets.setup": ["phoenix_vite.npm assets install"],
+      "assets.build": [
+        "phoenix_vite.npm vite build --manifest --emptyOutDir true",
+        "phoenix_vite.npm vite build --ssrManifest --emptyOutDir false --ssr js/server.js --outDir ../priv/svelte"
       ],
-      precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
+      "assets.deploy": ["assets.build", "phx.digest"],
+      precommit: [
+        "compile --warnings-as-errors",
+        "deps.unlock --unused",
+        "format",
+        "assets.build",
+        "test"
+      ]
     ]
   end
 end

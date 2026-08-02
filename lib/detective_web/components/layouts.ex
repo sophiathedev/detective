@@ -35,45 +35,8 @@ defmodule DetectiveWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <header class="border-b border-zinc-200 bg-white px-4 sm:px-6 lg:px-8">
-      <div class="mx-auto flex h-16 max-w-7xl items-center justify-between">
-        <a href="/" class="flex items-center gap-2 text-zinc-950 transition hover:opacity-70">
-          <img src={~p"/images/logo.svg"} width="36" />
-          <span class="text-sm font-semibold">v{Application.spec(:phoenix, :vsn)}</span>
-        </a>
-        <ul class="flex items-center gap-2">
-          <li>
-            <a
-              href="https://phoenixframework.org/"
-              class="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950"
-            >
-              Website
-            </a>
-          </li>
-          <li>
-            <a
-              href="https://github.com/phoenixframework/phoenix"
-              class="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950"
-            >
-              GitHub
-            </a>
-          </li>
-          <li>
-            <a
-              href="https://phoenix.hexdocs.pm/overview.html"
-              class="inline-flex items-center rounded-lg bg-zinc-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800"
-            >
-              Get Started <span aria-hidden="true">&rarr;</span>
-            </a>
-          </li>
-        </ul>
-      </div>
-    </header>
-
-    <main class="px-4 py-20 sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-2xl space-y-4">
-        {render_slot(@inner_block)}
-      </div>
+    <main id="app-shell">
+      {render_slot(@inner_block)}
     </main>
 
     <.flash_group flash={@flash} />
