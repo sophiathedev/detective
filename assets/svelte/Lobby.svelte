@@ -41,7 +41,12 @@
   }
 
   function syncPresenceDiff(diff) {
-    const nextState = structuredClone(presenceState)
+    const nextState = Object.fromEntries(
+      Object.entries(presenceState).map(([playerId, presence]) => [
+        playerId,
+        { metas: (presence.metas ?? []).map((meta) => ({ ...meta })) },
+      ]),
+    )
 
     for (const [playerId, presence] of Object.entries(diff.joins ?? {})) {
       const existingMetas = nextState[playerId]?.metas ?? []

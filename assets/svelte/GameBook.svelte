@@ -230,10 +230,10 @@
           </div>
         </div>
 
-        <div class="relative min-h-0 flex-1 overflow-hidden bg-[#b7a78b] p-2 sm:p-3">
+        <div class="relative overflow-hidden bg-[#b7a78b] p-2 sm:p-3">
           <svg
             id="game-map"
-            class="size-full min-h-[30rem] select-none border border-[#6e5c48] bg-[#c9b998]"
+            class="aspect-[2048/1331] w-full select-none border border-[#6e5c48] bg-[#c9b998]"
             viewBox="0 0 2048 1331"
             preserveAspectRatio="xMidYMid meet"
             role="img"
@@ -294,7 +294,6 @@
                 >
                   {#if legalLocation(location.id)}
                     <circle r="42" fill="none" stroke="#c94f3e" stroke-width="7" opacity="0.88">
-                      <animate attributeName="r" values="38;46;38" dur="2.2s" repeatCount="indefinite" />
                       <animate attributeName="opacity" values="0.9;0.38;0.9" dur="2.2s" repeatCount="indefinite" />
                     </circle>
                   {/if}
@@ -338,6 +337,45 @@
             Map: K. M. Leuschner and Metropolitan Surveys, 1932. Library of Congress, Geography and Map Division.
           </p>
         </div>
+
+        <section class="flex flex-1 flex-col border-t border-[#8d765d] px-4 py-4 sm:px-5" aria-labelledby="movement-ledger-heading">
+          <div class="grid gap-4 sm:grid-cols-[1.25fr_0.75fr]">
+            <div>
+              <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Travel rule · field note</p>
+              <h2 id="movement-ledger-heading" class="mt-1 font-serif text-lg font-semibold">District movement ledger</h2>
+              <p class="mt-2 max-w-xl text-xs leading-5 text-[#695642]">
+                One Move action reaches any location in the current district. A location filed under two districts is a border stop; enter it first, then spend another Move to cross.
+              </p>
+            </div>
+            <dl class="grid grid-cols-2 gap-x-3 gap-y-2 self-start font-mono text-[9px] uppercase tracking-[0.08em] text-[#6e5943]">
+              <div class="border-t border-[#9e876a] pt-2"><dt>Blue cross</dt><dd class="mt-1 text-[#2f4551]">Police Station</dd></div>
+              <div class="border-t border-[#9e876a] pt-2"><dt>Red marker</dt><dd class="mt-1 text-[#7a302c]">Mob Joint</dd></div>
+              <div class="border-t border-[#9e876a] pt-2"><dt>Red ring</dt><dd class="mt-1 text-[#9e3f34]">Legal command</dd></div>
+              <div class="border-t border-[#9e876a] pt-2"><dt>Dashed ink</dt><dd class="mt-1">Shared district</dd></div>
+            </dl>
+          </div>
+
+          <div class="mt-auto border-t border-[#9e876a] pt-3">
+            <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Known persons · public file</p>
+            <div class="mt-2 grid gap-2 sm:grid-cols-3">
+              {#each publicState.suspects as suspect, index}
+                <article class="flex items-center gap-2 border border-[#a18a6d] bg-[#e6d9bd] p-2">
+                  <svg class="size-10 shrink-0 bg-[#30261f]" viewBox="0 0 48 48" role="img" aria-label={`Original portrait sketch for ${suspect.name}`}>
+                    <rect width="48" height="48" fill={["#3d5360", "#6a4337", "#4b5d44"][index % 3]} />
+                    <circle cx="24" cy="20" r="9" fill="#d0aa82" />
+                    <path d={index % 3 === 0 ? "M13 18c4-12 18-12 22 0Z" : index % 3 === 1 ? "M12 17h24l-5-7H18Z" : "M14 20c2-12 18-13 21 0l-6-7-5 6Z"} fill="#211a16" />
+                    <path d="M8 48c2-12 8-18 16-18s14 6 16 18Z" fill="#242321" />
+                  </svg>
+                  <div class="min-w-0">
+                    <h3 class="truncate font-serif text-xs font-semibold">{suspect.name}</h3>
+                    <p class="mt-0.5 truncate font-mono text-[8px] uppercase tracking-[0.06em] text-[#705b45]">{suspect.occupation}</p>
+                    <p class="mt-1 truncate text-[9px] text-[#7e6951]">{suspect.location_id}</p>
+                  </div>
+                </article>
+              {/each}
+            </div>
+          </div>
+        </section>
       </section>
 
       <section id="casebook-action-page" class="relative z-10 flex min-h-[42rem] flex-col bg-[#e4d8bd] lg:min-h-0">
