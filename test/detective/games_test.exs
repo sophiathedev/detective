@@ -3,10 +3,12 @@ defmodule Detective.GamesTest do
 
   import Detective.AccountsFixtures
   import Detective.CasesFixtures
+  import Detective.GamesFixtures
 
   alias Detective.Accounts.Scope
   alias Detective.Games
   alias Detective.Games.GamePlayer
+  alias Detective.Invitations
   alias Detective.Invitations.GameInvite
 
   test "creates a waiting game, one Chisel, and a hashed invite" do
@@ -70,5 +72,38 @@ defmodule Detective.GamesTest do
              )
 
     assert "must be less than or equal to 4" in errors_on(changeset).max_detectives
+  end
+
+  test "detective readiness is versioned and rejects stale commands" do
+    host = user_fixture()
+    detective = user_fixture()
+    %{game: game, invite_token: token} = game_fixture(host)
+    assert {:ok, _result} = Invitations.accept(Scope.for_user(detective), token)
+
+    assert {:ok, %{event: :player_ready, lobby: ready_lobby}} =
+             Games.set_ready(Scope.for_user(detective), game.id, 0, true)
+
+    assert ready_lobby.current_version == 1
+    assert ready_lobby.membership.ready
+
+    assert {:error, :stale_version} =
+             Games.set_ready(Scope.for_user(detective), game.id, 0, false)
+
+    assert {:ok, %{event: :player_unready, lobby: unready_lobby}} =
+             Games.set_ready(Scope.for_user(detective), game.id, 1, false)
+
+    assert unready_lobby.current_version == 2
+    refute unready_lobby.membership.ready
+  end
+
+  test "only active detectives can change readiness" do
+    host = user_fixture()
+    %{game: game} = game_fixture(host)
+
+    assert {:error, :not_detective} =
+             Games.set_ready(Scope.for_user(host), game.id, 0, true)
+
+    assert {:error, :invalid_game_id} =
+             Games.set_ready(Scope.for_user(host), "not-a-uuid", 0, true)
   end
 end

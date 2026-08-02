@@ -49,7 +49,7 @@
   <main class="mx-auto grid max-w-7xl gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[minmax(0,0.88fr)_minmax(30rem,1.12fr)] lg:px-8 lg:py-16">
     <section id="create-game-form-section" aria-labelledby="create-game-title">
       <p class="font-mono text-xs uppercase tracking-[0.2em] text-[#ed796b]">Open a case room</p>
-      <h1 id="create-game-title" class="mt-4 text-4xl font-semibold tracking-[-0.04em] text-stone-100 sm:text-5xl">
+      <h1 id="create-game-title" class="mt-4 font-serif text-4xl font-semibold tracking-[-0.04em] text-stone-100 sm:text-5xl">
         Set the table.
       </h1>
       <p class="mt-4 max-w-lg text-base leading-7 text-stone-400">
@@ -59,7 +59,7 @@
       {#if created_room}
         <section id="created-room" class="mt-8 border border-[#ed796b]/60 bg-[#151819] p-5" aria-labelledby="created-room-title">
           <p class="font-mono text-xs uppercase tracking-[0.18em] text-[#ed796b]">Room {created_room.room_code}</p>
-          <h2 id="created-room-title" class="mt-2 text-xl font-semibold text-stone-100">Room created</h2>
+          <h2 id="created-room-title" class="mt-2 font-serif text-xl font-semibold text-stone-100">Room created</h2>
           <p class="mt-2 text-sm leading-6 text-stone-400">
             Copy this link now. Raw token disappears after reload and is never stored by the server.
           </p>

@@ -125,52 +125,42 @@ defmodule Detective.Games do
   end
 
   def get_lobby(%Scope{user: user}, game_id) do
-    membership =
-      GamePlayer
-      |> where(
-        [player],
-        player.game_id == ^game_id and player.user_id == ^user.id and player.status == "active"
-      )
-      |> select([player], %{role: player.role, ready: player.ready})
-      |> Repo.one()
-
-    if membership do
-      game =
-        Game
-        |> join(:inner, [game], version in assoc(game, :case_version))
-        |> join(:inner, [_game, version], case_file in assoc(version, :case_file))
-        |> where([game], game.id == ^game_id)
-        |> select([game, version, case_file], %{
-          id: game.id,
-          title: game.title,
-          room_code: game.room_code,
-          status: game.status,
-          phase: game.phase,
-          max_detectives: game.max_detectives,
-          case_title: case_file.title,
-          case_version: version.version
-        })
-        |> Repo.one()
-
-      players =
-        GamePlayer
-        |> join(:inner, [player], user in assoc(player, :user))
-        |> where([player], player.game_id == ^game_id and player.status == "active")
-        |> order_by([player], asc: player.role, asc: player.seat)
-        |> select([player, user], %{
-          id: player.id,
-          display_name: user.display_name,
-          role: player.role,
-          ready: player.ready,
-          seat: player.seat
-        })
-        |> Repo.all()
-
-      {:ok, Map.merge(game, %{membership: membership, players: players})}
+    with {:ok, game_id} <- cast_game_id(game_id),
+         %{id: _id} = membership <- membership_projection(game_id, user.id),
+         {:ok, lobby} <- public_lobby(game_id) do
+      {:ok, Map.put(lobby, :membership, membership)}
     else
-      {:error, :not_a_member}
+      :error -> {:error, :invalid_game_id}
+      nil -> {:error, :not_a_member}
+      {:error, reason} -> {:error, reason}
     end
   end
+
+  def public_lobby(game_id) do
+    with {:ok, game_id} <- cast_game_id(game_id),
+         %{id: _id} = game <- lobby_game_projection(game_id) do
+      {:ok, Map.put(game, :players, lobby_player_projections(game_id))}
+    else
+      :error -> {:error, :invalid_game_id}
+      nil -> {:error, :game_not_found}
+    end
+  end
+
+  def set_ready(%Scope{user: user} = scope, game_id, expected_version, ready)
+      when is_integer(expected_version) and is_boolean(ready) do
+    with {:ok, game_id} <- cast_game_id(game_id),
+         {:ok, result} <- transact_ready(user.id, game_id, expected_version, ready),
+         {:ok, lobby} <- get_lobby(scope, game_id) do
+      event = if ready, do: :player_ready, else: :player_unready
+      {:ok, %{event: event, player_id: result.player_id, lobby: lobby}}
+    else
+      :error -> {:error, :invalid_game_id}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def set_ready(%Scope{}, _game_id, _expected_version, _ready),
+    do: {:error, :invalid_command}
 
   defp parse_invite_hours(attrs) do
     case value(attrs, :invite_hours) do
@@ -188,6 +178,110 @@ defmodule Detective.Games do
   end
 
   defp value(attrs, key), do: Map.get(attrs, key) || Map.get(attrs, Atom.to_string(key))
+
+  defp transact_ready(user_id, game_id, expected_version, ready) do
+    Repo.transact(fn ->
+      game =
+        Game
+        |> where([game], game.id == ^game_id)
+        |> lock("FOR UPDATE")
+        |> Repo.one()
+
+      player =
+        GamePlayer
+        |> where(
+          [player],
+          player.game_id == ^game_id and player.user_id == ^user_id and
+            player.status == "active"
+        )
+        |> lock("FOR UPDATE")
+        |> Repo.one()
+
+      with %Game{} <- game,
+           %GamePlayer{} <- player,
+           :ok <- validate_waiting_lobby(game),
+           :ok <- validate_detective(player),
+           :ok <- validate_version(game, expected_version) do
+        player
+        |> GamePlayer.ready_changeset(ready)
+        |> Repo.update!()
+
+        game
+        |> Ecto.Changeset.change(current_version: game.current_version + 1)
+        |> Repo.update!()
+
+        {:ok, %{player_id: player.id}}
+      else
+        nil -> {:error, :not_a_member}
+        {:error, reason} -> {:error, reason}
+      end
+    end)
+  end
+
+  defp membership_projection(game_id, user_id) do
+    GamePlayer
+    |> where(
+      [player],
+      player.game_id == ^game_id and player.user_id == ^user_id and player.status == "active"
+    )
+    |> select([player], %{
+      id: player.id,
+      role: player.role,
+      ready: player.ready,
+      seat: player.seat
+    })
+    |> Repo.one()
+  end
+
+  defp lobby_game_projection(game_id) do
+    Game
+    |> join(:inner, [game], version in assoc(game, :case_version))
+    |> join(:inner, [_game, version], case_file in assoc(version, :case_file))
+    |> where([game], game.id == ^game_id)
+    |> select([game, version, case_file], %{
+      id: game.id,
+      title: game.title,
+      room_code: game.room_code,
+      status: game.status,
+      phase: game.phase,
+      max_detectives: game.max_detectives,
+      current_version: game.current_version,
+      case_title: case_file.title,
+      case_version: version.version
+    })
+    |> Repo.one()
+  end
+
+  defp lobby_player_projections(game_id) do
+    GamePlayer
+    |> join(:inner, [player], user in assoc(player, :user))
+    |> where([player], player.game_id == ^game_id and player.status == "active")
+    |> order_by([player], asc: player.role, asc: player.seat)
+    |> select([player, user], %{
+      id: player.id,
+      display_name: user.display_name,
+      role: player.role,
+      ready: player.ready,
+      seat: player.seat
+    })
+    |> Repo.all()
+  end
+
+  defp validate_waiting_lobby(%Game{status: "waiting", phase: "lobby"}), do: :ok
+  defp validate_waiting_lobby(%Game{}), do: {:error, :game_not_waiting}
+
+  defp validate_detective(%GamePlayer{role: "detective"}), do: :ok
+  defp validate_detective(%GamePlayer{}), do: {:error, :not_detective}
+
+  defp validate_version(%Game{current_version: version}, version), do: :ok
+  defp validate_version(%Game{}, _expected_version), do: {:error, :stale_version}
+
+  defp cast_game_id(game_id) do
+    case Ecto.UUID.cast(game_id) do
+      {:ok, cast_id} -> {:ok, cast_id}
+      :error -> :error
+    end
+  end
 
   defp generate_room_code do
     :crypto.strong_rand_bytes(5)

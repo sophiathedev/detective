@@ -37,7 +37,7 @@
     <section class="flex flex-col justify-center px-6 py-10 sm:px-10 lg:px-14" aria-labelledby="invite-title">
       {#if invite}
         <p class="font-mono text-xs uppercase tracking-[0.2em] text-[#e06a5b]">Invitation · {invite.room_code}</p>
-        <h1 id="invite-title" class="mt-4 text-3xl font-semibold tracking-[-0.035em] text-stone-100 sm:text-4xl">
+        <h1 id="invite-title" class="mt-4 font-serif text-3xl font-semibold tracking-[-0.035em] text-stone-100 sm:text-4xl">
           {invite.game_title}
         </h1>
         <p class="mt-3 text-base text-stone-400">{invite.case_title}</p>
@@ -74,7 +74,7 @@
         <p class="mt-3 text-xs leading-5 text-stone-500">Membership is added only after confirmation.</p>
       {:else}
         <p class="font-mono text-xs uppercase tracking-[0.2em] text-[#e06a5b]">Invitation unavailable</p>
-        <h1 id="invite-title" class="mt-4 text-3xl font-semibold tracking-tight">This file is closed.</h1>
+        <h1 id="invite-title" class="mt-4 font-serif text-3xl font-semibold tracking-tight">This file is closed.</h1>
         <p id="invite-error" role="alert" class="mt-5 text-sm leading-6 text-stone-400">
           {error ?? "This invitation cannot be used."}
         </p>

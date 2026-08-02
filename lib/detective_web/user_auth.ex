@@ -177,7 +177,9 @@ defmodule DetectiveWeb.UserAuth do
     end)
   end
 
-  defp user_session_topic(token), do: "users_sessions:#{Base.url_encode64(token)}"
+  def session_topic(token), do: "users_sessions:#{Base.url_encode64(token)}"
+
+  defp user_session_topic(token), do: session_topic(token)
 
   @doc """
   Handles mounting and authenticating the current_scope in LiveViews.

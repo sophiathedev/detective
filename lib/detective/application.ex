@@ -21,6 +21,7 @@ defmodule Detective.Application do
           Detective.Repo,
           {DNSCluster, query: Application.get_env(:detective, :dns_cluster_query) || :ignore},
           {Phoenix.PubSub, name: Detective.PubSub},
+          DetectiveWeb.Presence,
           # Start a worker by calling: Detective.Worker.start_link(arg)
           # {Detective.Worker, arg},
           # Start to serve requests, typically the last entry

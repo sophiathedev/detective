@@ -26,8 +26,16 @@ import {hooks as colocatedHooks} from "phoenix-colocated/detective"
 import topbar from "topbar"
 import {getHooks} from "live_svelte"
 import Components from "virtual:live-svelte-components"
+import {connectGameSocket} from "./game_socket"
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
+let gameSocket
+
+window.getGameSocket = () => {
+  gameSocket ??= connectGameSocket(csrfToken)
+  return gameSocket
+}
+
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},

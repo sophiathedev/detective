@@ -34,4 +34,8 @@ defmodule Detective.Games.GamePlayer do
     |> unique_constraint(:game_id, name: :one_chisel_per_game)
     |> unique_constraint([:game_id, :seat], name: :unique_active_seat_per_game)
   end
+
+  def ready_changeset(player, ready) when is_boolean(ready) do
+    change(player, ready: ready)
+  end
 end

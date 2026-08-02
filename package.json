@@ -1,6 +1,9 @@
 {
   "type": "module",
   "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@fontsource/ibm-plex-serif": "^5.3.0",
     "live_svelte": "file:./deps/live_svelte",
     "phoenix": "file:./deps/phoenix",
     "phoenix_html": "file:./deps/phoenix_html",
