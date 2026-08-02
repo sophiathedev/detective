@@ -1,7 +1,7 @@
 defmodule DetectiveWeb.DashboardLive do
   use DetectiveWeb, :live_view
 
-  @empty_game_summary %{waiting: 0, active: 0, finished: 0}
+  alias Detective.Games
 
   @impl true
   def mount(_params, _session, socket) do
@@ -11,7 +11,7 @@ defmodule DetectiveWeb.DashboardLive do
      assign(socket,
        page_title: "Dashboard",
        display_name: user.display_name,
-       games: @empty_game_summary
+       games: Games.game_summary(socket.assigns.current_scope)
      )}
   end
 
