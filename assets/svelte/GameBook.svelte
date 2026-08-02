@@ -10,12 +10,18 @@
   let privateState = $state(initialPrivate())
   let connectionState = $state("connecting")
   let selectedLocationId = $state(null)
+  let selectedSuspectId = $state(null)
+  let selectedTopicId = $state(null)
+  let selectedResponseId = $state(null)
+  let spendLeverage = $state(false)
   let commandPending = $state(false)
   let retryCommand = $state(null)
   let commandError = $state(null)
   let lastEvent = $state("Casebook synchronized.")
   let gameChannel = null
   let userChannel = null
+  const seenPublicEventIds = new Set()
+  const seenPrivateEventIds = new Set()
 
   let detectives = $derived(publicState.players.filter((player) => player.role === "detective"))
   let chisel = $derived(publicState.players.find((player) => player.role === "chisel"))
@@ -29,6 +35,22 @@
   let moveLocationIds = $derived(new Set(privateState.valid_move_location_ids ?? []))
   let placementLocationIds = $derived(new Set(privateState.placement_location_ids ?? []))
   let availableActions = $derived(new Set(privateState.available_actions ?? []))
+  let interrogationOptions = $derived(privateState.interrogation_options ?? [])
+  let interrogatableSuspectIds = $derived(
+    new Set(interrogationOptions.map((option) => option.suspect_id)),
+  )
+  let selectedInterrogation = $derived(
+    interrogationOptions.find((option) => option.suspect_id === selectedSuspectId),
+  )
+  let selectedTopic = $derived(
+    selectedInterrogation?.topics.find((topic) => topic.id === selectedTopicId),
+  )
+  let pendingPublic = $derived(publicState.pending_interrogation)
+  let pendingPrivate = $derived(privateState.pending_interrogation)
+  let latestStatement = $derived(privateState.statements?.[0])
+  let selectedSuspectLeverage = $derived(
+    privateState.leverage_on_suspects?.[selectedSuspectId] ?? 0,
+  )
 
   let mapConnections = $derived.by(() => {
     const connections = []
@@ -54,6 +76,19 @@
   function applyPrivate(nextState, version) {
     if (version < publicState.version) return
     privateState = nextState
+  }
+
+  function acceptEvent({ event_id, version }, seenEventIds) {
+    if (version < publicState.version) return false
+    if (!event_id) return true
+    if (seenEventIds.has(event_id)) return false
+
+    seenEventIds.add(event_id)
+    return true
+  }
+
+  function recordPublicEvent(message, description) {
+    if (acceptEvent(message, seenPublicEventIds)) lastEvent = description
   }
 
   function locationAction(location) {
@@ -123,6 +158,14 @@
       no_actions_remaining: "No actions remain this turn.",
       mob_joint_required: "Kickback is available only at a Mob Joint.",
       kickback_already_used: "Kickback was already used today.",
+      invalid_suspect: "That suspect is not available in this case.",
+      suspect_not_at_location: "Move to the suspect's location before questioning them.",
+      topic_not_known: "That case topic has not been discovered.",
+      invalid_response: "That response is not available for this question.",
+      response_forced_truthful: "Spent leverage requires the most useful response.",
+      suspect_leverage_required: "No leverage is available over that suspect.",
+      no_leverage_remaining: "No leverage marker remains to stake on a challenge.",
+      not_interrogating_detective: "Only the Detective who asked may decide.",
     }
 
     return messages[code] ?? "The server rejected this action."
@@ -144,6 +187,34 @@
     return "Location"
   }
 
+  function locationName(locationId) {
+    return publicState.locations.find((location) => location.id === locationId)?.name ?? locationId
+  }
+
+  function selectSuspect(suspectId) {
+    if (!interrogatableSuspectIds.has(suspectId) || commandPending) return
+
+    selectedSuspectId = suspectId
+    selectedTopicId =
+      interrogationOptions.find((option) => option.suspect_id === suspectId)?.topics[0]?.id ?? null
+    spendLeverage = false
+  }
+
+  function submitInterrogation() {
+    if (!selectedSuspectId || !selectedTopicId) return
+
+    sendCommand("interrogate", {
+      suspect_id: selectedSuspectId,
+      topic_id: selectedTopicId,
+      spend_leverage: spendLeverage,
+    })
+  }
+
+  function submitResponse() {
+    if (!selectedResponseId || !pendingPrivate?.id) return
+    sendCommand("select_response", { response_id: selectedResponseId })
+  }
+
   onMount(() => {
     const socket = window.getGameSocket?.()
     if (!socket) {
@@ -155,16 +226,65 @@
     userChannel = socket.channel(`user:${user_id}`, { game_id })
 
     gameChannel.on("game_state", ({ state }) => applyPublic(state))
-    gameChannel.on("detective_placed", () => (lastEvent = "A Detective entered the city."))
-    gameChannel.on("player_moved", () => (lastEvent = "A Detective moved to a new location."))
-    gameChannel.on("evidence_analyzed", () => (lastEvent = "Evidence was analyzed."))
-    gameChannel.on("kickback_collected", () => (lastEvent = "A contact paid out a kickback."))
-    gameChannel.on("turn_started", () => (lastEvent = "A new Detective turn began."))
-    gameChannel.on("day_advanced", () => (lastEvent = "The investigation advanced one day."))
-    gameChannel.on("accusation_opened", () => (lastEvent = "Time expired. The accusation phase is open."))
+    gameChannel.on("detective_placed", (message) =>
+      recordPublicEvent(message, "A Detective entered the city."),
+    )
+    gameChannel.on("player_moved", (message) =>
+      recordPublicEvent(message, "A Detective moved to a new location."),
+    )
+    gameChannel.on("evidence_analyzed", (message) =>
+      recordPublicEvent(message, "Evidence was analyzed."),
+    )
+    gameChannel.on("kickback_collected", (message) =>
+      recordPublicEvent(message, "A contact paid out a kickback."),
+    )
+    gameChannel.on(
+      "interrogation_started",
+      (message) => recordPublicEvent(message, "A suspect was called in for questioning."),
+    )
+    gameChannel.on(
+      "response_published",
+      (message) =>
+        recordPublicEvent(message, "The suspect's statement was delivered under seal."),
+    )
+    gameChannel.on(
+      "response_accepted",
+      (message) => recordPublicEvent(message, "The statement was accepted into the casefile."),
+    )
+    gameChannel.on(
+      "challenge_succeeded",
+      (message) =>
+        recordPublicEvent(message, "Challenge sustained. The suspect changed their statement."),
+    )
+    gameChannel.on(
+      "challenge_failed",
+      (message) =>
+        recordPublicEvent(message, "Challenge failed. The Chisel gained leverage."),
+    )
+    gameChannel.on("turn_started", (message) =>
+      recordPublicEvent(message, "A new Detective turn began."),
+    )
+    gameChannel.on("day_advanced", (message) =>
+      recordPublicEvent(message, "The investigation advanced one day."),
+    )
+    gameChannel.on("accusation_opened", (message) =>
+      recordPublicEvent(message, "Time expired. The accusation phase is open."),
+    )
 
     userChannel.on("private_state", ({ game_id: eventGameId, state, version }) => {
       if (eventGameId === game_id) applyPrivate(state, version)
+    })
+
+    userChannel.on("private_event", (message) => {
+      const { game_id: eventGameId, payload } = message
+      if (eventGameId !== game_id) return
+      if (!acceptEvent(message, seenPrivateEventIds)) return
+
+      if (payload.type === "challenge_resolved") {
+        lastEvent = payload.succeeded
+          ? "Challenge sustained. The corrected statement is now in your notes."
+          : "Challenge failed. The original statement was truthful."
+      }
     })
 
     gameChannel
@@ -355,11 +475,18 @@
             </dl>
           </div>
 
-          <div class="mt-auto border-t border-[#9e876a] pt-3">
+          <div class="mt-4 border-t border-[#9e876a] pt-3">
             <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Known persons · public file</p>
             <div class="mt-2 grid gap-2 sm:grid-cols-3">
               {#each publicState.suspects as suspect, index}
-                <article class="flex items-center gap-2 border border-[#a18a6d] bg-[#e6d9bd] p-2">
+                <button
+                  id={`interrogate-suspect-${suspect.id}`}
+                  type="button"
+                  disabled={!interrogatableSuspectIds.has(suspect.id) || commandPending}
+                  aria-pressed={selectedSuspectId === suspect.id}
+                  onclick={() => selectSuspect(suspect.id)}
+                  class={`flex min-h-14 items-center gap-2 border p-2 text-left transition ${selectedSuspectId === suspect.id ? "border-[#8f342d] bg-[#f0dfbd] ring-2 ring-[#a54235]" : "border-[#a18a6d] bg-[#e6d9bd]"} ${interrogatableSuspectIds.has(suspect.id) ? "cursor-pointer hover:bg-[#f2e4c8]" : "cursor-default"}`}
+                >
                   <svg class="size-10 shrink-0 bg-[#30261f]" viewBox="0 0 48 48" role="img" aria-label={`Original portrait sketch for ${suspect.name}`}>
                     <rect width="48" height="48" fill={["#3d5360", "#6a4337", "#4b5d44"][index % 3]} />
                     <circle cx="24" cy="20" r="9" fill="#d0aa82" />
@@ -369,9 +496,9 @@
                   <div class="min-w-0">
                     <h3 class="truncate font-serif text-xs font-semibold">{suspect.name}</h3>
                     <p class="mt-0.5 truncate font-mono text-[8px] uppercase tracking-[0.06em] text-[#705b45]">{suspect.occupation}</p>
-                    <p class="mt-1 truncate text-[9px] text-[#7e6951]">{suspect.location_id}</p>
+                    <p class="mt-1 truncate text-[9px] text-[#7e6951]">{locationName(suspect.location_id)}</p>
                   </div>
-                </article>
+                </button>
               {/each}
             </div>
           </div>
@@ -421,7 +548,7 @@
           {/each}
         </div>
 
-        <div class="grid min-h-0 flex-1 gap-0 xl:grid-cols-[minmax(0,1fr)_19rem]">
+        <div class="grid min-h-0 flex-1 gap-0 xl:grid-cols-[minmax(0,1fr)_15rem]">
           <div class="min-h-0 p-4 sm:p-5">
             <div class="flex flex-wrap items-start justify-between gap-4 border-b border-[#a38b6e] pb-4">
               <div>
@@ -451,7 +578,7 @@
               {/if}
             </div>
 
-            <div class="mt-5 grid gap-5 sm:grid-cols-[minmax(0,1fr)_minmax(13rem,0.72fr)]">
+            <div class="mt-5 grid gap-5 sm:grid-cols-[minmax(12rem,1fr)_minmax(10rem,0.72fr)]">
               <section aria-labelledby="selected-location-heading">
                 <p class="font-mono text-[10px] uppercase tracking-[0.14em] text-[#80694f]">Selected location</p>
                 {#if selectedLocation}
@@ -480,25 +607,169 @@
                     type="button"
                     disabled={!availableActions.has("analyze") || commandPending}
                     onclick={() => sendCommand("analyze", {})}
-                    class="min-h-10 cursor-pointer border border-[#796349] bg-[#efe2c5] px-3 text-left text-sm font-semibold transition hover:bg-[#f8ecd2] disabled:cursor-not-allowed disabled:opacity-35"
-                  >Analyze <span class="float-right font-mono text-[10px]">1 AP → $1</span></button>
+                    class="flex min-h-10 cursor-pointer items-center justify-between gap-2 border border-[#796349] bg-[#efe2c5] px-3 text-left text-sm font-semibold transition hover:bg-[#f8ecd2] disabled:cursor-not-allowed disabled:opacity-35"
+                  >Analyze <span class="shrink-0 font-mono text-[9px]">1 AP → $1</span></button>
                   <button
                     id="action-kickback"
                     type="button"
                     disabled={!availableActions.has("kickback") || commandPending}
                     onclick={() => sendCommand("kickback", {})}
-                    class="min-h-10 cursor-pointer border border-[#796349] bg-[#efe2c5] px-3 text-left text-sm font-semibold transition hover:bg-[#f8ecd2] disabled:cursor-not-allowed disabled:opacity-35"
-                  >Kickback <span class="float-right font-mono text-[10px]">1 AP</span></button>
+                    class="flex min-h-10 cursor-pointer items-center justify-between gap-2 border border-[#796349] bg-[#efe2c5] px-3 text-left text-sm font-semibold transition hover:bg-[#f8ecd2] disabled:cursor-not-allowed disabled:opacity-35"
+                  >Kickback <span class="shrink-0 font-mono text-[9px]">1 AP</span></button>
                   <button
                     id="action-end-turn"
                     type="button"
                     disabled={!availableActions.has("end_turn") || commandPending}
                     onclick={() => sendCommand("end_turn", {})}
-                    class="min-h-10 cursor-pointer bg-[#9c4035] px-3 text-left text-sm font-semibold text-[#fff0d6] transition hover:bg-[#ad4a3d] disabled:cursor-not-allowed disabled:bg-[#8d7b65]"
-                  >End turn <span class="float-right font-mono text-[10px]">0 AP</span></button>
+                    class="flex min-h-10 cursor-pointer items-center justify-between gap-2 bg-[#9c4035] px-3 text-left text-sm font-semibold text-[#fff0d6] transition hover:bg-[#ad4a3d] disabled:cursor-not-allowed disabled:bg-[#8d7b65]"
+                  >End turn <span class="shrink-0 font-mono text-[9px]">0 AP</span></button>
                 </div>
               </section>
             </div>
+
+            <section
+              id="interrogation-workspace"
+              class="mt-5 border-y border-[#91785c] bg-[#dccdad] px-3 py-4 sm:px-4"
+              aria-labelledby="interrogation-heading"
+            >
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">ARC interview desk</p>
+                  <h3 id="interrogation-heading" class="mt-1 font-serif text-xl font-semibold">Suspect statement</h3>
+                </div>
+                <p id="interrogation-status" class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]" aria-live="polite">
+                  {publicState.phase.replaceAll("_", " ")}
+                </p>
+              </div>
+
+              {#if publicState.phase === "detective_turn" && availableActions.has("interrogate")}
+                {#if latestStatement}
+                  <div id="challenge-result" class="mt-4 border-l-4 border-[#8c3f33] bg-[#eadbbc] p-4" aria-live="polite">
+                    <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7d6650]">Latest private note · {latestStatement.topic_code}</p>
+                    <p class="mt-2 font-serif text-sm italic leading-6">“{latestStatement.response_text}”</p>
+                    <p class="mt-2 font-mono text-[9px] uppercase tracking-[0.1em] text-[#8c3f33]">{latestStatement.resolution.replaceAll("_", " ")}</p>
+                  </div>
+                {/if}
+
+                {#if selectedInterrogation}
+                  <div class="mt-4 grid gap-4 sm:grid-cols-[0.8fr_1.2fr]">
+                    <div class="border-l-2 border-[#9e4035] pl-3">
+                      <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7b654d]">Subject</p>
+                      <p class="mt-1 font-serif text-lg font-semibold">{selectedInterrogation.suspect_name}</p>
+                      <p class="mt-2 text-xs leading-5 text-[#695642]">Choose one known case card. Free-form questions are not legal commands.</p>
+                    </div>
+
+                    <fieldset id="interrogation-topics">
+                      <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7b654d]">Known topics</legend>
+                      <div class="mt-2 grid gap-2">
+                        {#each selectedInterrogation.topics as topic}
+                          <label
+                            id={`interrogate-topic-${topic.id}`}
+                            class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 transition ${selectedTopicId === topic.id ? "border-[#963a31] bg-[#f1e2c4]" : "border-[#9f896c] bg-[#e4d6b8] hover:bg-[#ecdec1]"}`}
+                          >
+                            <input type="radio" name="interrogation-topic" value={topic.id} bind:group={selectedTopicId} class="accent-[#963a31]" />
+                            <span class="font-mono text-[10px] font-semibold text-[#963a31]">{topic.code}</span>
+                            <span class="text-sm font-semibold">{topic.title}</span>
+                          </label>
+                        {/each}
+                      </div>
+                    </fieldset>
+                  </div>
+
+                  {#if selectedSuspectLeverage > 0}
+                    <label class="mt-4 flex min-h-11 cursor-pointer items-center gap-3 border-t border-[#a48b6c] pt-3 text-xs">
+                      <input type="checkbox" bind:checked={spendLeverage} class="accent-[#963a31]" />
+                      Spend 1 leverage over this suspect to force the most useful response.
+                    </label>
+                  {/if}
+
+                  <button
+                    id="action-interrogate"
+                    type="button"
+                    disabled={!selectedTopic || commandPending}
+                    onclick={submitInterrogation}
+                    class="mt-4 min-h-11 w-full cursor-pointer bg-[#30261f] px-4 text-left text-sm font-semibold text-[#f5e7c9] transition hover:bg-[#49372a] disabled:cursor-not-allowed disabled:opacity-40"
+                  >Question suspect <span class="float-right font-mono text-[10px]">1 AP</span></button>
+                {:else}
+                  <p class="mt-4 border-l-2 border-[#9e4035] pl-3 text-sm leading-6 text-[#65523f]">Select a highlighted suspect from the public file. You must share their location.</p>
+                {/if}
+              {:else if pendingPublic?.stage === "awaiting_chisel"}
+                {#if privateState.role === "chisel" && pendingPrivate}
+                  <div id="chisel-response-deck" class="mt-4">
+                    <p class="text-sm leading-6 text-[#5f4b39]">
+                      {pendingPrivate.detective.display_name} asks {pendingPrivate.suspect.name} about case card {pendingPrivate.topic.code}.
+                    </p>
+                    <fieldset class="mt-3">
+                      <legend class="sr-only">Choose the suspect response</legend>
+                      <div class="grid gap-2">
+                        {#each pendingPrivate.response_options as response}
+                          <label
+                            id={`chisel-response-${response.id}`}
+                            class={`cursor-pointer border-l-4 px-3 py-3 transition ${selectedResponseId === response.id ? "bg-[#f3e4c5]" : "bg-[#d2c09f] hover:bg-[#dfcead]"} ${response.type === "most_useful" ? "border-[#2f4b42]" : "border-[#9d3d34]"}`}
+                          >
+                            <span class="flex items-center justify-between gap-3">
+                              <span class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#6f5944]">{response.type.replaceAll("_", " ")}</span>
+                              <input type="radio" name="chisel-response" value={response.id} bind:group={selectedResponseId} class="accent-[#963a31]" />
+                            </span>
+                            <span class="mt-2 block font-serif text-sm leading-6">{response.text}</span>
+                          </label>
+                        {/each}
+                      </div>
+                    </fieldset>
+                    <button
+                      id="action-select-response"
+                      type="button"
+                      disabled={!selectedResponseId || commandPending}
+                      onclick={submitResponse}
+                      class="mt-3 min-h-11 w-full cursor-pointer bg-[#8f372f] px-4 text-sm font-semibold text-[#fff0d6] transition hover:bg-[#a84338] disabled:cursor-not-allowed disabled:opacity-40"
+                    >Seal and deliver response</button>
+                  </div>
+                {:else}
+                  <div class="mt-4 border border-dashed border-[#8e765b] bg-[#d3c19f] p-5 text-center">
+                    <p class="font-serif text-lg italic">Statement requested</p>
+                    <p class="mt-2 font-mono text-[9px] uppercase tracking-[0.12em] text-[#745f48]">Waiting for the Chisel to seal a response</p>
+                  </div>
+                {/if}
+              {:else if pendingPublic?.stage === "awaiting_detective_decision"}
+                <div id="published-response-card" class="relative mt-4 border border-[#806749] bg-[#efe0c0] p-4" tabindex="-1">
+                  <span class="absolute right-3 top-3 font-mono text-[9px] uppercase tracking-[0.12em] text-[#963a31]">Statement · {pendingPublic.topic_code}</span>
+                  {#if privateState.role === "detective" && pendingPrivate?.response_text}
+                    <p class="max-w-xl pr-20 font-serif text-base italic leading-7">“{pendingPrivate.response_text}”</p>
+                  {:else if privateState.role === "chisel" && pendingPrivate?.selected_response}
+                    <p class="max-w-xl pr-20 font-serif text-base italic leading-7">“{pendingPrivate.selected_response.text}”</p>
+                  {:else}
+                    <p class="max-w-xl pr-20 font-serif text-base italic leading-7 text-[#76624c]">The statement is sealed for the questioning Detective.</p>
+                  {/if}
+                </div>
+
+                {#if availableActions.has("accept_response") || availableActions.has("challenge_response")}
+                  <div class="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      id="action-accept-response"
+                      type="button"
+                      disabled={!availableActions.has("accept_response") || commandPending}
+                      onclick={() => sendCommand("accept_response", {})}
+                      class="min-h-12 cursor-pointer border-2 border-[#344a40] bg-[#d6d2b5] font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#263c34] transition hover:bg-[#e5dfc1] disabled:cursor-not-allowed disabled:opacity-40"
+                    >Accept statement</button>
+                    <button
+                      id="action-challenge-response"
+                      type="button"
+                      disabled={!availableActions.has("challenge_response") || commandPending}
+                      onclick={() => sendCommand("challenge_response", {})}
+                      class="min-h-12 cursor-pointer border-2 border-[#9b3d34] bg-[#e1c5a9] font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#812f29] transition hover:bg-[#ecd2b5] disabled:cursor-not-allowed disabled:opacity-40"
+                    >Challenge · stake 1</button>
+                  </div>
+                {/if}
+              {:else if latestStatement}
+                <div id="challenge-result" class="mt-4 border-l-4 border-[#8c3f33] bg-[#eadbbc] p-4" aria-live="polite">
+                  <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7d6650]">Latest private note · {latestStatement.topic_code}</p>
+                  <p class="mt-2 font-serif text-sm italic leading-6">“{latestStatement.response_text}”</p>
+                  <p class="mt-2 font-mono text-[9px] uppercase tracking-[0.1em] text-[#8c3f33]">{latestStatement.resolution.replaceAll("_", " ")}</p>
+                </div>
+              {:else}
+                <p class="mt-4 text-sm leading-6 text-[#695642]">Move to a suspect, choose a known case card, and spend one action to question them.</p>
+              {/if}
+            </section>
 
             <section id="keyboard-location-list" class="mt-5 border-t border-[#a38b6e] pt-4" aria-labelledby="location-list-heading">
               <h3 id="location-list-heading" class="font-mono text-[10px] uppercase tracking-[0.14em] text-[#80694f]">Location index</h3>
@@ -529,7 +800,7 @@
               </svg>
               <div class="min-w-0">
                 <p class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7e3029]">Chisel · case handler</p>
-                <h2 id="chisel-heading" class="truncate font-serif text-lg font-semibold">{chisel?.display_name ?? "Unassigned"}</h2>
+                <h2 id="chisel-heading" class="break-words font-serif text-base font-semibold leading-tight">{chisel?.display_name ?? "Unassigned"}</h2>
                 <p class="mt-1 font-mono text-[9px] uppercase text-[#715d47]">No turn · reacts to Detective actions</p>
               </div>
             </div>
@@ -541,7 +812,7 @@
                 <dl class="mt-4 space-y-2 text-xs">
                   <div class="flex justify-between gap-3"><dt class="text-[#715d47]">Solution suspect</dt><dd class="font-mono font-semibold">{privateState.casebook.solution?.suspect_id ?? "—"}</dd></div>
                   <div class="flex justify-between gap-3"><dt class="text-[#715d47]">Leverage held</dt><dd class="font-mono font-semibold">{Object.values(privateState.leverage_by_detective).reduce((sum, value) => sum + value, 0)}</dd></div>
-                  <div class="flex justify-between gap-3"><dt class="text-[#715d47]">Pending response</dt><dd class="font-mono font-semibold">{privateState.pending_action ? "OPEN" : "NONE"}</dd></div>
+                  <div class="flex justify-between gap-3"><dt class="text-[#715d47]">Pending response</dt><dd class="font-mono font-semibold">{privateState.pending_interrogation ? "OPEN" : "NONE"}</dd></div>
                 </dl>
               </div>
             {:else}
