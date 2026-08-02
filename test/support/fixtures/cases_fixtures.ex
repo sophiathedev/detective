@@ -27,6 +27,22 @@ defmodule Detective.CasesFixtures do
         content: %{
           "briefing" => "An original test mystery.",
           "max_days" => 3,
+          "case_cards" => [
+            %{
+              "id" => "victim-file",
+              "code" => "A",
+              "type" => "victim",
+              "title" => "Victim File",
+              "initially_known" => true
+            },
+            %{
+              "id" => "sealed-ledger",
+              "code" => "B",
+              "type" => "evidence",
+              "title" => "Sealed Ledger",
+              "initially_known" => false
+            }
+          ],
           "locations" => [
             %{
               "id" => "central-precinct",
@@ -53,8 +69,35 @@ defmodule Detective.CasesFixtures do
               "y" => 0.7
             }
           ],
-          "suspects" => [],
-          "response_matrix" => %{},
+          "suspects" => [
+            %{
+              "id" => "night-clerk",
+              "name" => "Night Clerk",
+              "occupation" => "records clerk",
+              "location_id" => "central-precinct",
+              "initially_known" => true
+            }
+          ],
+          "response_matrix" => %{
+            "night-clerk" => %{
+              "victim-file" => %{
+                "most_useful" => %{
+                  "id" => "clerk-a-truth",
+                  "text" => "The victim signed the register shortly before midnight."
+                },
+                "misdirections" => [
+                  %{
+                    "id" => "clerk-a-misdirection-1",
+                    "text" => "The register was blank when I locked the archive."
+                  },
+                  %{
+                    "id" => "clerk-a-misdirection-2",
+                    "text" => "I never worked the midnight desk."
+                  }
+                ]
+              }
+            }
+          },
           "solution" => %{}
         }
       })

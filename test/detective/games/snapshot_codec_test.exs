@@ -29,6 +29,7 @@ defmodule Detective.Games.SnapshotCodecTest do
           leverage_supply: 7,
           leverage_on_suspects: %{},
           knowledge: ["signal-log"],
+          statements: [],
           kickback_day: nil
         }
       },
@@ -60,6 +61,35 @@ defmodule Detective.Games.SnapshotCodecTest do
     assert restored.players[player_id].scratch == 5
     assert restored.locations["precinct"].district_ids == ["central"]
     assert restored.case_definition["solution"]["suspect_id"] == "secret"
+  end
+
+  test "round-trips a pending interrogation with string keys" do
+    state = %State{
+      game_id: Ecto.UUID.generate(),
+      case_version_id: Ecto.UUID.generate(),
+      version: 4,
+      phase: :waiting_for_detective_decision,
+      players: %{},
+      locations: %{},
+      suspects: %{},
+      pending_action: %{
+        "id" => Ecto.UUID.generate(),
+        "type" => "interrogation",
+        "detective_player_id" => Ecto.UUID.generate(),
+        "detective_user_id" => Ecto.UUID.generate(),
+        "suspect_id" => "night-clerk",
+        "topic_id" => "victim-file",
+        "topic_code" => "A",
+        "forced_truthful" => false,
+        "selected_response_id" => "response-1",
+        "selected_response_text" => "A false trail.",
+        "selected_response_type" => "misdirection"
+      }
+    }
+
+    assert {:ok, restored} = state |> SnapshotCodec.dump() |> SnapshotCodec.load()
+    assert restored.phase == :waiting_for_detective_decision
+    assert restored.pending_action == state.pending_action
   end
 
   test "rejects an unsupported snapshot schema" do

@@ -6,7 +6,16 @@ defmodule Detective.Games.Command do
   @enforce_keys [:command_id, :type, :expected_version, :payload]
   defstruct [:command_id, :type, :expected_version, :payload]
 
-  @type command_type :: :place | :move | :analyze | :kickback | :end_turn
+  @type command_type ::
+          :place
+          | :move
+          | :analyze
+          | :kickback
+          | :interrogate
+          | :select_response
+          | :accept_response
+          | :challenge_response
+          | :end_turn
 
   @type t :: %__MODULE__{
           command_id: Ecto.UUID.t(),
@@ -39,6 +48,10 @@ defmodule Detective.Games.Command do
   defp command_type("move"), do: {:ok, :move}
   defp command_type("analyze"), do: {:ok, :analyze}
   defp command_type("kickback"), do: {:ok, :kickback}
+  defp command_type("interrogate"), do: {:ok, :interrogate}
+  defp command_type("select_response"), do: {:ok, :select_response}
+  defp command_type("accept_response"), do: {:ok, :accept_response}
+  defp command_type("challenge_response"), do: {:ok, :challenge_response}
   defp command_type("end_turn"), do: {:ok, :end_turn}
   defp command_type(_type), do: :error
 end

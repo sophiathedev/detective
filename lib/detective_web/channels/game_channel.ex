@@ -29,8 +29,7 @@ defmodule DetectiveWeb.GameChannel do
     with {:ok, command} <- Command.build(command_id, type, expected_version, payload),
          {:ok, reply} <-
            Session.execute(socket.assigns.game_id, socket.assigns.user_id, command),
-         {:ok, state} <- Session.get_state(socket.assigns.game_id),
-         :ok <- GameBroadcaster.broadcast(state, reply.events) do
+         :ok <- GameBroadcaster.broadcast(reply.state, reply.events) do
       {:reply,
        {:ok,
         %{
@@ -67,8 +66,22 @@ defmodule DetectiveWeb.GameChannel do
               :destination_outside_district,
               :mob_joint_required,
               :kickback_already_used,
+              :invalid_suspect,
+              :suspect_not_at_location,
+              :invalid_topic,
+              :topic_not_known,
+              :response_not_found,
+              :invalid_response,
+              :response_forced_truthful,
+              :suspect_leverage_required,
+              :no_leverage_remaining,
+              :invalid_pending_action,
+              :response_not_selected,
+              :not_interrogating_detective,
               :command_not_allowed,
-              :command_id_conflict
+              :command_id_conflict,
+              :unknown_persisted_event,
+              :session_unavailable
             ],
        do: Atom.to_string(reason)
 

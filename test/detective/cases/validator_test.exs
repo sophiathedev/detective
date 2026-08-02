@@ -23,6 +23,41 @@ defmodule Detective.Cases.ValidatorTest do
     assert {:error, :police_station_required} = Validator.validate(without_station)
   end
 
+  test "validates response references and requires one most useful response" do
+    case_definition =
+      valid_case()
+      |> Map.put("case_cards", [
+        %{
+          "id" => "victim",
+          "code" => "A",
+          "title" => "Victim",
+          "type" => "victim",
+          "initially_known" => true
+        }
+      ])
+      |> Map.put("response_matrix", %{
+        "suspect" => %{
+          "victim" => %{
+            "most_useful" => "A useful answer.",
+            "misdirections" => ["A false trail."]
+          }
+        }
+      })
+
+    assert :ok = Validator.validate(case_definition)
+
+    invalid_reference = put_in(case_definition["response_matrix"]["unknown"], %{})
+    assert {:error, :invalid_response_reference} = Validator.validate(invalid_reference)
+
+    without_truth =
+      put_in(
+        case_definition["response_matrix"]["suspect"]["victim"]["most_useful"],
+        ""
+      )
+
+    assert {:error, :invalid_response_matrix} = Validator.validate(without_truth)
+  end
+
   defp valid_case do
     %{
       "locations" => [

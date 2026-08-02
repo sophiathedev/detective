@@ -48,6 +48,42 @@ defmodule Detective.Games.ProjectionsTest do
     refute Map.has_key?(chisel.private, :actions_remaining)
   end
 
+  test "pending response options and truth metadata remain role-private" do
+    state =
+      %{state_fixture() | phase: :waiting_for_chisel, pending_action: pending_interrogation()}
+
+    public = Public.render(state)
+    {:ok, detective} = Projections.for_user(state, detective_user_id())
+    {:ok, chisel} = Projections.for_user(state, chisel_user_id())
+
+    refute Jason.encode!(public) =~ "secret answer"
+    refute Jason.encode!(public) =~ "response-0"
+    refute Jason.encode!(detective) =~ "most_useful"
+
+    assert Enum.map(chisel.private.pending_interrogation.response_options, & &1.type) == [
+             "most_useful"
+           ]
+
+    selected =
+      pending_interrogation()
+      |> Map.put("selected_response_id", "response-0")
+      |> Map.put("selected_response_text", "secret answer")
+      |> Map.put("selected_response_type", "most_useful")
+
+    selected_state = %{
+      state
+      | phase: :waiting_for_detective_decision,
+        pending_action: selected
+    }
+
+    selected_public = Public.render(selected_state)
+    {:ok, selected_detective} = Projections.for_user(selected_state, detective_user_id())
+
+    refute Jason.encode!(selected_public) =~ "secret answer"
+    refute Jason.encode!(selected_public) =~ "most_useful"
+    assert selected_detective.private.pending_interrogation.response_text == "secret answer"
+  end
+
   defp state_fixture do
     detective_id = "10000000-0000-0000-0000-000000000001"
     chisel_id = "10000000-0000-0000-0000-000000000002"
@@ -71,7 +107,8 @@ defmodule Detective.Games.ProjectionsTest do
           scratch: 4,
           leverage_supply: 7,
           leverage_on_suspects: %{},
-          knowledge: [],
+          knowledge: ["topic"],
+          statements: [],
           kickback_day: nil
         },
         chisel_id => %{
@@ -92,14 +129,46 @@ defmodule Detective.Games.ProjectionsTest do
           y: 0.3
         }
       },
-      suspects: %{},
+      suspects: %{
+        "suspect" => %{
+          id: "suspect",
+          name: "Suspect",
+          occupation: "witness",
+          location_id: "precinct"
+        }
+      },
       case_definition: %{
         "briefing" => "Private briefing",
         "solution" => %{"suspect_id" => "murderer"},
+        "case_cards" => [
+          %{
+            "id" => "topic",
+            "code" => "A",
+            "title" => "Known Topic",
+            "type" => "information",
+            "initially_known" => true
+          }
+        ],
         "response_matrix" => %{
           "suspect" => %{"topic" => %{"most_useful" => "secret answer"}}
         }
       }
+    }
+  end
+
+  defp pending_interrogation do
+    %{
+      "id" => Ecto.UUID.generate(),
+      "type" => "interrogation",
+      "detective_player_id" => "10000000-0000-0000-0000-000000000001",
+      "detective_user_id" => detective_user_id(),
+      "suspect_id" => "suspect",
+      "topic_id" => "topic",
+      "topic_code" => "A",
+      "forced_truthful" => false,
+      "selected_response_id" => nil,
+      "selected_response_text" => nil,
+      "selected_response_type" => nil
     }
   end
 

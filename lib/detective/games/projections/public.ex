@@ -15,6 +15,7 @@ defmodule Detective.Games.Projections.Public do
       players: public_players(state),
       locations: public_locations(state),
       suspects: public_suspects(state),
+      pending_interrogation: pending_interrogation(state),
       public_history: state.public_history
     }
   end
@@ -73,4 +74,23 @@ defmodule Detective.Games.Projections.Public do
       }
     end)
   end
+
+  defp pending_interrogation(
+         %State{pending_action: %{"type" => "interrogation"} = pending} = state
+       ) do
+    %{
+      id: pending["id"],
+      detective_player_id: pending["detective_player_id"],
+      suspect_id: pending["suspect_id"],
+      topic_code: pending["topic_code"],
+      stage:
+        if(state.phase == :waiting_for_chisel,
+          do: "awaiting_chisel",
+          else: "awaiting_detective_decision"
+        ),
+      response_delivered: is_binary(pending["selected_response_id"])
+    }
+  end
+
+  defp pending_interrogation(%State{}), do: nil
 end

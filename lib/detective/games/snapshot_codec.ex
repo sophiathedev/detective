@@ -88,6 +88,7 @@ defmodule Detective.Games.SnapshotCodec do
        leverage_supply: player["leverage_supply"],
        leverage_on_suspects: player["leverage_on_suspects"] || %{},
        knowledge: player["knowledge"] || [],
+       statements: player["statements"] || [],
        kickback_day: player["kickback_day"]
      }}
   end

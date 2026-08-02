@@ -17,15 +17,11 @@ defmodule Detective.Games.Session do
   end
 
   def execute(game_id, actor_id, %Command{} = command) do
-    with {:ok, pid} <- SessionSupervisor.ensure_session(game_id) do
-      GenServer.call(pid, {:execute, actor_id, command}, 15_000)
-    end
+    session_call(game_id, {:execute, actor_id, command}, 15_000, 1)
   end
 
   def get_state(game_id) do
-    with {:ok, pid} <- SessionSupervisor.ensure_session(game_id) do
-      GenServer.call(pid, :get_state)
-    end
+    session_call(game_id, :get_state, 5_000, 1)
   end
 
   def via(game_id), do: {:via, Registry, {Detective.GameRegistry, game_id}}
@@ -48,13 +44,24 @@ defmodule Detective.Games.Session do
 
       record ->
         if Persistence.command_matches?(record, actor_id, command) do
-          reply = %{
-            version: record.accepted_version,
-            duplicate: true,
-            events: []
-          }
+          case Persistence.events_for_command(
+                 state.game_id,
+                 command.command_id,
+                 record.accepted_version
+               ) do
+            {:ok, events} ->
+              reply = %{
+                version: record.accepted_version,
+                duplicate: true,
+                events: events,
+                state: state
+              }
 
-          {:reply, {:ok, reply}, state}
+              {:reply, {:ok, reply}, state}
+
+            {:error, reason} ->
+              {:reply, {:error, reason}, state}
+          end
         else
           {:reply, {:error, :command_id_conflict}, state}
         end
@@ -63,17 +70,34 @@ defmodule Detective.Games.Session do
 
   defp execute_new_command(state, actor_id, command) do
     with {:ok, next_state, events} <- Engine.apply(state, actor_id, command),
-         {:ok, _changes} <-
+         {:ok, changes} <-
            Persistence.persist_command(state.game_id, actor_id, command, next_state, events) do
+      events = Persistence.attach_delivery_metadata(events, changes, next_state.version)
+
       reply = %{
         version: next_state.version,
         duplicate: false,
-        events: events
+        events: events,
+        state: next_state
       }
 
       {:reply, {:ok, reply}, next_state}
     else
       {:error, reason} -> {:reply, {:error, reason}, state}
+    end
+  end
+
+  defp session_call(game_id, message, timeout, attempts_left) do
+    with {:ok, pid} <- SessionSupervisor.ensure_session(game_id) do
+      try do
+        GenServer.call(pid, message, timeout)
+      catch
+        :exit, _reason when attempts_left > 0 ->
+          session_call(game_id, message, timeout, attempts_left - 1)
+
+        :exit, _reason ->
+          {:error, :session_unavailable}
+      end
     end
   end
 end

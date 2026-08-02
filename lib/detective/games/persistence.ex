@@ -20,6 +20,22 @@ defmodule Detective.Games.Persistence do
   alias Detective.Repo
   alias Ecto.Multi
 
+  @persisted_event_types %{
+    "detective_placed" => :detective_placed,
+    "player_moved" => :player_moved,
+    "evidence_analyzed" => :evidence_analyzed,
+    "kickback_collected" => :kickback_collected,
+    "interrogation_started" => :interrogation_started,
+    "response_published" => :response_published,
+    "response_accepted" => :response_accepted,
+    "challenge_succeeded" => :challenge_succeeded,
+    "challenge_failed" => :challenge_failed,
+    "turn_ended" => :turn_ended,
+    "turn_started" => :turn_started,
+    "day_advanced" => :day_advanced,
+    "accusation_opened" => :accusation_opened
+  }
+
   def load_state(game_id) do
     snapshot =
       GameSnapshot
@@ -41,6 +57,58 @@ defmodule Detective.Games.Persistence do
   def command_matches?(%CommandRecord{} = record, actor_id, %Command{} = command) do
     record.actor_id == actor_id and record.command_type == Atom.to_string(command.type) and
       record.payload_digest == payload_digest(command.payload)
+  end
+
+  def events_for_command(game_id, command_id, version) do
+    events =
+      GameEvent
+      |> where([event], event.game_id == ^game_id and event.command_id == ^command_id)
+      |> order_by([event], asc: event.sequence)
+      |> Repo.all()
+
+    event_ids = Enum.map(events, & &1.id)
+
+    private_payloads =
+      GamePrivateEvent
+      |> where([event], event.game_event_id in ^event_ids)
+      |> Repo.all()
+      |> Enum.group_by(& &1.game_event_id)
+
+    Enum.reduce_while(events, {:ok, []}, fn event, {:ok, acc} ->
+      case Map.fetch(@persisted_event_types, event.event_type) do
+        {:ok, type} ->
+          recipients =
+            private_payloads
+            |> Map.get(event.id, [])
+            |> Map.new(&{&1.recipient_user_id, &1.payload})
+
+          restored = %Event{
+            type: type,
+            public_payload: event.public_payload,
+            private_payloads: recipients,
+            delivery_id: event.id,
+            version: version
+          }
+
+          {:cont, {:ok, [restored | acc]}}
+
+        :error ->
+          {:halt, {:error, :unknown_persisted_event}}
+      end
+    end)
+    |> case do
+      {:ok, restored} -> {:ok, Enum.reverse(restored)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def attach_delivery_metadata(events, changes, version) do
+    events
+    |> Enum.with_index(1)
+    |> Enum.map(fn {%Event{} = event, index} ->
+      persisted_event = Map.fetch!(changes, {:event, index})
+      %{event | delivery_id: persisted_event.id, version: version}
+    end)
   end
 
   def persist_command(

@@ -19,6 +19,53 @@ alias Detective.Repo
 
 slug = "signal-at-midnight"
 
+add_case_codes = fn case_cards ->
+  case_cards
+  |> Enum.with_index()
+  |> Enum.map(fn {card, index} -> Map.put(card, "code", <<?A + index>>) end)
+end
+
+second_misdirections = %{
+  "iona-pike" => %{
+    "mara-venn" => "Mara was calm when I left; whatever happened came long after my shift ended.",
+    "copper-tuning-key" =>
+      "I reported the key missing before dusk, so its disappearance cannot implicate me.",
+    "signal-log" =>
+      "Mara asked me to replace the entry because the receiver had logged a harmless test pulse."
+  },
+  "tomas-vale" => %{
+    "mara-venn" =>
+      "Mara called only for a weather reading and never mentioned an unregistered ship.",
+    "copper-tuning-key" =>
+      "That grease is sold at every chandlery; it cannot tie the tool to the harbor relay.",
+    "signal-log" =>
+      "My channel was closed before 00:17, so the missing transmission could not concern my route."
+  },
+  "celeste-rook" => %{
+    "mara-venn" =>
+      "Mara and I had not spoken in months; the sealed envelope arrived from an anonymous courier.",
+    "copper-tuning-key" =>
+      "The object missing from my photograph might be any instrument stored on the lower shelf.",
+    "signal-log" =>
+      "My copy is too blurred to distinguish a relay code from an ordinary maintenance notation."
+  }
+}
+
+author_response_decks = fn matrix ->
+  Map.new(matrix, fn {suspect_id, suspect_matrix} ->
+    normalized_topics =
+      Map.new(suspect_matrix, fn {topic_id, entry} ->
+        [first_misdirection | _rest] = entry["misdirections"]
+        second_misdirection = get_in(second_misdirections, [suspect_id, topic_id])
+        misdirections = [first_misdirection, second_misdirection]
+
+        {topic_id, Map.put(entry, "misdirections", misdirections)}
+      end)
+
+    {suspect_id, normalized_topics}
+  end)
+end
+
 map_locations = [
   %{
     "id" => "central-precinct",
@@ -234,6 +281,11 @@ map_locations = [
             "Mara traced the midnight broadcast to a smuggling route enabled by Iona's stolen relay code. When Mara prepared to expose the scheme, Iona struck her with the tuning key and rewrote the signal log. The preserved recording and Celeste's photograph reveal the cover-up."
         }
 
+        content =
+          content
+          |> Map.update!("case_cards", add_case_codes)
+          |> Map.update!("response_matrix", author_response_decks)
+
         {:ok, version} =
           Cases.create_version(case_file, %{
             version: 1,
@@ -244,18 +296,23 @@ map_locations = [
         version
 
       case_file ->
-        case Repo.get_by(CaseVersion, case_id: case_file.id, version: 2) do
+        case Repo.get_by(CaseVersion, case_id: case_file.id, version: 4) do
           nil ->
-            legacy_version = Repo.get_by!(CaseVersion, case_id: case_file.id, version: 1)
+            legacy_version =
+              Repo.get_by(CaseVersion, case_id: case_file.id, version: 3) ||
+                Repo.get_by(CaseVersion, case_id: case_file.id, version: 2) ||
+                Repo.get_by!(CaseVersion, case_id: case_file.id, version: 1)
 
             upgraded_content =
               legacy_version.content
               |> Map.put("max_days", 6)
               |> Map.put("locations", map_locations)
+              |> Map.update!("case_cards", add_case_codes)
+              |> Map.update!("response_matrix", author_response_decks)
 
             {:ok, version} =
               Cases.create_version(case_file, %{
-                version: 2,
+                version: 4,
                 content: upgraded_content,
                 published_at: DateTime.utc_now() |> DateTime.truncate(:second)
               })

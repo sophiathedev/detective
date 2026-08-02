@@ -9,13 +9,15 @@ defmodule Detective.Games.RuntimeTest do
   alias Detective.Games.{
     Command,
     CommandRecord,
+    Event,
     Game,
     GameEvent,
     GamePrivateEvent,
     GameSnapshot,
     Persistence,
     Session,
-    SessionSupervisor
+    SessionSupervisor,
+    State
   }
 
   alias Detective.{Games, Invitations}
@@ -93,14 +95,25 @@ defmodule Detective.Games.RuntimeTest do
       payload: %{"location_id" => "central-precinct"}
     }
 
-    assert {:ok, %{version: placed_version, duplicate: false}} =
+    assert {:ok,
+            %{
+              version: placed_version,
+              duplicate: false,
+              events: [%Event{delivery_id: delivery_id, version: placed_version}]
+            }} =
              Session.execute(game.id, detective.id, place)
 
     assert placed_version == lobby.current_version + 1
+    assert is_binary(delivery_id)
     assert Repo.aggregate(GameSnapshot, :count) == 2
     assert Repo.aggregate(GameEvent, :count) == 2
 
-    assert {:ok, %{version: ^placed_version, duplicate: true}} =
+    assert {:ok,
+            %{
+              version: ^placed_version,
+              duplicate: true,
+              events: [%Event{delivery_id: ^delivery_id, version: ^placed_version}]
+            }} =
              Session.execute(game.id, detective.id, place)
 
     assert Repo.aggregate(GameSnapshot, :count) == 2
@@ -160,6 +173,74 @@ defmodule Detective.Games.RuntimeTest do
     refute Map.has_key?(analyzed_event.public_payload, "scratch")
   end
 
+  test "pending interrogation restores across Chisel and Detective decisions" do
+    %{host: host, detective: detective, game: game, version: version} = ready_game()
+
+    {:ok, %{lobby: lobby}} =
+      Games.start_game(
+        Scope.for_user(host),
+        game.id,
+        Ecto.UUID.generate(),
+        version
+      )
+
+    {:ok, %{version: placed_version}} =
+      Session.execute(game.id, detective.id, %Command{
+        command_id: Ecto.UUID.generate(),
+        type: :place,
+        expected_version: lobby.current_version,
+        payload: %{"location_id" => "central-precinct"}
+      })
+
+    {:ok, %{version: interrogation_version}} =
+      Session.execute(game.id, detective.id, %Command{
+        command_id: Ecto.UUID.generate(),
+        type: :interrogate,
+        expected_version: placed_version,
+        payload: %{
+          "suspect_id" => "night-clerk",
+          "topic_id" => "victim-file",
+          "spend_leverage" => false
+        }
+      })
+
+    assert Repo.aggregate(GamePrivateEvent, :count) == 1
+    restart_session(game.id)
+
+    assert {:ok, restored_question} = Session.get_state(game.id)
+    assert restored_question.phase == :waiting_for_chisel
+    assert restored_question.pending_action["suspect_id"] == "night-clerk"
+
+    {:ok, %{version: decision_version}} =
+      Session.execute(game.id, host.id, %Command{
+        command_id: Ecto.UUID.generate(),
+        type: :select_response,
+        expected_version: interrogation_version,
+        payload: %{"response_id" => "clerk-a-misdirection-2"}
+      })
+
+    restart_session(game.id)
+
+    assert {:ok, restored_decision} = Session.get_state(game.id)
+    assert restored_decision.phase == :waiting_for_detective_decision
+    assert restored_decision.pending_action["selected_response_type"] == "misdirection"
+
+    assert {:ok, %{version: resolved_version}} =
+             Session.execute(game.id, detective.id, %Command{
+               command_id: Ecto.UUID.generate(),
+               type: :challenge_response,
+               expected_version: decision_version,
+               payload: %{}
+             })
+
+    assert resolved_version == decision_version + 1
+    assert {:ok, resolved} = Session.get_state(game.id)
+    player = State.player_by_user_id(resolved, detective.id)
+    assert resolved.phase == :detective_turn
+    assert resolved.pending_action == nil
+    assert hd(player.statements)["resolution"] == "challenge_succeeded"
+  end
+
   defp ready_game do
     host = user_fixture()
     detective = user_fixture()
@@ -177,5 +258,12 @@ defmodule Detective.Games.RuntimeTest do
     end)
 
     %{host: host, detective: detective, game: game, version: lobby.current_version}
+  end
+
+  defp restart_session(game_id) do
+    {:ok, pid} = SessionSupervisor.ensure_session(game_id)
+    monitor = Process.monitor(pid)
+    assert :ok = DynamicSupervisor.terminate_child(SessionSupervisor, pid)
+    assert_receive {:DOWN, ^monitor, :process, ^pid, :shutdown}
   end
 end

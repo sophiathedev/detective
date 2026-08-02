@@ -9,6 +9,10 @@ defmodule Detective.Games.CommandTest do
     assert {:ok, %Command{type: :move, command_id: ^command_id}} =
              Command.build(command_id, "move", 3, %{"location_id" => "archive"})
 
+    for type <- ~w(interrogate select_response accept_response challenge_response) do
+      assert {:ok, %Command{}} = Command.build(command_id, type, 3, %{})
+    end
+
     assert {:error, :invalid_command} =
              Command.build(command_id, "invent_atom", 3, %{})
 

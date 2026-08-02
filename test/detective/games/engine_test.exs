@@ -148,6 +148,127 @@ defmodule Detective.Games.EngineTest do
     assert "analyze" in actions
     assert "end_turn" in actions
     refute "kickback" in actions
+    assert "interrogate" in actions
+  end
+
+  test "interrogation is location-bound, costs one action, and exposes options only to Chisel" do
+    state = placed_state()
+
+    assert {:error, :invalid_suspect} =
+             apply_command(state, "detective-1", :interrogate, %{
+               "suspect_id" => "unknown",
+               "topic_id" => "victim-file"
+             })
+
+    assert {:error, :topic_not_known} =
+             apply_command(state, "detective-1", :interrogate, %{
+               "suspect_id" => "night-clerk",
+               "topic_id" => "sealed-ledger"
+             })
+
+    assert {:ok, awaiting_chisel, [event]} =
+             apply_command(state, "detective-1", :interrogate, %{
+               "suspect_id" => "night-clerk",
+               "topic_id" => "victim-file"
+             })
+
+    assert awaiting_chisel.phase == :waiting_for_chisel
+    assert awaiting_chisel.pending_action["type"] == "interrogation"
+    assert player(awaiting_chisel, "detective-1").actions_remaining == 3
+    assert event.type == :interrogation_started
+    refute Map.has_key?(event.public_payload, :response_options)
+
+    chisel_payload = event.private_payloads[user_id("chisel")]
+    assert chisel_payload.type == "chisel_response_options"
+
+    assert Enum.map(chisel_payload.response_options, & &1.type) == [
+             "most_useful",
+             "misdirection",
+             "misdirection"
+           ]
+
+    assert {:error, :wrong_phase} = apply_command(awaiting_chisel, "detective-1", :move)
+
+    assert {:error, :wrong_role} =
+             apply_command(awaiting_chisel, "detective-1", :select_response, %{
+               "response_id" => "response-1"
+             })
+  end
+
+  test "successful challenge is resolved by the server and returns the most useful statement" do
+    state = awaiting_chisel_state()
+
+    assert {:ok, awaiting_decision, [published]} =
+             apply_command(state, "chisel", :select_response, %{
+               "response_id" => "response-1"
+             })
+
+    assert awaiting_decision.phase == :waiting_for_detective_decision
+    assert published.type == :response_published
+    refute Map.has_key?(published.public_payload, :response_text)
+
+    assert published.private_payloads[user_id("detective-1")].response_text ==
+             "I never worked the midnight desk."
+
+    assert {:error, :not_interrogating_detective} =
+             apply_command(awaiting_decision, "detective-2", :challenge_response)
+
+    assert {:ok, resolved, [event]} =
+             apply_command(awaiting_decision, "detective-1", :challenge_response)
+
+    detective = player(resolved, "detective-1")
+    chisel = player(resolved, "chisel")
+
+    assert resolved.phase == :detective_turn
+    assert resolved.pending_action == nil
+    assert event.type == :challenge_succeeded
+    assert event.public_payload.succeeded
+    assert detective.leverage_supply == 6
+    assert detective.leverage_on_suspects["night-clerk"] == 1
+    assert chisel.leverage_by_detective[detective.id] == 1
+
+    assert hd(detective.statements)["response_text"] ==
+             "The victim signed the register shortly before midnight."
+
+    assert hd(detective.statements)["resolution"] == "challenge_succeeded"
+  end
+
+  test "failed challenge transfers the staked marker to the Chisel" do
+    state = awaiting_chisel_state()
+
+    assert {:ok, awaiting_decision, _events} =
+             apply_command(state, "chisel", :select_response, %{
+               "response_id" => "response-0"
+             })
+
+    assert {:ok, resolved, [event]} =
+             apply_command(awaiting_decision, "detective-1", :challenge_response)
+
+    detective = player(resolved, "detective-1")
+    chisel = player(resolved, "chisel")
+    assert event.type == :challenge_failed
+    refute event.public_payload.succeeded
+    assert detective.leverage_supply == 6
+    assert chisel.leverage_by_detective[detective.id] == 2
+    assert detective.leverage_on_suspects == %{}
+  end
+
+  test "accepting a response resumes the turn without spending leverage" do
+    state = awaiting_chisel_state()
+
+    assert {:ok, awaiting_decision, _events} =
+             apply_command(state, "chisel", :select_response, %{
+               "response_id" => "response-2"
+             })
+
+    assert {:ok, resolved, [event]} =
+             apply_command(awaiting_decision, "detective-1", :accept_response)
+
+    detective = player(resolved, "detective-1")
+    assert event.type == :response_accepted
+    assert detective.leverage_supply == 7
+    assert hd(detective.statements)["resolution"] == "accepted"
+    assert hd(detective.statements)["response_text"] == "The desk sergeant forged the register."
   end
 
   test "rejects a case definition without a valid Police Station" do
@@ -174,6 +295,18 @@ defmodule Detective.Games.EngineTest do
              })
 
     placed
+  end
+
+  defp awaiting_chisel_state do
+    state = placed_state()
+
+    assert {:ok, awaiting_chisel, _events} =
+             apply_command(state, "detective-1", :interrogate, %{
+               "suspect_id" => "night-clerk",
+               "topic_id" => "victim-file"
+             })
+
+    awaiting_chisel
   end
 
   defp apply_command(state, actor, type, payload \\ %{}) do
@@ -226,6 +359,22 @@ defmodule Detective.Games.EngineTest do
   defp case_definition do
     %{
       "max_days" => 2,
+      "case_cards" => [
+        %{
+          "id" => "victim-file",
+          "code" => "A",
+          "title" => "Victim File",
+          "type" => "victim",
+          "initially_known" => true
+        },
+        %{
+          "id" => "sealed-ledger",
+          "code" => "B",
+          "title" => "Sealed Ledger",
+          "type" => "evidence",
+          "initially_known" => false
+        }
+      ],
       "locations" => [
         location(
           "central-precinct",
@@ -240,7 +389,25 @@ defmodule Detective.Games.EngineTest do
         location("harbor-precinct", "Harbor Precinct", "police_station", ["harbor"], 0.78, 0.65),
         location("pier-club", "Pier Club", "mob_joint", ["harbor"], 0.86, 0.73)
       ],
-      "suspects" => []
+      "suspects" => [
+        %{
+          "id" => "night-clerk",
+          "name" => "Night Clerk",
+          "occupation" => "records clerk",
+          "location_id" => "central-precinct"
+        }
+      ],
+      "response_matrix" => %{
+        "night-clerk" => %{
+          "victim-file" => %{
+            "most_useful" => "The victim signed the register shortly before midnight.",
+            "misdirections" => [
+              "I never worked the midnight desk.",
+              "The desk sergeant forged the register."
+            ]
+          }
+        }
+      }
     }
   end
 
