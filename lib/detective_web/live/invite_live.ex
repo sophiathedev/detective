@@ -1,6 +1,8 @@
 defmodule DetectiveWeb.InviteLive do
   use DetectiveWeb, :live_view
 
+  alias Detective.Games
+  alias Detective.Games.LobbyBroadcaster
   alias Detective.Invitations
 
   @impl true
@@ -30,6 +32,9 @@ defmodule DetectiveWeb.InviteLive do
   def handle_event("accept_invite", _params, socket) do
     case Invitations.accept(socket.assigns.current_scope, socket.assigns.invite_token) do
       {:ok, %{game: game}} ->
+        {:ok, lobby} = Games.get_lobby(socket.assigns.current_scope, game.id)
+        :ok = LobbyBroadcaster.broadcast_lobby(lobby)
+
         {:noreply, push_navigate(socket, to: ~p"/games/#{game.id}/lobby")}
 
       {:error, :already_a_member} when not is_nil(socket.assigns.invite) ->

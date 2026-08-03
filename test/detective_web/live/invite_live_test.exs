@@ -18,7 +18,7 @@ defmodule DetectiveWeb.InviteLiveTest do
 
   test "shows an allow-listed preview and accepts membership", %{conn: conn} do
     host = user_fixture(display_name: "Host Name")
-    detective = user_fixture()
+    detective = user_fixture(display_name: "Detective Name")
     %{game: game, invite_token: token} = game_fixture(host)
 
     {:ok, view, _html} =
@@ -33,8 +33,17 @@ defmodule DetectiveWeb.InviteLiveTest do
     refute Map.has_key?(invite, "token_hash")
     refute Map.has_key?(invite, "content")
 
+    DetectiveWeb.Endpoint.subscribe("lobby:#{game.id}")
+
     assert {:error, {:live_redirect, %{to: path}}} = render_click(view, "accept_invite")
     assert path == ~p"/games/#{game.id}/lobby"
+
+    assert_receive %Phoenix.Socket.Broadcast{
+      event: "lobby_state",
+      payload: %{lobby: lobby, version: 0}
+    }
+
+    assert Enum.any?(lobby.players, &(&1.display_name == "Detective Name"))
   end
 
   test "does not reveal details for an invalid token", %{conn: conn} do
