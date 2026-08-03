@@ -364,6 +364,35 @@ defmodule Detective.Games.ConnectionMonitorTest do
     assert {:error, :players_offline} = Session.execute(game.id, host.id, offline_resume)
   end
 
+  test "Resume validates status and role before the Presence gate" do
+    %{game: game, host: host, detective: detective, player_ids: player_ids} = active_game()
+    assert {:ok, active} = Session.get_state(game.id)
+
+    active_resume = %Command{
+      command_id: Ecto.UUID.generate(),
+      type: :resume_game,
+      expected_version: active.version,
+      payload: %{}
+    }
+
+    assert {:error, :game_not_paused} = Session.execute(game.id, host.id, active_resume)
+
+    assert {:ok, %{state: paused}} = Session.pause_for_disconnect(game.id, player_ids)
+
+    detective_resume = %Command{
+      command_id: Ecto.UUID.generate(),
+      type: :resume_game,
+      expected_version: paused.version,
+      payload: %{}
+    }
+
+    assert {:error, :wrong_role} =
+             Session.execute(game.id, detective.id, detective_resume)
+
+    host_resume = %{detective_resume | command_id: Ecto.UUID.generate()}
+    assert {:error, :players_offline} = Session.execute(game.id, host.id, host_resume)
+  end
+
   defp active_game do
     host = user_fixture()
     detective = user_fixture()

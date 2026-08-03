@@ -109,8 +109,8 @@ defmodule Detective.Games.Session do
   end
 
   defp execute_new_command(state, actor_id, command) do
-    with :ok <- validate_connection_gate(state, command),
-         {:ok, next_state, events} <- Engine.apply(state, actor_id, command),
+    with {:ok, next_state, events} <- Engine.apply(state, actor_id, command),
+         :ok <- validate_connection_gate(state, command),
          {:ok, changes} <-
            Persistence.persist_command(state.game_id, actor_id, command, next_state, events) do
       events = Persistence.attach_delivery_metadata(events, changes, next_state.version)
