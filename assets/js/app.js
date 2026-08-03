@@ -24,7 +24,7 @@ import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/detective"
 import topbar from "topbar"
-import {getHooks} from "live_svelte"
+import {getHooks} from "./live_svelte_client"
 import Components from "virtual:live-svelte-components"
 import {connectGameSocket} from "./game_socket"
 
