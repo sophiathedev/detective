@@ -567,7 +567,6 @@
       .join()
       .receive("ok", ({ state }) => {
         applyPublic(state)
-        connectionState = "online"
       })
       .receive("error", () => (connectionState = "unauthorized"))
       .receive("timeout", () => (connectionState = "offline"))
