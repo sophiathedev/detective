@@ -138,6 +138,16 @@
   text-transform: uppercase;
 }
 
+.game-pause-command-error {
+  margin-top: 1.25rem;
+  border-left: 3px solid #8f372f;
+  background: rgb(143 55 47 / 0.1);
+  padding: 0.85rem 1rem;
+  color: #542720;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
 .game-pause-document button {
   position: relative;
   margin-top: 1.25rem;

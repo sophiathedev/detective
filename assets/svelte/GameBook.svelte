@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from "svelte"
+  import { onDestroy, onMount } from "svelte"
 
   let { game_id, user_id, initial_public, initial_private } = $props()
 
@@ -29,6 +29,9 @@
   let allPlayersOnline = $state(false)
   let connectionSnapshotReceived = $state(false)
   let connectionClock = $state(Date.now())
+  let pauseDocument = $state(null)
+  let previouslyFocusedElement = null
+  let pauseActive = false
   let gameChannel = null
   let userChannel = null
   const seenPublicEventIds = new Set()
@@ -295,6 +298,45 @@
     return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
   }
 
+  function restorePreviousFocus() {
+    const focusTarget = previouslyFocusedElement
+    previouslyFocusedElement = null
+
+    window.requestAnimationFrame(() => {
+      if (
+        focusTarget?.isConnected &&
+        !focusTarget.closest("[inert]") &&
+        typeof focusTarget.focus === "function"
+      ) {
+        focusTarget.focus({ preventScroll: true })
+      }
+    })
+  }
+
+  $effect(() => {
+    const paused = publicState.status === "paused"
+
+    if (paused === pauseActive) return
+
+    pauseActive = paused
+
+    if (paused) {
+      previouslyFocusedElement = document.activeElement
+
+      window.requestAnimationFrame(() => {
+        if (publicState.status === "paused" && pauseDocument?.isConnected) {
+          pauseDocument.focus({ preventScroll: true })
+        }
+      })
+    } else {
+      restorePreviousFocus()
+    }
+  })
+
+  onDestroy(() => {
+    if (typeof window !== "undefined" && pauseActive) restorePreviousFocus()
+  })
+
   function selectSuspect(suspectId) {
     if (
       (!interrogatableSuspectIds.has(suspectId) && !searchableSuspectIds.has(suspectId)) ||
@@ -551,6 +593,11 @@
       id="open-casebook"
       class="relative grid min-h-0 flex-1 overflow-hidden border border-[#6f5b45] bg-[#d8c9aa] shadow-[0_24px_70px_rgba(0,0,0,0.55)] lg:grid-cols-2"
     >
+      <div
+        id="game-casebook-workspace"
+        class="contents"
+        inert={publicState.status === "paused"}
+      >
       <div class="pointer-events-none absolute inset-y-0 left-1/2 z-30 hidden w-9 -translate-x-1/2 bg-[#5a4430] opacity-35 lg:block" aria-hidden="true"></div>
       <div class="pointer-events-none absolute inset-y-0 left-1/2 z-30 hidden w-px bg-[#2f2118]/70 lg:block" aria-hidden="true"></div>
 
@@ -1377,7 +1424,7 @@
               <p class="mt-2 text-sm leading-5 text-[#4f3e30]">{lastEvent}</p>
             </div>
 
-            {#if commandError}
+            {#if commandError && publicState.status !== "paused"}
               <div id="game-command-error" class="mt-4 border-l-2 border-[#a54235] bg-[#e1cfad] p-3 text-xs leading-5" role="alert">
                 <p>{commandError}</p>
                 {#if retryCommand}
@@ -1388,6 +1435,7 @@
           </aside>
         </div>
       </section>
+      </div>
 
       {#if publicState.status === "paused"}
         <section
@@ -1397,7 +1445,13 @@
           aria-labelledby="game-pause-heading"
           aria-describedby="game-pause-description"
         >
-          <div class="game-pause-document">
+          <div
+            id="game-pause-document"
+            class="game-pause-document"
+            role="document"
+            tabindex="-1"
+            bind:this={pauseDocument}
+          >
             <p class="game-pause-kicker">Case sealed</p>
             <h2 id="game-pause-heading" class="mt-2 font-serif text-3xl font-semibold tracking-[-0.025em] sm:text-4xl">
               Investigation paused
@@ -1421,6 +1475,19 @@
               Seal record · {publicState.pause?.player_ids?.length ?? 0} disconnected · held from
               {publicState.pause?.previous_phase?.replaceAll("_", " ") ?? "active investigation"}
             </p>
+
+            {#if commandError}
+              <div id="game-pause-command-error" class="game-pause-command-error" role="alert">
+                <p>{commandError}</p>
+                {#if retryCommand?.type === "resume_game"}
+                  <button
+                    id="action-retry-resume-game"
+                    type="button"
+                    onclick={retryLastCommand}
+                  >Retry resume</button>
+                {/if}
+              </div>
+            {/if}
 
             {#if privateState.role === "chisel"}
               <button
