@@ -43,7 +43,7 @@ defmodule Detective.Games.Game do
     ])
     |> validate_length(:title, min: 3, max: 80)
     |> validate_format(:room_code, ~r/^[A-Z2-9]{6}$/)
-    |> validate_inclusion(:status, ~w(waiting active finished cancelled))
+    |> validate_inclusion(:status, ~w(waiting active paused finished cancelled))
     |> validate_inclusion(:phase, ~w(lobby))
     |> validate_number(:max_detectives, greater_than_or_equal_to: 1, less_than_or_equal_to: 4)
     |> validate_number(:current_version, greater_than_or_equal_to: 0)
@@ -55,7 +55,7 @@ defmodule Detective.Games.Game do
   def transition_changeset(game, attrs) do
     game
     |> change(attrs)
-    |> validate_inclusion(:status, ~w(waiting active finished cancelled))
+    |> validate_inclusion(:status, ~w(waiting active paused finished cancelled))
     |> validate_inclusion(
       :phase,
       ~w(lobby briefing detective_turn waiting_for_chisel waiting_for_snitches waiting_for_detective_decision resolving_challenge accusation paused finished)

@@ -122,6 +122,45 @@ defmodule Detective.Games.SnapshotCodecTest do
     assert restored.pending_action == state.pending_action
   end
 
+  test "paused snapshots preserve prior phase and pending action" do
+    state = %State{
+      game_id: Ecto.UUID.generate(),
+      case_version_id: Ecto.UUID.generate(),
+      players: %{},
+      locations: %{},
+      suspects: %{}
+    }
+
+    paused = %{
+      state
+      | status: :paused,
+        phase: :paused,
+        paused_from_phase: :waiting_for_chisel,
+        pause_reason: :player_disconnected,
+        paused_player_ids: ["detective-player"],
+        pending_action: %{"type" => "interrogation", "id" => "question-1"}
+    }
+
+    assert {:ok, restored} = paused |> SnapshotCodec.dump() |> SnapshotCodec.load()
+    assert restored.paused_from_phase == :waiting_for_chisel
+    assert restored.pause_reason == :player_disconnected
+    assert restored.paused_player_ids == ["detective-player"]
+    assert restored.pending_action == paused.pending_action
+  end
+
+  test "schema two snapshots load with empty pause metadata" do
+    legacy =
+      %State{players: %{}, locations: %{}, suspects: %{}}
+      |> SnapshotCodec.dump()
+      |> Map.put("schema_version", 2)
+      |> Map.drop(["paused_from_phase", "pause_reason", "paused_player_ids"])
+
+    assert {:ok, restored} = SnapshotCodec.load(legacy)
+    assert restored.paused_from_phase == nil
+    assert restored.pause_reason == nil
+    assert restored.paused_player_ids == []
+  end
+
   test "rejects an unsupported snapshot schema" do
     assert {:error, :unsupported_snapshot} =
              SnapshotCodec.load(%{"schema_version" => State.schema_version() + 1})

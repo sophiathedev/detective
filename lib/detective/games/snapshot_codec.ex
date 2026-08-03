@@ -12,9 +12,11 @@ defmodule Detective.Games.SnapshotCodec do
   end
 
   def load(%{"schema_version" => schema_version} = data)
-      when schema_version in [1, @schema_version] do
+      when schema_version in [1, 2, @schema_version] do
     with {:ok, status} <- status(data["status"]),
          {:ok, phase} <- phase(data["phase"]),
+         {:ok, paused_from_phase} <- optional_phase(data["paused_from_phase"]),
+         {:ok, pause_reason} <- optional_reason(data["pause_reason"]),
          {:ok, players} <- load_players(data["players"]),
          {:ok, locations} <- load_locations(data["locations"]),
          {:ok, suspects} <- load_suspects(data["suspects"]) do
@@ -25,6 +27,9 @@ defmodule Detective.Games.SnapshotCodec do
          case_version_id: data["case_version_id"],
          status: status,
          phase: phase,
+         paused_from_phase: paused_from_phase,
+         pause_reason: pause_reason,
+         paused_player_ids: data["paused_player_ids"] || [],
          version: data["version"],
          day: data["day"],
          days_remaining: data["days_remaining"],
@@ -162,4 +167,11 @@ defmodule Detective.Games.SnapshotCodec do
   defp phase("paused"), do: {:ok, :paused}
   defp phase("finished"), do: {:ok, :finished}
   defp phase(_phase), do: {:error, :invalid_snapshot_phase}
+
+  defp optional_phase(nil), do: {:ok, nil}
+  defp optional_phase(value), do: phase(value)
+
+  defp optional_reason(nil), do: {:ok, nil}
+  defp optional_reason("player_disconnected"), do: {:ok, :player_disconnected}
+  defp optional_reason(_value), do: {:error, :invalid_snapshot_pause_reason}
 end

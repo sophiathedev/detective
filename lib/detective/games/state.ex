@@ -6,13 +6,16 @@ defmodule Detective.Games.State do
   server-only and must only leave this struct through projection modules.
   """
 
-  @schema_version 2
+  @schema_version 3
 
   defstruct schema_version: @schema_version,
             game_id: nil,
             case_version_id: nil,
             status: :active,
             phase: :detective_turn,
+            paused_from_phase: nil,
+            pause_reason: nil,
+            paused_player_ids: [],
             version: 0,
             day: 1,
             days_remaining: 0,
