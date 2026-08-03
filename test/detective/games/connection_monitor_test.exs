@@ -17,6 +17,17 @@ defmodule Detective.Games.ConnectionMonitorTest do
   alias Detective.{Games, Invitations}
   alias DetectiveWeb.{Endpoint, Presence}
 
+  setup do
+    previous_grace_ms = Application.fetch_env!(:detective, :disconnect_grace_ms)
+    Application.put_env(:detective, :disconnect_grace_ms, 60_000)
+
+    on_exit(fn ->
+      Application.put_env(:detective, :disconnect_grace_ms, previous_grace_ms)
+    end)
+
+    :ok
+  end
+
   test "keeps a player online until their final Presence meta leaves" do
     game_id = Ecto.UUID.generate()
     [player_id, other_player_id] = player_ids()
@@ -179,6 +190,53 @@ defmodule Detective.Games.ConnectionMonitorTest do
     game_id = Ecto.UUID.generate()
 
     assert {:error, :game_finished} = start_monitor(game_id, player_ids(), :finished)
+  end
+
+  test "ensure_monitor applies paused status to an existing active monitor" do
+    game_id = Ecto.UUID.generate()
+    player_ids = player_ids()
+    {:ok, monitor_pid} = start_monitor(game_id, player_ids, :active)
+
+    assert map_size(:sys.get_state(monitor_pid).timers) == length(player_ids)
+
+    assert {:ok, ^monitor_pid} = ConnectionMonitor.ensure_monitor(game_id, player_ids, :paused)
+
+    state = :sys.get_state(monitor_pid)
+    assert state.game_status == :paused
+    assert state.timers == %{}
+  end
+
+  test "ensure_monitor stops an existing monitor for a finished game" do
+    game_id = Ecto.UUID.generate()
+    player_ids = player_ids()
+    {:ok, monitor_pid} = start_monitor(game_id, player_ids, :active)
+    monitor = Process.monitor(monitor_pid)
+
+    assert {:error, :game_finished} =
+             ConnectionMonitor.ensure_monitor(game_id, player_ids, :finished)
+
+    assert_receive {:DOWN, ^monitor, :process, ^monitor_pid, :normal}
+  end
+
+  test "Session startup errors keep the monitor alive with a fresh retry timer" do
+    host = user_fixture()
+    %{game: game} = game_fixture(host)
+    [player_id | _rest] = player_ids()
+    {:ok, monitor_pid} = start_monitor(game.id, [player_id], :active)
+    first_timer = :sys.get_state(monitor_pid).timers[player_id]
+    monitor = Process.monitor(monitor_pid)
+
+    send(monitor_pid, {:disconnect_timeout, player_id, first_timer.token})
+    second_timer = :sys.get_state(monitor_pid).timers[player_id]
+
+    refute_receive {:DOWN, ^monitor, :process, ^monitor_pid, _reason}, 0
+    assert second_timer.token != first_timer.token
+
+    send(monitor_pid, {:disconnect_timeout, player_id, second_timer.token})
+    third_timer = :sys.get_state(monitor_pid).timers[player_id]
+
+    refute_receive {:DOWN, ^monitor, :process, ^monitor_pid, _reason}, 0
+    assert third_timer.token != second_timer.token
   end
 
   test "resume requires fresh Presence but duplicate replay bypasses the online gate" do

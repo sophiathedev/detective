@@ -10,19 +10,62 @@ defmodule Detective.Games.ConnectionMonitorSupervisor do
   @impl true
   def init(_init_arg), do: DynamicSupervisor.init(strategy: :one_for_one)
 
-  def ensure_monitor(_game_id, _player_ids, :finished), do: {:error, :game_finished}
+  def ensure_monitor(game_id, player_ids, :finished) do
+    case Registry.lookup(Detective.GameRegistry, {:connection_monitor, game_id}) do
+      [{pid, _value}] -> ensure_finished(pid, player_ids)
+      [] -> :ok
+    end
+
+    {:error, :game_finished}
+  end
 
   def ensure_monitor(game_id, player_ids, game_status) do
     case Registry.lookup(Detective.GameRegistry, {:connection_monitor, game_id}) do
       [{pid, _value}] ->
-        if Process.alive?(pid) do
-          {:ok, pid}
-        else
-          start_monitor(game_id, player_ids, game_status, 2)
-        end
+        ensure_existing_or_start(pid, game_id, player_ids, game_status, 2)
 
       [] ->
         start_monitor(game_id, player_ids, game_status, 2)
+    end
+  end
+
+  defp ensure_existing_or_start(pid, game_id, player_ids, game_status, attempts_left) do
+    cond do
+      Process.alive?(pid) ->
+        try do
+          :ok = ConnectionMonitor.ensure_state(pid, player_ids, game_status)
+          {:ok, pid}
+        catch
+          :exit, _reason ->
+            if attempts_left > 0 do
+              retry_start(game_id, player_ids, game_status, attempts_left)
+            else
+              {:error, :connection_monitor_unavailable}
+            end
+        end
+
+      attempts_left > 0 ->
+        retry_start(game_id, player_ids, game_status, attempts_left)
+
+      true ->
+        {:error, :connection_monitor_unavailable}
+    end
+  end
+
+  defp retry_start(game_id, player_ids, game_status, attempts_left) do
+    _ = :sys.get_state(__MODULE__)
+    start_monitor(game_id, player_ids, game_status, attempts_left - 1)
+  end
+
+  defp ensure_finished(pid, player_ids) do
+    if Process.alive?(pid) do
+      try do
+        ConnectionMonitor.ensure_state(pid, player_ids, :finished)
+      catch
+        :exit, _reason -> :ok
+      end
+    else
+      :ok
     end
   end
 
@@ -35,17 +78,7 @@ defmodule Detective.Games.ConnectionMonitorSupervisor do
         {:ok, pid}
 
       {:error, {:already_started, pid}} ->
-        cond do
-          Process.alive?(pid) ->
-            {:ok, pid}
-
-          attempts_left > 0 ->
-            _ = :sys.get_state(__MODULE__)
-            start_monitor(game_id, player_ids, game_status, attempts_left - 1)
-
-          true ->
-            {:error, :connection_monitor_unavailable}
-        end
+        ensure_existing_or_start(pid, game_id, player_ids, game_status, attempts_left)
 
       {:error, reason} ->
         {:error, reason}

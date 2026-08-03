@@ -40,6 +40,10 @@ defmodule Detective.Games.ConnectionMonitor do
     end
   end
 
+  def ensure_state(pid, player_ids, status) when status in [:active, :paused, :finished] do
+    GenServer.call(pid, {:ensure_state, player_ids, status})
+  end
+
   @impl true
   def init({game_id, player_ids, game_status}) do
     :ok = Endpoint.subscribe(presence_topic(game_id))
@@ -68,6 +72,16 @@ defmodule Detective.Games.ConnectionMonitor do
   def handle_call(:all_players_online, _from, state) do
     state = reconcile(state)
     {:reply, MapSet.equal?(state.online_player_ids, state.player_ids), state}
+  end
+
+  def handle_call({:ensure_state, _player_ids, :finished}, _from, state) do
+    {:stop, :normal, :ok, cancel_all_timers(%{state | game_status: :finished})}
+  end
+
+  def handle_call({:ensure_state, player_ids, status}, _from, state)
+      when status in [:active, :paused] do
+    state = reconcile(%{state | player_ids: MapSet.new(player_ids), game_status: status})
+    {:reply, :ok, state}
   end
 
   @impl true
@@ -107,7 +121,7 @@ defmodule Detective.Games.ConnectionMonitor do
         |> MapSet.difference(state.online_player_ids)
         |> Enum.sort()
 
-      :ok = Session.request_pause_for_disconnect(state.game_id, offline_player_ids)
+      _result = Session.request_pause_for_disconnect(state.game_id, offline_player_ids)
     end
 
     {:noreply, state}
