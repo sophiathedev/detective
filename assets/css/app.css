@@ -179,6 +179,12 @@
   opacity: 0.45;
 }
 
+@media (max-width: 63.999rem) {
+  .game-pause-seal {
+    place-items: start center;
+  }
+}
+
 .game-map-board {
   isolation: isolate;
 }
