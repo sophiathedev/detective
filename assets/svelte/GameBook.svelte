@@ -394,6 +394,14 @@
     })
   }
 
+  function invalidateConnectionSnapshot() {
+    connectionState = "offline"
+    connectionSnapshotReceived = false
+    onlinePlayerIds = []
+    offlineDeadlines = {}
+    allPlayersOnline = false
+  }
+
   onMount(() => {
     const connectionClockInterval = window.setInterval(() => {
       connectionClock = Date.now()
@@ -407,12 +415,16 @@
     gameChannel = socket.channel(`game:${game_id}`, {})
     userChannel = socket.channel(`user:${user_id}`, { game_id })
 
+    gameChannel.onError(invalidateConnectionSnapshot)
+    gameChannel.onClose(invalidateConnectionSnapshot)
+
     gameChannel.on("game_state", ({ state }) => applyPublic(state))
     gameChannel.on("connection_state", (state) => {
       onlinePlayerIds = state.online_player_ids
       offlineDeadlines = state.offline_deadlines
       allPlayersOnline = state.all_players_online
       connectionSnapshotReceived = true
+      connectionState = "online"
     })
     gameChannel.on("game_paused", (message) =>
       recordPublicEvent(message, "A missing investigator sealed the case."),
