@@ -12,6 +12,15 @@ defmodule Detective.Games.Projections.Public do
       version: state.version,
       day: state.day,
       days_remaining: state.days_remaining,
+      pause:
+        if(state.status == :paused,
+          do: %{
+            reason: Atom.to_string(state.pause_reason),
+            player_ids: state.paused_player_ids,
+            previous_phase: Atom.to_string(state.paused_from_phase)
+          },
+          else: nil
+        ),
       current_detective_id: state.current_detective_id,
       players: public_players(state),
       locations: public_locations(state),

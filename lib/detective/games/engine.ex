@@ -95,6 +95,45 @@ defmodule Detective.Games.Engine do
     end
   end
 
+  def apply_system(%State{status: :active} = state, {:pause_for_disconnect, ids})
+      when is_list(ids) and ids != [] do
+    next_state =
+      %{
+        state
+        | status: :paused,
+          phase: :paused,
+          paused_from_phase: state.phase,
+          pause_reason: :player_disconnected,
+          paused_player_ids: Enum.uniq(ids)
+      }
+      |> advance_version()
+
+    event = %Event{
+      type: :game_paused,
+      public_payload: %{
+        reason: "player_disconnected",
+        disconnected_player_ids: next_state.paused_player_ids
+      }
+    }
+
+    {:ok, next_state, [event]}
+  end
+
+  def apply_system(%State{status: status} = state, {:pause_for_disconnect, _ids})
+      when status in [:paused, :finished],
+      do: {:ok, state, []}
+
+  defp dispatch(%State{status: :active}, _actor, %Command{type: :resume_game}),
+    do: {:error, :game_not_paused}
+
+  defp dispatch(%State{status: :paused} = state, actor, %Command{type: :resume_game} = command) do
+    with :ok <- validate_resume_actor(actor) do
+      execute(state, actor, command)
+    end
+  end
+
+  defp dispatch(%State{status: :paused}, _actor, %Command{}), do: {:error, :game_paused}
+
   defp dispatch(state, actor, %Command{type: type} = command)
        when type in [:allow_question, :block_question, :resolve_snitches, :select_response] do
     with :ok <- validate_chisel_interrogation_turn(state, actor) do
@@ -853,6 +892,33 @@ defmodule Detective.Games.Engine do
     end
   end
 
+  defp execute(
+         %State{paused_from_phase: restored_phase} = state,
+         actor,
+         %Command{type: :resume_game}
+       ) do
+    next_state =
+      %{
+        state
+        | status: :active,
+          phase: restored_phase,
+          paused_from_phase: nil,
+          pause_reason: nil,
+          paused_player_ids: []
+      }
+      |> advance_version()
+
+    event = %Event{
+      type: :game_resumed,
+      public_payload: %{
+        chisel_player_id: actor.id,
+        restored_phase: Atom.to_string(restored_phase)
+      }
+    }
+
+    {:ok, next_state, [event]}
+  end
+
   defp execute(state, actor, %Command{type: :accuse, payload: payload}) do
     with :ok <- validate_accusation_start(state, actor),
          {:ok, guess} <- AccusationSheet.build_guess(state.case_definition, payload),
@@ -1280,6 +1346,9 @@ defmodule Detective.Games.Engine do
 
   defp validate_version(%State{version: version}, version), do: :ok
   defp validate_version(%State{}, _expected_version), do: {:error, :stale_version}
+
+  defp validate_resume_actor(%{role: "chisel"}), do: :ok
+  defp validate_resume_actor(_actor), do: {:error, :wrong_role}
 
   defp validate_detective_turn(%State{phase: :detective_turn} = state, %{
          id: player_id,

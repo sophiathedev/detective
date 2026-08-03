@@ -27,6 +27,7 @@ defmodule Detective.Games.Command do
           | :challenge_response
           | :accuse
           | :submit_final_guess
+          | :resume_game
           | :end_turn
 
   @type t :: %__MODULE__{

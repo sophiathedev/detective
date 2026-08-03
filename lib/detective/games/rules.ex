@@ -8,6 +8,12 @@ defmodule Detective.Games.Rules do
 
   def available_actions(%State{} = state, actor_user_id) do
     case State.player_by_user_id(state, actor_user_id) do
+      %{role: "detective"} when state.status == :paused ->
+        []
+
+      %{role: "chisel"} when state.status == :paused ->
+        ["resume_game"]
+
       %{id: player_id, role: "detective"} = player
       when player_id == state.current_detective_id and state.phase == :detective_turn ->
         detective_actions(state, player)

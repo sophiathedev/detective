@@ -148,6 +148,42 @@ defmodule Detective.Games.ProjectionsTest do
     assert Enum.map(chisel.private.casebook.case_cards, & &1["id"]) == ["hidden-card", "topic"]
   end
 
+  test "paused public projection allow-lists pause metadata without private interrogation data" do
+    detective_id = "10000000-0000-0000-0000-000000000001"
+
+    paused = %{
+      state_fixture()
+      | status: :paused,
+        phase: :paused,
+        paused_from_phase: :waiting_for_chisel,
+        pause_reason: :player_disconnected,
+        paused_player_ids: [detective_id],
+        pending_action:
+          pending_interrogation()
+          |> Map.put("selected_response_text", "secret answer")
+          |> Map.put("response_matrix", %{"private" => true})
+    }
+
+    public = Public.render(paused)
+    public_json = Jason.encode!(public)
+
+    assert public.pause == %{
+             reason: "player_disconnected",
+             player_ids: [detective_id],
+             previous_phase: "waiting_for_chisel"
+           }
+
+    for forbidden <- [
+          "solution",
+          "response_matrix",
+          "pending_action",
+          "selected_response_text",
+          "secret answer"
+        ] do
+      refute public_json =~ forbidden
+    end
+  end
+
   defp state_fixture do
     detective_id = "10000000-0000-0000-0000-000000000001"
     chisel_id = "10000000-0000-0000-0000-000000000002"

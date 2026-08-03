@@ -831,6 +831,60 @@ defmodule Detective.Games.EngineTest do
     |> put_known_weapon("detective-1")
   end
 
+  test "disconnect pause preserves and restores the exact phase" do
+    state = awaiting_chisel_state()
+    detective_id = player(state, "detective-1").id
+    pending = state.pending_action
+
+    assert {:error, :game_not_paused} = apply_command(state, "chisel", :resume_game)
+
+    assert {:ok, paused, [pause_event]} =
+             Engine.apply_system(state, {:pause_for_disconnect, [detective_id]})
+
+    assert paused.status == :paused
+    assert paused.phase == :paused
+    assert paused.paused_from_phase == :waiting_for_chisel
+    assert paused.pending_action == pending
+    assert pause_event.type == :game_paused
+    assert Rules.available_actions(paused, user_id("detective-1")) == []
+    assert Rules.available_actions(paused, user_id("chisel")) == ["resume_game"]
+
+    assert {:error, :game_paused} = apply_command(paused, "detective-1", :end_turn)
+    assert {:error, :wrong_role} = apply_command(paused, "detective-1", :resume_game)
+
+    assert {:ok, resumed, [resume_event]} = apply_command(paused, "chisel", :resume_game)
+
+    assert resumed.status == :active
+    assert resumed.phase == :waiting_for_chisel
+    assert resumed.pending_action == pending
+    assert resume_event.type == :game_resumed
+  end
+
+  test "resume restores every pausable gameplay phase" do
+    phases = [
+      :detective_turn,
+      :waiting_for_chisel,
+      :waiting_for_snitches,
+      :waiting_for_detective_decision,
+      :accusation
+    ]
+
+    Enum.each(phases, fn phase ->
+      state = %{new_state() | phase: phase, pending_action: %{"saved_phase" => phase}}
+
+      assert {:ok, paused, [_event]} =
+               Engine.apply_system(
+                 state,
+                 {:pause_for_disconnect, [player(state, "detective-1").id]}
+               )
+
+      assert {:ok, resumed, [_event]} = apply_command(paused, "chisel", :resume_game)
+
+      assert resumed.phase == phase
+      assert resumed.pending_action == state.pending_action
+    end)
+  end
+
   defp put_known_weapon(state, detective_key) do
     detective_id = player_id(detective_key)
 
