@@ -2,17 +2,53 @@ defmodule DetectiveWeb.GameChannel do
   use DetectiveWeb, :channel
 
   alias Detective.Games
-  alias Detective.Games.{Command, GameBroadcaster, Session}
+  alias Detective.Games.{Command, ConnectionMonitor, GameBroadcaster, Session}
+  alias DetectiveWeb.Presence
 
   @impl true
   def join("game:" <> game_id, _payload, socket) do
     case Games.game_projection(socket.assigns.current_scope, game_id) do
       {:ok, projection} ->
-        {:ok, %{state: projection.public}, assign(socket, :game_id, projection.public.game_id)}
+        game_status =
+          case projection.public.status do
+            "active" -> :active
+            "paused" -> :paused
+          end
+
+        socket =
+          socket
+          |> assign(:game_id, projection.public.game_id)
+          |> assign(:player_id, projection.private.player_id)
+          |> assign(:game_player_ids, Enum.map(projection.public.players, & &1.id))
+          |> assign(:game_status, game_status)
+
+        send(self(), :after_join)
+        {:ok, %{state: projection.public}, socket}
 
       {:error, reason} ->
         {:error, %{code: error_code(reason)}}
     end
+  end
+
+  @impl true
+  def handle_info(:after_join, socket) do
+    {:ok, _pid} =
+      ConnectionMonitor.ensure_monitor(
+        socket.assigns.game_id,
+        socket.assigns.game_player_ids,
+        socket.assigns.game_status
+      )
+
+    {:ok, _ref} =
+      Presence.track(
+        self(),
+        ConnectionMonitor.presence_topic(socket.assigns.game_id),
+        socket.assigns.player_id,
+        %{online_at: System.system_time(:second)}
+      )
+
+    _state = ConnectionMonitor.sync(socket.assigns.game_id)
+    {:noreply, socket}
   end
 
   @impl true
@@ -52,6 +88,9 @@ defmodule DetectiveWeb.GameChannel do
               :invalid_game_id,
               :not_a_member,
               :game_not_active,
+              :game_not_paused,
+              :game_paused,
+              :players_offline,
               :snapshot_not_found,
               :stale_version,
               :wrong_phase,

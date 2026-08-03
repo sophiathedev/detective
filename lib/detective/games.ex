@@ -227,7 +227,7 @@ defmodule Detective.Games do
 
   def game_projection(%Scope{user: user} = scope, game_id) do
     with {:ok, lobby} <- get_lobby(scope, game_id),
-         :ok <- validate_active_game(lobby),
+         :ok <- validate_playable_game(lobby),
          {:ok, state} <- Session.get_state(lobby.id),
          {:ok, projection} <- Projections.for_user(state, user.id) do
       {:ok, projection}
@@ -348,8 +348,8 @@ defmodule Detective.Games do
   defp validate_version(%Game{current_version: version}, version), do: :ok
   defp validate_version(%Game{}, _expected_version), do: {:error, :stale_version}
 
-  defp validate_active_game(%{status: "active"}), do: :ok
-  defp validate_active_game(_lobby), do: {:error, :game_not_active}
+  defp validate_playable_game(%{status: status}) when status in ["active", "paused"], do: :ok
+  defp validate_playable_game(_lobby), do: {:error, :game_not_active}
 
   defp cast_game_id(game_id) do
     case Ecto.UUID.cast(game_id) do

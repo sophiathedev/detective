@@ -6,7 +6,7 @@ defmodule DetectiveWeb.GameLiveTest do
   import Phoenix.LiveViewTest
 
   alias Detective.Accounts.Scope
-  alias Detective.Games.SessionSupervisor
+  alias Detective.Games.{Session, SessionSupervisor, State}
   alias Detective.{Games, Invitations}
 
   test "active member opens the graphical casebook", %{conn: conn} do
@@ -14,6 +14,22 @@ defmodule DetectiveWeb.GameLiveTest do
     conn = log_in_user(conn, host)
 
     assert {:ok, view, _html} = live(conn, ~p"/games/#{game.id}")
+    assert has_element?(view, "#game-book-frontend")
+  end
+
+  test "paused member opens the graphical casebook", %{conn: conn} do
+    %{detective: detective, game: game} = active_game()
+    {:ok, state} = Session.get_state(game.id)
+    detective_player = State.player_by_user_id(state, detective.id)
+
+    assert {:ok, _reply} =
+             Session.pause_for_disconnect(game.id, [detective_player.id])
+
+    assert {:ok, view, _html} =
+             conn
+             |> log_in_user(detective)
+             |> live(~p"/games/#{game.id}")
+
     assert has_element?(view, "#game-book-frontend")
   end
 

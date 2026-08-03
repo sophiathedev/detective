@@ -9,9 +9,16 @@ defmodule DetectiveWeb.GameChannelTest do
 
   alias Detective.Accounts
   alias Detective.Accounts.Scope
-  alias Detective.Games.SessionSupervisor
+
+  alias Detective.Games.{
+    ConnectionMonitor,
+    ConnectionMonitorSupervisor,
+    Session,
+    SessionSupervisor
+  }
+
   alias Detective.{Games, Invitations}
-  alias DetectiveWeb.UserSocket
+  alias DetectiveWeb.{Endpoint, Presence, UserSocket}
 
   setup do
     host = user_fixture()
@@ -34,6 +41,11 @@ defmodule DetectiveWeb.GameChannelTest do
     on_exit(fn ->
       case Registry.lookup(Detective.GameRegistry, game.id) do
         [{pid, _value}] -> DynamicSupervisor.terminate_child(SessionSupervisor, pid)
+        [] -> :ok
+      end
+
+      case Registry.lookup(Detective.GameRegistry, {:connection_monitor, game.id}) do
+        [{pid, _value}] -> DynamicSupervisor.terminate_child(ConnectionMonitorSupervisor, pid)
         [] -> :ok
       end
     end)
@@ -77,6 +89,124 @@ defmodule DetectiveWeb.GameChannelTest do
              subscribe_and_join(socket, "user:#{context.outsider.id}", %{
                "game_id" => context.game.id
              })
+  end
+
+  test "a player stays online until their final game channel leaves", context do
+    detective_id = player_id_for_role(context.lobby.players, "detective")
+    host_id = player_id_for_role(context.lobby.players, "chisel")
+
+    assert {:ok, _reply, first_tab} =
+             subscribe_and_join(
+               authenticated_socket(context.detective),
+               "game:#{context.game.id}",
+               %{}
+             )
+
+    assert {:ok, _reply, second_tab} =
+             subscribe_and_join(
+               authenticated_socket(context.detective),
+               "game:#{context.game.id}",
+               %{}
+             )
+
+    await_presence_count(context.game.id, detective_id, &(&1 == 2))
+    flush_connection_states()
+
+    Process.unlink(first_tab.channel_pid)
+    leave_ref = leave(first_tab)
+    assert_reply leave_ref, :ok
+    await_presence_count(context.game.id, detective_id, &(&1 == 1))
+    flush_connection_states()
+    payload = ConnectionMonitor.sync(context.game.id)
+
+    assert_broadcast "connection_state", broadcast_payload
+    assert broadcast_payload == payload
+
+    assert Enum.sort(Map.keys(payload)) ==
+             [:all_players_online, :offline_deadlines, :online_player_ids]
+
+    assert payload.online_player_ids == [detective_id]
+    assert is_integer(payload.offline_deadlines[host_id])
+    refute Map.has_key?(payload.offline_deadlines, detective_id)
+    refute Jason.encode!(payload) =~ "solution"
+    refute Jason.encode!(payload) =~ "response_matrix"
+
+    flush_connection_states()
+    Process.unlink(second_tab.channel_pid)
+    leave_ref = leave(second_tab)
+    assert_reply leave_ref, :ok
+    await_presence_count(context.game.id, detective_id, &(&1 == 0))
+    flush_connection_states()
+    payload = ConnectionMonitor.sync(context.game.id)
+
+    assert_broadcast "connection_state", broadcast_payload
+    assert broadcast_payload == payload
+    assert payload.online_player_ids == []
+    assert is_integer(payload.offline_deadlines[detective_id])
+    assert is_integer(payload.offline_deadlines[host_id])
+  end
+
+  test "paused members rejoin and only the online Chisel can resume", context do
+    detective_id = player_id_for_role(context.lobby.players, "detective")
+    host_id = player_id_for_role(context.lobby.players, "chisel")
+
+    assert {:ok, _reply, detective_game_socket} =
+             subscribe_and_join(
+               authenticated_socket(context.detective),
+               "game:#{context.game.id}",
+               %{}
+             )
+
+    assert {:ok, _reply, host_game_socket} =
+             subscribe_and_join(
+               authenticated_socket(context.host),
+               "game:#{context.game.id}",
+               %{}
+             )
+
+    await_presence_count(context.game.id, detective_id, &(&1 == 1))
+    await_presence_count(context.game.id, host_id, &(&1 == 1))
+
+    assert {:ok, %{state: paused}} =
+             Session.pause_for_disconnect(context.game.id, [detective_id])
+
+    paused_version = paused.version
+
+    detective_resume =
+      push(detective_game_socket, "command", resume_payload(paused_version))
+
+    assert_reply detective_resume, :error, %{code: "wrong_role"}
+
+    paused_action =
+      push(detective_game_socket, "command", %{
+        "command_id" => Ecto.UUID.generate(),
+        "type" => "end_turn",
+        "expected_version" => paused_version,
+        "payload" => %{}
+      })
+
+    assert_reply paused_action, :error, %{code: "game_paused"}
+
+    Process.unlink(detective_game_socket.channel_pid)
+    leave_ref = leave(detective_game_socket)
+    assert_reply leave_ref, :ok
+    await_presence_count(context.game.id, detective_id, &(&1 == 0))
+
+    host_resume = push(host_game_socket, "command", resume_payload(paused_version))
+    assert_reply host_resume, :error, %{code: "players_offline"}
+
+    assert {:ok, _reply, _rejoined_detective} =
+             subscribe_and_join(
+               authenticated_socket(context.detective),
+               "game:#{context.game.id}",
+               %{}
+             )
+
+    await_presence_count(context.game.id, detective_id, &(&1 == 1))
+
+    host_resume = push(host_game_socket, "command", resume_payload(paused_version))
+    assert_reply host_resume, :ok, %{version: resumed_version}
+    assert_broadcast "game_resumed", %{version: ^resumed_version}
   end
 
   test "click-style placement command persists and broadcasts canonical projections", context do
@@ -370,5 +500,49 @@ defmodule DetectiveWeb.GameChannelTest do
     players
     |> Enum.find(&(&1.role == "detective"))
     |> Map.fetch!(:id)
+  end
+
+  defp player_id_for_role(players, role) do
+    players
+    |> Enum.find(&(&1.role == role))
+    |> Map.fetch!(:id)
+  end
+
+  defp resume_payload(version) do
+    %{
+      "command_id" => Ecto.UUID.generate(),
+      "type" => "resume_game",
+      "expected_version" => version,
+      "payload" => %{}
+    }
+  end
+
+  defp await_presence_count(game_id, player_id, predicate) do
+    topic = ConnectionMonitor.presence_topic(game_id)
+    :ok = Endpoint.subscribe(topic)
+
+    if predicate.(presence_count(game_id, player_id)) do
+      :ok
+    else
+      assert_receive %Phoenix.Socket.Broadcast{topic: ^topic, event: "presence_diff"}
+      await_presence_count(game_id, player_id, predicate)
+    end
+  end
+
+  defp presence_count(game_id, player_id) do
+    game_id
+    |> ConnectionMonitor.presence_topic()
+    |> Presence.list()
+    |> get_in([player_id, :metas])
+    |> List.wrap()
+    |> length()
+  end
+
+  defp flush_connection_states do
+    receive do
+      %Phoenix.Socket.Broadcast{event: "connection_state"} -> flush_connection_states()
+    after
+      0 -> :ok
+    end
   end
 end
