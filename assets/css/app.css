@@ -29,3 +29,18 @@
 @custom-variant phx-change-loading (.phx-change-loading&, .phx-change-loading &);
 
 [data-phx-session], [data-phx-teleported-src] { display: contents }
+
+@media (prefers-reduced-motion: reduce) {
+  #game-book-shell *,
+  #game-book-shell *::before,
+  #game-book-shell *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  #game-map animate {
+    display: none;
+  }
+}

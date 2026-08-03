@@ -13,6 +13,10 @@
   let selectedSuspectId = $state(null)
   let selectedTopicId = $state(null)
   let selectedResponseId = $state(null)
+  let blockedSnitchPlayerIds = $state([])
+  let accusationSuspectId = $state(null)
+  let accusationWeaponId = $state(null)
+  let accusationMotiveId = $state(null)
   let spendLeverage = $state(false)
   let commandPending = $state(false)
   let retryCommand = $state(null)
@@ -36,6 +40,7 @@
   let placementLocationIds = $derived(new Set(privateState.placement_location_ids ?? []))
   let availableActions = $derived(new Set(privateState.available_actions ?? []))
   let interrogationOptions = $derived(privateState.interrogation_options ?? [])
+  let searchableSuspectIds = $derived(new Set(privateState.searchable_suspect_ids ?? []))
   let interrogatableSuspectIds = $derived(
     new Set(interrogationOptions.map((option) => option.suspect_id)),
   )
@@ -48,6 +53,12 @@
   let pendingPublic = $derived(publicState.pending_interrogation)
   let pendingPrivate = $derived(privateState.pending_interrogation)
   let latestStatement = $derived(privateState.statements?.[0])
+  let latestSearch = $derived(privateState.search_notes?.[0])
+  let heldEvidence = $derived(privateState.evidence ?? [])
+  let knownCaseCards = $derived(privateState.known_case_cards ?? [])
+  let accusationOptions = $derived(
+    privateState.accusation_options ?? { suspects: [], weapons: [], motives: [] },
+  )
   let selectedSuspectLeverage = $derived(
     privateState.leverage_on_suspects?.[selectedSuspectId] ?? 0,
   )
@@ -166,6 +177,26 @@
       suspect_leverage_required: "No leverage is available over that suspect.",
       no_leverage_remaining: "No leverage marker remains to stake on a challenge.",
       not_interrogating_detective: "Only the Detective who asked may decide.",
+      search_not_available: "This case has no Search card for that target.",
+      search_archived: "That Search card was archived and cannot be used again.",
+      evidence_not_takeable: "That Case card cannot be taken as evidence.",
+      evidence_unavailable: "That evidence is already held or faceup.",
+      free_question_pending: "Ask the newly discovered suspect now, or decline the free question.",
+      free_question_not_available: "No immediate free question is waiting.",
+      question_block_unavailable: "No matching Chisel leverage remains to block this question.",
+      question_not_blocked: "This question is not waiting on a goon decision.",
+      insufficient_scratch: "You do not have enough Scratch for that bribe.",
+      not_snitch_eligible: "You are not eligible to Snitch on this question.",
+      snitch_choice_recorded: "Your facedown Snitch choice is already locked.",
+      invalid_snitch_resolution: "The selected Snitch blocks are not legal.",
+      insufficient_chisel_leverage: "The Chisel lacks matching leverage for one of those blocks.",
+      accusation_not_available: "This case has no validated accusation sheet.",
+      invalid_accusation: "Choose one valid suspect, weapon, and motive.",
+      accusation_must_start_turn: "The Solve token may be used only before spending an action.",
+      solve_token_spent: "Your one Solve token has already been spent.",
+      accusation_suspect_unknown: "That suspect has not been revealed.",
+      accusation_weapon_unknown: "That possible weapon has not been discovered.",
+      final_guess_already_submitted: "Your final guess is already sealed.",
     }
 
     return messages[code] ?? "The server rejected this action."
@@ -192,7 +223,11 @@
   }
 
   function selectSuspect(suspectId) {
-    if (!interrogatableSuspectIds.has(suspectId) || commandPending) return
+    if (
+      (!interrogatableSuspectIds.has(suspectId) && !searchableSuspectIds.has(suspectId)) ||
+      commandPending
+    )
+      return
 
     selectedSuspectId = suspectId
     selectedTopicId =
@@ -210,9 +245,38 @@
     })
   }
 
+  function submitSuspectSearch() {
+    if (!selectedSuspectId || !searchableSuspectIds.has(selectedSuspectId)) return
+    sendCommand("search_suspect", { suspect_id: selectedSuspectId })
+  }
+
   function submitResponse() {
     if (!selectedResponseId || !pendingPrivate?.id) return
     sendCommand("select_response", { response_id: selectedResponseId })
+  }
+
+  function submitSnitchResolution() {
+    const requestIds = new Set(pendingPrivate?.snitch_requests?.map((request) => request.player_id) ?? [])
+    const blockedPlayerIds = blockedSnitchPlayerIds.filter((playerId) => requestIds.has(playerId))
+    sendCommand("resolve_snitches", { blocked_player_ids: blockedPlayerIds })
+  }
+
+  function submitAccusation() {
+    if (!accusationSuspectId || !accusationWeaponId || !accusationMotiveId) return
+
+    const commandType = availableActions.has("accuse")
+      ? "accuse"
+      : availableActions.has("submit_final_guess")
+        ? "submit_final_guess"
+        : null
+
+    if (!commandType) return
+
+    sendCommand(commandType, {
+      suspect_id: accusationSuspectId,
+      weapon_id: accusationWeaponId,
+      motive_id: accusationMotiveId,
+    })
   }
 
   onMount(() => {
@@ -237,6 +301,39 @@
     )
     gameChannel.on("kickback_collected", (message) =>
       recordPublicEvent(message, "A contact paid out a kickback."),
+    )
+    gameChannel.on("location_searched", (message) =>
+      recordPublicEvent(message, "A Detective searched the current location."),
+    )
+    gameChannel.on("suspect_searched", (message) =>
+      recordPublicEvent(message, "A Detective searched a suspect."),
+    )
+    gameChannel.on("evidence_submitted", (message) =>
+      recordPublicEvent(message, "Held evidence returned to the public casefile."),
+    )
+    gameChannel.on("free_question_declined", (message) =>
+      recordPublicEvent(message, "The immediate question was declined."),
+    )
+    gameChannel.on("question_allowed", (message) =>
+      recordPublicEvent(message, "The Chisel allowed the question to proceed."),
+    )
+    gameChannel.on("question_blocked", (message) =>
+      recordPublicEvent(message, "The Chisel sent a goon to block the question."),
+    )
+    gameChannel.on("question_abandoned", (message) =>
+      recordPublicEvent(message, "The blocked question was abandoned."),
+    )
+    gameChannel.on("goon_bribed", (message) =>
+      recordPublicEvent(message, "The Detective paid the goon and restored the question."),
+    )
+    gameChannel.on("snitch_decision_recorded", (message) =>
+      recordPublicEvent(message, "A facedown Snitch decision was filed."),
+    )
+    gameChannel.on("snitch_window_closed", (message) =>
+      recordPublicEvent(message, "All Snitch decisions were revealed."),
+    )
+    gameChannel.on("snitches_resolved", (message) =>
+      recordPublicEvent(message, "The Chisel resolved the revealed Snitch requests."),
     )
     gameChannel.on(
       "interrogation_started",
@@ -270,6 +367,18 @@
     gameChannel.on("accusation_opened", (message) =>
       recordPublicEvent(message, "Time expired. The accusation phase is open."),
     )
+    gameChannel.on("accusation_submitted", (message) =>
+      recordPublicEvent(message, "A Detective submitted a Solve accusation."),
+    )
+    gameChannel.on("accusation_rejected", (message) =>
+      recordPublicEvent(message, "A Solve accusation was incorrect."),
+    )
+    gameChannel.on("final_guess_submitted", (message) =>
+      recordPublicEvent(message, "A sealed final guess entered the casefile."),
+    )
+    gameChannel.on("game_finished", (message) =>
+      recordPublicEvent(message, "The case is closed and the solution is public."),
+    )
 
     userChannel.on("private_state", ({ game_id: eventGameId, state, version }) => {
       if (eventGameId === game_id) applyPrivate(state, version)
@@ -284,6 +393,26 @@
         lastEvent = payload.succeeded
           ? "Challenge sustained. The corrected statement is now in your notes."
           : "Challenge failed. The original statement was truthful."
+      } else if (payload.type === "search_result") {
+        lastEvent = payload.free_question_suspect_id
+          ? "Search complete. A newly discovered suspect may be questioned for free."
+          : "Search complete. The private result is filed in your notebook."
+      } else if (payload.type === "snitch_choice_recorded") {
+        lastEvent = payload.snitch
+          ? "Your Snitch marker is facedown. Other players cannot see the choice yet."
+          : "You passed on this Snitch opportunity."
+      } else if (payload.type === "snitch_resolved") {
+        lastEvent = payload.blocked
+          ? "The Chisel spent leverage to block your Snitch. No Scratch was charged."
+          : "Your Snitch succeeded. The final response will arrive after the decision."
+      } else if (payload.type === "snitch_result") {
+        lastEvent = "The final response reached your private notebook for $3 Scratch."
+      } else if (payload.type === "accusation_result") {
+        lastEvent = payload.solved
+          ? "Your accusation solved all three parts of the case."
+          : `${payload.correct_count} of 3 accusation elements were correct.`
+      } else if (payload.type === "final_guess_recorded") {
+        lastEvent = "Your final guess is sealed until every Detective submits."
       }
     })
 
@@ -346,7 +475,7 @@
           </div>
           <div class="text-right font-mono text-[10px] uppercase tracking-[0.12em] text-[#6f5d49]">
             <p>{publicState.phase.replaceAll("_", " ")}</p>
-            <p class="mt-1">Active: {activeDetective?.display_name ?? "—"}</p>
+            <p class="mt-1">Active: {activeDetective?.display_name ?? "-"}</p>
           </div>
         </div>
 
@@ -482,10 +611,10 @@
                 <button
                   id={`interrogate-suspect-${suspect.id}`}
                   type="button"
-                  disabled={!interrogatableSuspectIds.has(suspect.id) || commandPending}
+                  disabled={(!interrogatableSuspectIds.has(suspect.id) && !searchableSuspectIds.has(suspect.id)) || commandPending}
                   aria-pressed={selectedSuspectId === suspect.id}
                   onclick={() => selectSuspect(suspect.id)}
-                  class={`flex min-h-14 items-center gap-2 border p-2 text-left transition ${selectedSuspectId === suspect.id ? "border-[#8f342d] bg-[#f0dfbd] ring-2 ring-[#a54235]" : "border-[#a18a6d] bg-[#e6d9bd]"} ${interrogatableSuspectIds.has(suspect.id) ? "cursor-pointer hover:bg-[#f2e4c8]" : "cursor-default"}`}
+                  class={`flex min-h-14 items-center gap-2 border p-2 text-left transition ${selectedSuspectId === suspect.id ? "border-[#8f342d] bg-[#f0dfbd] ring-2 ring-[#a54235]" : "border-[#a18a6d] bg-[#e6d9bd]"} ${interrogatableSuspectIds.has(suspect.id) || searchableSuspectIds.has(suspect.id) ? "cursor-pointer hover:bg-[#f2e4c8]" : "cursor-default"}`}
                 >
                   <svg class="size-10 shrink-0 bg-[#30261f]" viewBox="0 0 48 48" role="img" aria-label={`Original portrait sketch for ${suspect.name}`}>
                     <rect width="48" height="48" fill={["#3d5360", "#6a4337", "#4b5d44"][index % 3]} />
@@ -561,7 +690,7 @@
                 </p>
               </div>
               {#if privateState.role === "detective"}
-                <dl class="grid grid-cols-3 gap-4 text-right">
+                <dl class="grid grid-cols-2 gap-4 text-right sm:grid-cols-4">
                   <div>
                     <dt class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#80694f]">Actions</dt>
                     <dd class="mt-1 font-mono text-lg font-semibold">{ownPlayer?.actions_remaining ?? 0}</dd>
@@ -573,6 +702,10 @@
                   <div>
                     <dt class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#80694f]">Leverage</dt>
                     <dd class="mt-1 font-mono text-lg font-semibold">{privateState.leverage_supply}</dd>
+                  </div>
+                  <div>
+                    <dt class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#80694f]">Solve</dt>
+                    <dd class="mt-1 font-mono text-sm font-semibold">{privateState.solve_token_available ? "READY" : "SPENT"}</dd>
                   </div>
                 </dl>
               {/if}
@@ -603,6 +736,20 @@
                 <h3 id="game-actions-heading" class="font-mono text-[10px] uppercase tracking-[0.14em] text-[#80694f]">Available actions</h3>
                 <div class="mt-2 grid gap-2">
                   <button
+                    id="action-search-location"
+                    type="button"
+                    disabled={!availableActions.has("search_location") || commandPending}
+                    onclick={() => sendCommand("search_location", {})}
+                    class="flex min-h-10 cursor-pointer items-center justify-between gap-2 border border-[#796349] bg-[#efe2c5] px-3 text-left text-sm font-semibold transition hover:bg-[#f8ecd2] disabled:cursor-not-allowed disabled:opacity-35"
+                  >Search location <span class="shrink-0 font-mono text-[9px]">1 AP</span></button>
+                  <button
+                    id="action-search-suspect"
+                    type="button"
+                    disabled={!selectedSuspectId || !searchableSuspectIds.has(selectedSuspectId) || commandPending}
+                    onclick={submitSuspectSearch}
+                    class="flex min-h-10 cursor-pointer items-center justify-between gap-2 border border-[#796349] bg-[#efe2c5] px-3 text-left text-sm font-semibold transition hover:bg-[#f8ecd2] disabled:cursor-not-allowed disabled:opacity-35"
+                  >Search suspect <span class="shrink-0 font-mono text-[9px]">1 AP</span></button>
+                  <button
                     id="action-analyze"
                     type="button"
                     disabled={!availableActions.has("analyze") || commandPending}
@@ -616,6 +763,13 @@
                     onclick={() => sendCommand("kickback", {})}
                     class="flex min-h-10 cursor-pointer items-center justify-between gap-2 border border-[#796349] bg-[#efe2c5] px-3 text-left text-sm font-semibold transition hover:bg-[#f8ecd2] disabled:cursor-not-allowed disabled:opacity-35"
                   >Kickback <span class="shrink-0 font-mono text-[9px]">1 AP</span></button>
+                  <button
+                    id="action-skip-free-question"
+                    type="button"
+                    disabled={!availableActions.has("skip_free_question") || commandPending}
+                    onclick={() => sendCommand("skip_free_question", {})}
+                    class="flex min-h-10 cursor-pointer items-center justify-between gap-2 border border-[#796349] bg-[#d7c7aa] px-3 text-left text-sm font-semibold transition hover:bg-[#e7d8bb] disabled:hidden"
+                  >Decline free question <span class="shrink-0 font-mono text-[9px]">0 AP</span></button>
                   <button
                     id="action-end-turn"
                     type="button"
@@ -689,11 +843,126 @@
                     disabled={!selectedTopic || commandPending}
                     onclick={submitInterrogation}
                     class="mt-4 min-h-11 w-full cursor-pointer bg-[#30261f] px-4 text-left text-sm font-semibold text-[#f5e7c9] transition hover:bg-[#49372a] disabled:cursor-not-allowed disabled:opacity-40"
-                  >Question suspect <span class="float-right font-mono text-[10px]">1 AP</span></button>
+                  >Question suspect <span class="float-right font-mono text-[10px]">{privateState.free_question_suspect_id ? "FREE" : "1 AP"}</span></button>
                 {:else}
                   <p class="mt-4 border-l-2 border-[#9e4035] pl-3 text-sm leading-6 text-[#65523f]">Select a highlighted suspect from the public file. You must share their location.</p>
                 {/if}
-              {:else if pendingPublic?.stage === "awaiting_chisel"}
+              {:else if pendingPublic?.stage === "awaiting_chisel_block"}
+                {#if privateState.role === "chisel" && pendingPrivate}
+                  <div id="chisel-block-decision" class="mt-4 border-l-4 border-[#71372f] bg-[#d3c19f] p-4">
+                    <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">Chisel leverage window</p>
+                    <p class="mt-2 text-sm leading-6 text-[#5f4b39]">
+                      {pendingPrivate.detective.display_name} asks {pendingPrivate.suspect.name} about case card {pendingPrivate.topic.code}.
+                    </p>
+                    <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                      <button
+                        id="action-allow-question"
+                        type="button"
+                        disabled={!availableActions.has("allow_question") || commandPending}
+                        onclick={() => sendCommand("allow_question", {})}
+                        class="min-h-11 cursor-pointer border-2 border-[#344a40] bg-[#d6d2b5] px-3 text-sm font-semibold text-[#263c34] transition hover:bg-[#e5dfc1] disabled:cursor-not-allowed disabled:opacity-40"
+                      >Allow question</button>
+                      <button
+                        id="action-block-question"
+                        type="button"
+                        disabled={!availableActions.has("block_question") || commandPending}
+                        onclick={() => sendCommand("block_question", {})}
+                        class="min-h-11 cursor-pointer border-2 border-[#9b3d34] bg-[#e1c5a9] px-3 text-sm font-semibold text-[#812f29] transition hover:bg-[#ecd2b5] disabled:cursor-not-allowed disabled:opacity-40"
+                      >Spend matching leverage to block</button>
+                    </div>
+                  </div>
+                {:else}
+                  <div class="mt-4 border border-dashed border-[#8e765b] bg-[#d3c19f] p-5 text-center">
+                    <p class="font-serif text-lg italic">Question under review</p>
+                    <p class="mt-2 font-mono text-[9px] uppercase tracking-[0.12em] text-[#745f48]">Waiting for the Chisel's leverage decision</p>
+                  </div>
+                {/if}
+              {:else if pendingPublic?.stage === "question_blocked"}
+                <div id="blocked-question-card" class="mt-4 border-l-4 border-[#9b3d34] bg-[#e1c5a9] p-4">
+                  <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#812f29]">Question blocked</p>
+                  <p class="mt-2 text-sm leading-6 text-[#5f4b39]">The action remains spent. The questioning Detective may abandon the question or pay $2 Scratch to bribe the goon.</p>
+                  {#if availableActions.has("accept_question_block") || availableActions.has("bribe_goon")}
+                    <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                      <button
+                        id="action-accept-question-block"
+                        type="button"
+                        disabled={!availableActions.has("accept_question_block") || commandPending}
+                        onclick={() => sendCommand("accept_question_block", {})}
+                        class="min-h-11 cursor-pointer border border-[#796349] bg-[#d7c7aa] px-3 text-sm font-semibold transition hover:bg-[#e7d8bb] disabled:cursor-not-allowed disabled:opacity-40"
+                      >Abandon question</button>
+                      <button
+                        id="action-bribe-goon"
+                        type="button"
+                        disabled={!availableActions.has("bribe_goon") || commandPending}
+                        onclick={() => sendCommand("bribe_goon", {})}
+                        class="min-h-11 cursor-pointer bg-[#8f372f] px-3 text-sm font-semibold text-[#fff0d6] transition hover:bg-[#a84338] disabled:cursor-not-allowed disabled:opacity-40"
+                      >Pay $2 and proceed</button>
+                    </div>
+                  {/if}
+                </div>
+              {:else if pendingPublic?.stage === "awaiting_snitches"}
+                <div id="snitch-window" class="mt-4 border-y border-[#8e765b] bg-[#d3c19f] p-4">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#812f29]">Facedown informants</p>
+                      <p class="mt-1 font-serif text-lg font-semibold">Snitch window</p>
+                    </div>
+                    <p class="font-mono text-[9px] uppercase tracking-[0.1em] text-[#725e48]">{pendingPublic.snitch_decisions_recorded}/{pendingPublic.snitch_decisions_required} filed</p>
+                  </div>
+                  {#if availableActions.has("choose_snitch") || availableActions.has("decline_snitch")}
+                    <p class="mt-3 text-sm leading-6 text-[#5f4b39]">Your choice remains hidden until every eligible Detective files a marker. An allowed Snitch costs $3 only after the final response.</p>
+                    <div class="mt-3 grid grid-cols-2 gap-2">
+                      <button
+                        id="action-decline-snitch"
+                        type="button"
+                        disabled={!availableActions.has("decline_snitch") || commandPending}
+                        onclick={() => sendCommand("decline_snitch", {})}
+                        class="min-h-11 cursor-pointer border border-[#796349] bg-[#d7c7aa] px-3 text-sm font-semibold transition hover:bg-[#e7d8bb] disabled:cursor-not-allowed disabled:opacity-40"
+                      >Pass</button>
+                      <button
+                        id="action-choose-snitch"
+                        type="button"
+                        disabled={!availableActions.has("choose_snitch") || commandPending}
+                        onclick={() => sendCommand("choose_snitch", {})}
+                        class="min-h-11 cursor-pointer bg-[#30261f] px-3 text-sm font-semibold text-[#f5e7c9] transition hover:bg-[#49372a] disabled:cursor-not-allowed disabled:opacity-40"
+                      >Place Snitch facedown</button>
+                    </div>
+                  {:else}
+                    <p class="mt-3 text-sm leading-6 text-[#5f4b39]">Waiting for all eligible Detectives to lock their private choice.</p>
+                  {/if}
+                </div>
+              {:else if pendingPublic?.stage === "awaiting_chisel_snitch_block"}
+                {#if privateState.role === "chisel" && pendingPrivate}
+                  <div id="chisel-snitch-blocks" class="mt-4 border-l-4 border-[#71372f] bg-[#d3c19f] p-4">
+                    <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">Revealed Snitch markers</p>
+                    <p class="mt-2 text-sm leading-6 text-[#5f4b39]">Spend one matching leverage marker for each informant you want to block.</p>
+                    <fieldset class="mt-3 grid gap-2">
+                      <legend class="sr-only">Choose Snitches to block</legend>
+                      {#each pendingPrivate.snitch_requests as request}
+                        <label id={`snitch-block-${request.player_id}`} class="flex min-h-11 cursor-pointer items-center justify-between gap-3 border border-[#8e765b] bg-[#e5d6b8] px-3 py-2">
+                          <span class="text-sm font-semibold">{request.display_name}</span>
+                          <span class="flex items-center gap-2 font-mono text-[9px] uppercase text-[#725e48]">
+                            {request.can_block ? "block" : "no leverage"}
+                            <input type="checkbox" value={request.player_id} bind:group={blockedSnitchPlayerIds} disabled={!request.can_block} class="accent-[#963a31]" />
+                          </span>
+                        </label>
+                      {/each}
+                    </fieldset>
+                    <button
+                      id="action-resolve-snitches"
+                      type="button"
+                      disabled={!availableActions.has("resolve_snitches") || commandPending}
+                      onclick={submitSnitchResolution}
+                      class="mt-3 min-h-11 w-full cursor-pointer bg-[#8f372f] px-4 text-sm font-semibold text-[#fff0d6] transition hover:bg-[#a84338] disabled:cursor-not-allowed disabled:opacity-40"
+                    >Resolve Snitches and open response deck</button>
+                  </div>
+                {:else}
+                  <div class="mt-4 border border-dashed border-[#8e765b] bg-[#d3c19f] p-5 text-center">
+                    <p class="font-serif text-lg italic">Snitch markers revealed</p>
+                    <p class="mt-2 font-mono text-[9px] uppercase tracking-[0.12em] text-[#745f48]">Waiting for the Chisel to spend matching leverage</p>
+                  </div>
+                {/if}
+              {:else if pendingPublic?.stage === "awaiting_chisel_response"}
                 {#if privateState.role === "chisel" && pendingPrivate}
                   <div id="chisel-response-deck" class="mt-4">
                     <p class="text-sm leading-6 text-[#5f4b39]">
@@ -771,6 +1040,131 @@
               {/if}
             </section>
 
+            {#if publicState.result}
+              <section id="case-closed-result" class="mt-5 border-2 border-[#71372f] bg-[#eadbbc] p-4 sm:p-5" aria-labelledby="case-result-heading">
+                <div class="flex flex-wrap items-start justify-between gap-4 border-b border-[#9d8669] pb-4">
+                  <div>
+                    <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Case closed</p>
+                    <h3 id="case-result-heading" class="mt-1 font-serif text-2xl font-semibold">The sealed solution</h3>
+                  </div>
+                  <p class="font-mono text-[10px] uppercase tracking-[0.12em] text-[#71372f]">Winner: {publicState.result.winner.role}</p>
+                </div>
+                <dl class="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div class="border-l-2 border-[#71372f] pl-3"><dt class="font-mono text-[9px] uppercase text-[#725e48]">Suspect</dt><dd class="mt-1 font-serif text-base font-semibold">{publicState.result.solution.suspect_name}</dd></div>
+                  <div class="border-l-2 border-[#71372f] pl-3"><dt class="font-mono text-[9px] uppercase text-[#725e48]">Weapon</dt><dd class="mt-1 font-serif text-base font-semibold">{publicState.result.solution.weapon_label}</dd></div>
+                  <div class="border-l-2 border-[#71372f] pl-3"><dt class="font-mono text-[9px] uppercase text-[#725e48]">Motive</dt><dd class="mt-1 font-serif text-base font-semibold">{publicState.result.solution.motive_label}</dd></div>
+                </dl>
+                {#if publicState.result.epilogue}<p class="mt-4 max-w-3xl font-serif text-sm italic leading-6 text-[#4f3e30]">{publicState.result.epilogue}</p>{/if}
+              </section>
+            {:else if privateState.role === "detective" && accusationOptions.motives.length > 0 && (availableActions.has("accuse") || availableActions.has("submit_final_guess") || privateState.solve_attempt || privateState.final_guess || publicState.phase === "accusation")}
+              <section id="accusation-sheet" class="mt-5 border-2 border-[#71372f] bg-[#d7c6a6] p-4" aria-labelledby="accusation-heading">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Sealed deduction</p>
+                    <h3 id="accusation-heading" class="mt-1 font-serif text-xl font-semibold">Suspect, weapon, motive</h3>
+                  </div>
+                  <span class="border border-[#8c3f33] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.1em] text-[#8c3f33]">
+                    {publicState.phase === "accusation" ? "final guess" : "solve token"}
+                  </span>
+                </div>
+
+                {#if privateState.solve_attempt}
+                  <p id="solve-attempt-result" class="mt-3 border-l-4 border-[#8c3f33] bg-[#eadbbc] p-3 text-sm font-semibold">
+                    {privateState.solve_attempt.correct_count} of 3 elements were correct. The token is spent; your turn continues.
+                  </p>
+                {/if}
+
+                {#if privateState.final_guess && publicState.phase === "accusation"}
+                  <p id="final-guess-sealed" class="mt-3 border border-dashed border-[#8e765b] p-4 text-center font-serif text-sm italic">Your final guess is sealed. Waiting for the remaining Detectives.</p>
+                {:else}
+                  <div class="mt-4 grid gap-4 lg:grid-cols-3">
+                    <fieldset id="accusation-suspects">
+                      <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">1 / Suspect</legend>
+                      <div class="mt-2 grid gap-2">
+                        {#each accusationOptions.suspects as suspect}
+                          <label class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 ${accusationSuspectId === suspect.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}>
+                            <input type="radio" name="accusation-suspect" value={suspect.id} bind:group={accusationSuspectId} class="accent-[#963a31]" />
+                            <span class="text-sm font-semibold">{suspect.name}</span>
+                          </label>
+                        {/each}
+                      </div>
+                    </fieldset>
+
+                    <fieldset id="accusation-weapons">
+                      <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">2 / Known weapon</legend>
+                      <div class="mt-2 grid gap-2">
+                        {#each accusationOptions.weapons as weapon}
+                          <label class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 ${accusationWeaponId === weapon.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}>
+                            <input type="radio" name="accusation-weapon" value={weapon.id} bind:group={accusationWeaponId} class="accent-[#963a31]" />
+                            <span class="text-sm font-semibold">{weapon.label}</span>
+                          </label>
+                        {/each}
+                      </div>
+                    </fieldset>
+
+                    <fieldset id="accusation-motives">
+                      <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">3 / Motive</legend>
+                      <div class="mt-2 grid gap-2">
+                        {#each accusationOptions.motives as motive}
+                          <label class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 ${accusationMotiveId === motive.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}>
+                            <input type="radio" name="accusation-motive" value={motive.id} bind:group={accusationMotiveId} class="accent-[#963a31]" />
+                            <span class="text-sm font-semibold">{motive.label}</span>
+                          </label>
+                        {/each}
+                      </div>
+                    </fieldset>
+                  </div>
+
+                  <button
+                    id="action-submit-accusation"
+                    type="button"
+                    disabled={(!availableActions.has("accuse") && !availableActions.has("submit_final_guess")) || !accusationSuspectId || !accusationWeaponId || !accusationMotiveId || commandPending}
+                    onclick={submitAccusation}
+                    class="mt-4 min-h-12 w-full cursor-pointer bg-[#8f372f] px-4 text-sm font-semibold text-[#fff0d6] transition hover:bg-[#a84338] disabled:cursor-not-allowed disabled:opacity-40"
+                  >{publicState.phase === "accusation" ? "Seal final guess" : "Spend Solve token"}</button>
+                  {#if publicState.phase !== "accusation"}<p class="mt-2 text-xs leading-5 text-[#695642]">A Solve accusation is legal only at the beginning of your turn, before any action is spent.</p>{/if}
+                {/if}
+              </section>
+            {/if}
+
+            {#if privateState.role === "detective"}
+              <section id="private-evidence-dossier" class="mt-5 border-y border-[#91785c] bg-[#d4c3a3] px-3 py-4 sm:px-4" aria-labelledby="evidence-dossier-heading">
+                <div class="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Private folio</p>
+                    <h3 id="evidence-dossier-heading" class="mt-1 font-serif text-xl font-semibold">Search notes and evidence</h3>
+                  </div>
+                  <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#705b45]">{heldEvidence.length} held / {knownCaseCards.length} known</p>
+                </div>
+
+                <div class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1.1fr)_minmax(12rem,0.9fr)]">
+                  <article id="latest-search-note" class="min-h-28 border-l-4 border-[#71372f] bg-[#eadbbc] p-3">
+                    {#if latestSearch}
+                      <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">Day {latestSearch.day} / {latestSearch.target_type.replaceAll("_", " ")}</p>
+                      <p class="mt-2 font-serif text-sm italic leading-6">“{latestSearch.text}”</p>
+                    {:else}
+                      <p class="font-serif text-sm italic leading-6 text-[#725e48]">No private Search card has been filed.</p>
+                    {/if}
+                  </article>
+
+                  <div id="held-evidence-list" class="grid content-start gap-2">
+                    {#each heldEvidence as card}
+                      <article id={`held-evidence-${card.id}`} class="border border-[#8b7257] bg-[#efe0c0] px-3 py-2">
+                        <div class="flex items-center justify-between gap-3">
+                          <span class="font-mono text-[10px] font-semibold text-[#8c3f33]">{card.code}</span>
+                          <span class="font-mono text-[8px] uppercase tracking-[0.1em] text-[#725e48]">held evidence</span>
+                        </div>
+                        <h4 class="mt-1 font-serif text-sm font-semibold">{card.title}</h4>
+                        {#if card.description}<p class="mt-1 text-[11px] leading-4 text-[#695642]">{card.description}</p>{/if}
+                      </article>
+                    {:else}
+                      <p class="border border-dashed border-[#8b7257] p-3 text-xs leading-5 text-[#725e48]">No Case card is currently held as evidence.</p>
+                    {/each}
+                  </div>
+                </div>
+              </section>
+            {/if}
+
             <section id="keyboard-location-list" class="mt-5 border-t border-[#a38b6e] pt-4" aria-labelledby="location-list-heading">
               <h3 id="location-list-heading" class="font-mono text-[10px] uppercase tracking-[0.14em] text-[#80694f]">Location index</h3>
               <div class="mt-2 grid gap-1 sm:grid-cols-2">
@@ -810,7 +1204,7 @@
                 <p class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7e3029]">Private casebook</p>
                 <p class="mt-2 font-serif text-sm italic leading-6 text-[#4e3d2f]">{privateState.casebook.briefing}</p>
                 <dl class="mt-4 space-y-2 text-xs">
-                  <div class="flex justify-between gap-3"><dt class="text-[#715d47]">Solution suspect</dt><dd class="font-mono font-semibold">{privateState.casebook.solution?.suspect_id ?? "—"}</dd></div>
+                  <div class="flex justify-between gap-3"><dt class="text-[#715d47]">Solution suspect</dt><dd class="font-mono font-semibold">{privateState.casebook.solution?.suspect_id ?? "-"}</dd></div>
                   <div class="flex justify-between gap-3"><dt class="text-[#715d47]">Leverage held</dt><dd class="font-mono font-semibold">{Object.values(privateState.leverage_by_detective).reduce((sum, value) => sum + value, 0)}</dd></div>
                   <div class="flex justify-between gap-3"><dt class="text-[#715d47]">Pending response</dt><dd class="font-mono font-semibold">{privateState.pending_interrogation ? "OPEN" : "NONE"}</dd></div>
                 </dl>
