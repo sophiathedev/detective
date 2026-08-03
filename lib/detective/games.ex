@@ -131,7 +131,7 @@ defmodule Detective.Games do
     |> then(fn counts ->
       %{
         waiting: Map.get(counts, "waiting", 0),
-        active: Map.get(counts, "active", 0),
+        active: Map.get(counts, "active", 0) + Map.get(counts, "paused", 0),
         finished: Map.get(counts, "finished", 0)
       }
     end)

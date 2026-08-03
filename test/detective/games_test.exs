@@ -106,4 +106,19 @@ defmodule Detective.GamesTest do
     assert {:error, :invalid_game_id} =
              Games.set_ready(Scope.for_user(host), "not-a-uuid", 0, true)
   end
+
+  test "counts paused games in the active dashboard bucket" do
+    user = user_fixture()
+    %{game: game} = game_fixture(user)
+
+    game
+    |> Ecto.Changeset.change(status: "paused")
+    |> Repo.update!()
+
+    assert Games.game_summary(Scope.for_user(user)) == %{
+             waiting: 0,
+             active: 1,
+             finished: 0
+           }
+  end
 end
