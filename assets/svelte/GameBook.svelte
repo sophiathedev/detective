@@ -22,6 +22,8 @@
   let retryCommand = $state(null)
   let commandError = $state(null)
   let lastEvent = $state("Casebook synchronized.")
+  let mapIntent = $state(null)
+  let lastTravel = $state(null)
   let gameChannel = null
   let userChannel = null
   const seenPublicEventIds = new Set()
@@ -62,6 +64,27 @@
   let selectedSuspectLeverage = $derived(
     privateState.leverage_on_suspects?.[selectedSuspectId] ?? 0,
   )
+  let travelPath = $derived.by(() => {
+    if (!lastTravel?.from_location_id || !lastTravel?.location_id) return null
+
+    const from = publicState.locations.find(
+      (location) => location.id === lastTravel.from_location_id,
+    )
+    const destination = publicState.locations.find(
+      (location) => location.id === lastTravel.location_id,
+    )
+
+    return from && destination ? { from, destination, key: lastTravel.key } : null
+  })
+  let mapStatus = $derived(
+    privateState.role !== "detective"
+      ? "Field map · only the active Detective can issue movement commands."
+      : mapIntent
+      ? `${mapIntent.type === "place" ? "Placing" : "Moving to"} ${locationName(mapIntent.locationId)}…`
+      : ownPlayer?.location_id
+        ? "Click a red-ringed location to spend 1 Move action."
+        : "Choose any blue Police Station to enter the city for free.",
+  )
 
   let mapConnections = $derived.by(() => {
     const connections = []
@@ -81,6 +104,15 @@
 
   function applyPublic(nextState) {
     if (nextState.version < publicState.version) return
+
+    const nextOwnPlayer = nextState.players.find(
+      (player) => player.id === privateState.player_id,
+    )
+
+    if (mapIntent && nextOwnPlayer?.location_id === mapIntent.locationId) {
+      mapIntent = null
+    }
+
     publicState = nextState
   }
 
@@ -99,7 +131,10 @@
   }
 
   function recordPublicEvent(message, description) {
-    if (acceptEvent(message, seenPublicEventIds)) lastEvent = description
+    if (!acceptEvent(message, seenPublicEventIds)) return false
+
+    lastEvent = description
+    return true
   }
 
   function locationAction(location) {
@@ -108,8 +143,15 @@
     if (commandPending || connectionState !== "online") return
 
     if (placementLocationIds.has(location.id) && availableActions.has("place")) {
+      mapIntent = { type: "place", locationId: location.id, commandId: null }
       sendCommand("place", { location_id: location.id })
     } else if (moveLocationIds.has(location.id) && availableActions.has("move")) {
+      mapIntent = {
+        type: "move",
+        locationId: location.id,
+        fromLocationId: ownPlayer?.location_id,
+        commandId: null,
+      }
       sendCommand("move", { location_id: location.id })
     }
   }
@@ -133,6 +175,10 @@
         payload,
       }
 
+    if (mapIntent && (type === "place" || type === "move")) {
+      mapIntent = { ...mapIntent, commandId: command.command_id }
+    }
+
     commandPending = true
     commandError = null
     retryCommand = null
@@ -146,6 +192,7 @@
       .receive("error", ({ code }) => {
         commandPending = false
         retryCommand = null
+        if (mapIntent?.commandId === command.command_id) mapIntent = null
         commandError = commandErrorMessage(code)
       })
       .receive("timeout", () => {
@@ -293,9 +340,14 @@
     gameChannel.on("detective_placed", (message) =>
       recordPublicEvent(message, "A Detective entered the city."),
     )
-    gameChannel.on("player_moved", (message) =>
-      recordPublicEvent(message, "A Detective moved to a new location."),
-    )
+    gameChannel.on("player_moved", (message) => {
+      if (recordPublicEvent(message, "A Detective moved to a new location.")) {
+        lastTravel = {
+          ...message.payload,
+          key: message.event_id ?? `${message.version}-${message.payload.player_id}`,
+        }
+      }
+    })
     gameChannel.on("evidence_analyzed", (message) =>
       recordPublicEvent(message, "Evidence was analyzed."),
     )
@@ -480,9 +532,17 @@
         </div>
 
         <div class="relative overflow-hidden bg-[#b7a78b] p-2 sm:p-3">
+          <div
+            id="map-command-status"
+            class={`pointer-events-none absolute left-4 top-4 z-10 max-w-[18rem] border px-3 py-2 font-mono text-[9px] uppercase tracking-[0.1em] shadow-[0_8px_24px_rgba(35,24,16,0.22)] sm:left-5 sm:top-5 ${mapIntent ? "map-command-pending border-[#8e342d] bg-[#f1dec0] text-[#7d2e28]" : "border-[#776149] bg-[#e8dcc3]/95 text-[#5d4b38]"}`}
+            aria-live="polite"
+            aria-busy={mapIntent !== null}
+          >
+            {mapStatus}
+          </div>
           <svg
             id="game-map"
-            class="aspect-[2048/1331] w-full select-none border border-[#6e5c48] bg-[#c9b998]"
+            class="game-map-board aspect-[2048/1331] w-full select-none border border-[#6e5c48] bg-[#c9b998]"
             viewBox="0 0 2048 1331"
             preserveAspectRatio="xMidYMid meet"
             role="img"
@@ -528,23 +588,45 @@
               {/each}
             </g>
 
+            {#if travelPath}
+              {#key travelPath.key}
+                <g id="latest-travel-trace" class="map-travel-trace" aria-hidden="true">
+                  <line
+                    x1={travelPath.from.x * 2048}
+                    y1={travelPath.from.y * 1331}
+                    x2={travelPath.destination.x * 2048}
+                    y2={travelPath.destination.y * 1331}
+                    pathLength="1"
+                    class="map-travel-line"
+                    vector-effect="non-scaling-stroke"
+                  />
+                  <circle
+                    cx={travelPath.destination.x * 2048}
+                    cy={travelPath.destination.y * 1331}
+                    r="48"
+                    class="map-arrival-pulse"
+                    vector-effect="non-scaling-stroke"
+                  />
+                </g>
+              {/key}
+            {/if}
+
             <g id="map-locations">
               {#each publicState.locations as location}
                 <g
                   id={`map-location-${location.id}`}
                   transform={`translate(${location.x * 2048} ${location.y * 1331})`}
-                  class={legalLocation(location.id) ? "cursor-pointer" : "cursor-default"}
+                  class={`map-location-marker ${legalLocation(location.id) ? "map-location-legal cursor-pointer" : "cursor-default"} ${mapIntent?.locationId === location.id ? "map-location-pending" : ""}`}
                   role="button"
                   tabindex="0"
                   aria-label={locationLabel(location)}
                   aria-disabled={!legalLocation(location.id)}
+                  aria-busy={mapIntent?.locationId === location.id}
                   onclick={() => locationAction(location)}
                   onkeydown={(event) => locationKeydown(event, location)}
                 >
                   {#if legalLocation(location.id)}
-                    <circle r="42" fill="none" stroke="#c94f3e" stroke-width="7" opacity="0.88">
-                      <animate attributeName="opacity" values="0.9;0.38;0.9" dur="2.2s" repeatCount="indefinite" />
-                    </circle>
+                    <circle class="map-legal-ring" r="42" fill="none" stroke="#c94f3e" stroke-width="7" />
                   {/if}
                   <circle
                     r={selectedLocationId === location.id ? 25 : 20}
@@ -573,7 +655,11 @@
               {#each detectives as detective}
                 {@const tokenLocation = publicState.locations.find((location) => location.id === detective.location_id)}
                 {#if tokenLocation}
-                  <g transform={`translate(${tokenLocation.x * 2048 + (detective.seat - 1) * 22} ${tokenLocation.y * 1331 - 28})`}>
+                  <g
+                    id={`detective-map-token-${detective.id}`}
+                    class={`map-detective-token ${lastTravel?.player_id === detective.id ? "map-detective-token-active" : ""}`}
+                    style={`transform: translate(${tokenLocation.x * 2048 + (detective.seat - 1) * 22}px, ${tokenLocation.y * 1331 - 28}px);`}
+                  >
                     <path d="M0-32 27-14 20 25 0 39-20 25-27-14Z" fill={["#28485c", "#724438", "#3f5d44", "#6b5535"][detective.seat - 1]} stroke="#f2e4c8" stroke-width="5" />
                     <text y="8" text-anchor="middle" fill="#f8ecd2" font-family="IBM Plex Mono, monospace" font-size="22" font-weight="600">D{detective.seat}</text>
                   </g>
