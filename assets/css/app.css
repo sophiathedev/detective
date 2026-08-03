@@ -35,6 +35,140 @@
   transform-origin: 50% 0;
 }
 
+.detective-offline-mark {
+  display: block;
+  margin-top: 0.3rem;
+  color: #973b32;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.game-pause-seal {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  overflow-y: auto;
+  background:
+    radial-gradient(circle at 50% 42%, rgb(69 45 31 / 0.22), transparent 48%),
+    rgb(24 17 13 / 0.82);
+  backdrop-filter: blur(2px) saturate(0.72);
+}
+
+.game-pause-document {
+  position: relative;
+  isolation: isolate;
+  width: min(34rem, 100%);
+  overflow: hidden;
+  border: 3px double #8f372f;
+  background: #e7d8b9;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  color: #2c2119;
+  box-shadow:
+    0 24px 70px rgb(0 0 0 / 0.5),
+    inset 0 0 0 1px rgb(255 244 218 / 0.38),
+    inset 0 0 42px rgb(92 58 34 / 0.14);
+  animation: game-pause-seal-in 320ms cubic-bezier(0.22, 0.72, 0.24, 1) both;
+}
+
+.game-pause-document::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    repeating-linear-gradient(7deg, transparent 0 7px, rgb(77 50 29 / 0.025) 8px 9px),
+    repeating-linear-gradient(93deg, transparent 0 19px, rgb(255 250 230 / 0.08) 20px 21px),
+    radial-gradient(circle at 20% 15%, rgb(255 248 220 / 0.3), transparent 35%),
+    radial-gradient(circle at 82% 88%, rgb(95 58 32 / 0.12), transparent 42%);
+  content: "";
+  pointer-events: none;
+}
+
+.game-pause-document::after {
+  position: absolute;
+  inset: 0.55rem;
+  border: 1px solid rgb(143 55 47 / 0.38);
+  content: "";
+  pointer-events: none;
+}
+
+.game-pause-kicker {
+  color: #8f372f;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.game-pause-ledger {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  border-block: 1px solid rgb(111 83 56 / 0.42);
+  padding-block: 0.75rem;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.game-pause-ledger strong {
+  color: #6f2f29;
+  font-weight: 600;
+  text-align: right;
+}
+
+.game-pause-provenance {
+  margin-top: 0.75rem;
+  color: #705b45;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+.game-pause-document button {
+  position: relative;
+  margin-top: 1.25rem;
+  min-height: 3rem;
+  width: 100%;
+  cursor: pointer;
+  border: 1px solid #6f2f29;
+  background: #8f372f;
+  color: #fff0d6;
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.game-pause-document button:hover:not(:disabled) {
+  background: #a84338;
+  box-shadow: 0 8px 18px rgb(91 35 29 / 0.22);
+  transform: translateY(-1px);
+}
+
+.game-pause-document button:focus-visible {
+  outline: 3px solid #f1d7a5;
+  outline-offset: 3px;
+}
+
+.game-pause-document button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .game-map-board {
   isolation: isolate;
 }
@@ -109,6 +243,17 @@
   to {
     opacity: 1;
     transform: perspective(1200px) rotateX(0) translateY(0);
+  }
+}
+
+@keyframes game-pause-seal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) rotate(-0.5deg) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) rotate(0) scale(1);
   }
 }
 

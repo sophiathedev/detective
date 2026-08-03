@@ -24,6 +24,11 @@
   let lastEvent = $state("Casebook synchronized.")
   let mapIntent = $state(null)
   let lastTravel = $state(null)
+  let onlinePlayerIds = $state([])
+  let offlineDeadlines = $state({})
+  let allPlayersOnline = $state(false)
+  let connectionSnapshotReceived = $state(false)
+  let connectionClock = $state(Date.now())
   let gameChannel = null
   let userChannel = null
   const seenPublicEventIds = new Set()
@@ -60,6 +65,11 @@
   let knownCaseCards = $derived(privateState.known_case_cards ?? [])
   let accusationOptions = $derived(
     privateState.accusation_options ?? { suspects: [], weapons: [], motives: [] },
+  )
+  let offlinePlayers = $derived(
+    connectionSnapshotReceived
+      ? publicState.players.filter((player) => !onlinePlayerIds.includes(player.id))
+      : [],
   )
   let selectedSuspectLeverage = $derived(
     privateState.leverage_on_suspects?.[selectedSuspectId] ?? 0,
@@ -244,6 +254,9 @@
       accusation_suspect_unknown: "That suspect has not been revealed.",
       accusation_weapon_unknown: "That possible weapon has not been discovered.",
       final_guess_already_submitted: "Your final guess is already sealed.",
+      game_paused: "The case is sealed while a player is offline.",
+      game_not_paused: "The case is not paused.",
+      players_offline: "Every player must reconnect before the Chisel resumes.",
     }
 
     return messages[code] ?? "The server rejected this action."
@@ -267,6 +280,19 @@
 
   function locationName(locationId) {
     return publicState.locations.find((location) => location.id === locationId)?.name ?? locationId
+  }
+
+  function disconnectCountdown(playerId) {
+    const deadline = offlineDeadlines[playerId]
+    const remainingMilliseconds = deadline ? deadline - connectionClock : 0
+
+    if (remainingMilliseconds <= 0) return "PAUSED"
+
+    const remainingSeconds = Math.ceil(remainingMilliseconds / 1000)
+    const minutes = Math.floor(remainingSeconds / 60)
+    const seconds = remainingSeconds % 60
+
+    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
   }
 
   function selectSuspect(suspectId) {
@@ -327,16 +353,31 @@
   }
 
   onMount(() => {
+    const connectionClockInterval = window.setInterval(() => {
+      connectionClock = Date.now()
+    }, 1000)
     const socket = window.getGameSocket?.()
     if (!socket) {
       connectionState = "offline"
-      return
+      return () => window.clearInterval(connectionClockInterval)
     }
 
     gameChannel = socket.channel(`game:${game_id}`, {})
     userChannel = socket.channel(`user:${user_id}`, { game_id })
 
     gameChannel.on("game_state", ({ state }) => applyPublic(state))
+    gameChannel.on("connection_state", (state) => {
+      onlinePlayerIds = state.online_player_ids
+      offlineDeadlines = state.offline_deadlines
+      allPlayersOnline = state.all_players_online
+      connectionSnapshotReceived = true
+    })
+    gameChannel.on("game_paused", (message) =>
+      recordPublicEvent(message, "A missing investigator sealed the case."),
+    )
+    gameChannel.on("game_resumed", (message) =>
+      recordPublicEvent(message, "Every investigator returned. The case reopened."),
+    )
     gameChannel.on("detective_placed", (message) =>
       recordPublicEvent(message, "A Detective entered the city."),
     )
@@ -483,6 +524,7 @@
       .receive("error", () => (connectionState = "unauthorized"))
 
     return () => {
+      window.clearInterval(connectionClockInterval)
       gameChannel?.leave()
       userChannel?.leave()
       gameChannel = null
@@ -751,6 +793,14 @@
                     <p class="truncate text-xs font-semibold text-[#30251c]">{detective.display_name}</p>
                     <p class="mt-1 font-mono text-[10px] text-[#705b45]">AP {detective.actions_remaining}/4</p>
                     <p class="truncate font-mono text-[9px] uppercase tracking-[0.08em] text-[#826a50]">{detective.location_id ?? "Not placed"}</p>
+                    {#if connectionSnapshotReceived && !onlinePlayerIds.includes(detective.id)}
+                      <span
+                        id={`detective-connection-${seat}`}
+                        class="detective-offline-mark"
+                        role="timer"
+                        aria-label={`${detective.display_name} offline, pause countdown ${disconnectCountdown(detective.id)}`}
+                      >OFFLINE · {disconnectCountdown(detective.id)}</span>
+                    {/if}
                   </div>
                 </div>
                 {#if detective.id === publicState.current_detective_id}
@@ -1282,6 +1332,27 @@
                 <p class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7e3029]">Chisel · case handler</p>
                 <h2 id="chisel-heading" class="break-words font-serif text-base font-semibold leading-tight">{chisel?.display_name ?? "Unassigned"}</h2>
                 <p class="mt-1 font-mono text-[9px] uppercase text-[#715d47]">No turn · reacts to Detective actions</p>
+                <span
+                  id="chisel-connection-state"
+                  class={[
+                    "mt-1 block font-mono text-[9px] font-semibold uppercase tracking-[0.1em]",
+                    !connectionSnapshotReceived
+                      ? "text-[#715d47]"
+                      : chisel && onlinePlayerIds.includes(chisel.id)
+                        ? "text-[#315344]"
+                        : "text-[#973b32]",
+                  ]}
+                  role="timer"
+                  aria-label={`Chisel connection status: ${!connectionSnapshotReceived ? "syncing" : chisel && onlinePlayerIds.includes(chisel.id) ? "online" : `offline, pause countdown ${disconnectCountdown(chisel?.id)}`}`}
+                >
+                  {#if !connectionSnapshotReceived}
+                    SYNCING
+                  {:else if chisel && onlinePlayerIds.includes(chisel.id)}
+                    ONLINE
+                  {:else}
+                    OFFLINE · {disconnectCountdown(chisel?.id)}
+                  {/if}
+                </span>
               </div>
             </div>
 
@@ -1317,6 +1388,51 @@
           </aside>
         </div>
       </section>
+
+      {#if publicState.status === "paused"}
+        <section
+          id="game-pause-seal"
+          class="game-pause-seal"
+          role="status"
+          aria-labelledby="game-pause-heading"
+          aria-describedby="game-pause-description"
+        >
+          <div class="game-pause-document">
+            <p class="game-pause-kicker">Case sealed</p>
+            <h2 id="game-pause-heading" class="mt-2 font-serif text-3xl font-semibold tracking-[-0.025em] sm:text-4xl">
+              Investigation paused
+            </h2>
+            <p id="game-pause-description" class="mt-3 font-serif text-base italic leading-7">
+              Waiting for every investigator to return.
+            </p>
+
+            <div class="game-pause-ledger">
+              <span>Connection ledger</span>
+              <strong>
+                {connectionSnapshotReceived
+                  ? allPlayersOnline
+                    ? "All investigators present"
+                    : `${offlinePlayers.length} ${offlinePlayers.length === 1 ? "investigator" : "investigators"} absent`
+                  : "Synchronizing presence"}
+              </strong>
+            </div>
+
+            <p class="game-pause-provenance">
+              Seal record · {publicState.pause?.player_ids?.length ?? 0} disconnected · held from
+              {publicState.pause?.previous_phase?.replaceAll("_", " ") ?? "active investigation"}
+            </p>
+
+            {#if privateState.role === "chisel"}
+              <button
+                id="action-resume-game"
+                type="button"
+                disabled={!allPlayersOnline || !availableActions.has("resume_game") || commandPending}
+                onclick={() => sendCommand("resume_game", {})}
+              >Resume investigation</button>
+            {/if}
+          </div>
+        </section>
+      {/if}
     </main>
   </div>
 </div>
