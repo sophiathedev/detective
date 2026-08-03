@@ -1,28 +1,28 @@
 defmodule Detective.Games.ConnectionMonitor do
   use GenServer
 
-  alias Detective.Games.{ConnectionMonitorSupervisor, Session}
+  alias Detective.Games.{ConnectionMonitorSupervisor, Persistence, Session}
   alias DetectiveWeb.{Endpoint, Presence}
 
-  def start_link({game_id, player_ids, game_status}) do
+  def start_link({game_id, player_ids, game_status, game_version}) do
     GenServer.start_link(
       __MODULE__,
-      {game_id, player_ids, game_status},
+      {game_id, player_ids, game_status, game_version},
       name: via(game_id)
     )
   end
 
-  def child_spec({game_id, _player_ids, _game_status} = init_arg) do
+  def child_spec({game_id, _player_ids, _game_status, _game_version} = init_arg) do
     %{
       id: {__MODULE__, game_id},
       start: {__MODULE__, :start_link, [init_arg]},
-      restart: :temporary,
+      restart: :transient,
       type: :worker
     }
   end
 
-  def ensure_monitor(game_id, player_ids, game_status) do
-    ConnectionMonitorSupervisor.ensure_monitor(game_id, player_ids, game_status)
+  def ensure_monitor(game_id, player_ids, game_status, game_version) do
+    ConnectionMonitorSupervisor.ensure_monitor(game_id, player_ids, game_status, game_version)
   end
 
   def presence_topic(game_id), do: "game_presence:#{game_id}"
@@ -33,30 +33,39 @@ defmodule Detective.Games.ConnectionMonitor do
 
   def all_players_online?(game_id), do: call_monitor(game_id, :all_players_online)
 
-  def game_status_changed(game_id, status) when status in [:active, :paused, :finished] do
+  def game_status_changed(game_id, status, version)
+      when status in [:active, :paused, :finished] and is_integer(version) and version >= 0 do
     case monitor_pid(game_id) do
-      {:ok, pid} -> GenServer.cast(pid, {:game_status_changed, status})
+      {:ok, pid} -> GenServer.cast(pid, {:game_status_changed, status, version})
       {:error, :monitor_not_found} -> :ok
     end
   end
 
-  def ensure_state(pid, player_ids, status) when status in [:active, :paused, :finished] do
-    GenServer.call(pid, {:ensure_state, player_ids, status})
+  def ensure_state(pid, player_ids, status, version)
+      when status in [:active, :paused, :finished] and is_integer(version) and version >= 0 do
+    GenServer.call(pid, {:ensure_state, player_ids, status, version})
   end
 
   @impl true
-  def init({game_id, player_ids, game_status}) do
-    :ok = Endpoint.subscribe(presence_topic(game_id))
+  def init({game_id, player_ids, game_status, game_version}) do
+    seed = authoritative_seed(game_id, player_ids, game_status, game_version)
 
-    state = %{
-      game_id: game_id,
-      player_ids: MapSet.new(player_ids),
-      game_status: game_status,
-      online_player_ids: MapSet.new(),
-      timers: %{}
-    }
+    if seed.game_status == :finished do
+      :ignore
+    else
+      :ok = Endpoint.subscribe(presence_topic(game_id))
 
-    {:ok, reconcile(state)}
+      state = %{
+        game_id: game_id,
+        player_ids: MapSet.new(seed.player_ids),
+        game_status: seed.game_status,
+        game_version: seed.game_version,
+        online_player_ids: MapSet.new(),
+        timers: %{}
+      }
+
+      {:ok, reconcile(state)}
+    end
   end
 
   @impl true
@@ -74,23 +83,21 @@ defmodule Detective.Games.ConnectionMonitor do
     {:reply, MapSet.equal?(state.online_player_ids, state.player_ids), state}
   end
 
-  def handle_call({:ensure_state, _player_ids, :finished}, _from, state) do
-    {:stop, :normal, :ok, cancel_all_timers(%{state | game_status: :finished})}
-  end
-
-  def handle_call({:ensure_state, player_ids, status}, _from, state)
-      when status in [:active, :paused] do
-    state = reconcile(%{state | player_ids: MapSet.new(player_ids), game_status: status})
-    {:reply, :ok, state}
+  def handle_call({:ensure_state, player_ids, status, version}, _from, state)
+      when status in [:active, :paused, :finished] do
+    case apply_seed(state, player_ids, status, version) do
+      {:ok, state} -> {:reply, :ok, state}
+      {:stop, state} -> {:stop, :normal, :ok, state}
+    end
   end
 
   @impl true
-  def handle_cast({:game_status_changed, :finished}, state) do
-    {:stop, :normal, cancel_all_timers(%{state | game_status: :finished})}
-  end
-
-  def handle_cast({:game_status_changed, status}, state) when status in [:active, :paused] do
-    {:noreply, reconcile(%{state | game_status: status})}
+  def handle_cast({:game_status_changed, status, version}, state)
+      when status in [:active, :paused, :finished] do
+    case apply_status(state, status, version) do
+      {:ok, state} -> {:noreply, state}
+      {:stop, state} -> {:stop, :normal, state}
+    end
   end
 
   @impl true
@@ -113,7 +120,9 @@ defmodule Detective.Games.ConnectionMonitor do
   end
 
   defp handle_current_timeout(state, player_id) do
-    state = state |> cancel_all_timers() |> reconcile()
+    {timer, timers} = Map.pop!(state.timers, player_id)
+    :ok = cancel_timer(timer)
+    state = state |> Map.put(:timers, timers) |> reconcile()
 
     if state.game_status == :active and not MapSet.member?(state.online_player_ids, player_id) do
       offline_player_ids =
@@ -126,6 +135,63 @@ defmodule Detective.Games.ConnectionMonitor do
 
     {:noreply, state}
   end
+
+  defp authoritative_seed(game_id, player_ids, game_status, game_version) do
+    requested = %{
+      player_ids: player_ids,
+      game_status: game_status,
+      game_version: game_version
+    }
+
+    case Persistence.connection_monitor_seed(game_id) do
+      {:ok, persisted} when persisted.game_version >= game_version -> persisted
+      _missing_or_older -> requested
+    end
+  end
+
+  defp apply_seed(state, _player_ids, _status, version) when version < state.game_version,
+    do: {:ok, state}
+
+  defp apply_seed(state, player_ids, status, version) when version == state.game_version do
+    player_ids = MapSet.new(player_ids)
+
+    if status == state.game_status and MapSet.equal?(player_ids, state.player_ids) do
+      {:ok, reconcile(state)}
+    else
+      {:ok, state}
+    end
+  end
+
+  defp apply_seed(state, player_ids, status, version) do
+    state = %{
+      state
+      | player_ids: MapSet.new(player_ids),
+        game_status: status,
+        game_version: version
+    }
+
+    apply_new_status(state)
+  end
+
+  defp apply_status(state, _status, version) when version < state.game_version,
+    do: {:ok, state}
+
+  defp apply_status(%{game_status: status, game_version: version} = state, status, version),
+    do: {:ok, state}
+
+  # Conflicting equal-version updates are ambiguous, so the current state wins.
+  defp apply_status(state, _status, version) when version == state.game_version,
+    do: {:ok, state}
+
+  defp apply_status(state, status, version) do
+    state = %{state | game_status: status, game_version: version}
+    apply_new_status(state)
+  end
+
+  defp apply_new_status(%{game_status: :finished} = state),
+    do: {:stop, cancel_all_timers(state)}
+
+  defp apply_new_status(state), do: {:ok, reconcile(state)}
 
   defp reconcile(state) do
     online_player_ids = online_player_ids(state)

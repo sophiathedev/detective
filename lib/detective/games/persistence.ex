@@ -67,6 +67,17 @@ defmodule Detective.Games.Persistence do
     end
   end
 
+  def connection_monitor_seed(game_id) do
+    with {:ok, %State{} = state} <- load_state(game_id) do
+      {:ok,
+       %{
+         player_ids: Map.keys(state.players),
+         game_status: state.status,
+         game_version: state.version
+       }}
+    end
+  end
+
   def lookup_command(game_id, command_id) do
     Repo.get_by(CommandRecord, game_id: game_id, command_id: command_id)
   end

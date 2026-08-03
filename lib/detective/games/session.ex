@@ -114,7 +114,13 @@ defmodule Detective.Games.Session do
          {:ok, changes} <-
            Persistence.persist_command(state.game_id, actor_id, command, next_state, events) do
       events = Persistence.attach_delivery_metadata(events, changes, next_state.version)
-      :ok = ConnectionMonitor.game_status_changed(state.game_id, next_state.status)
+
+      :ok =
+        ConnectionMonitor.game_status_changed(
+          state.game_id,
+          next_state.status,
+          next_state.version
+        )
 
       reply = %{
         version: next_state.version,
@@ -147,7 +153,13 @@ defmodule Detective.Games.Session do
                  "active"
                ) do
           events = Persistence.attach_delivery_metadata(events, changes, next_state.version)
-          :ok = ConnectionMonitor.game_status_changed(state.game_id, next_state.status)
+
+          :ok =
+            ConnectionMonitor.game_status_changed(
+              state.game_id,
+              next_state.status,
+              next_state.version
+            )
 
           {:ok,
            %{
@@ -166,7 +178,8 @@ defmodule Detective.Games.Session do
            ConnectionMonitor.ensure_monitor(
              state.game_id,
              Map.keys(state.players),
-             state.status
+             state.status,
+             state.version
            ),
          true <- ConnectionMonitor.all_players_online?(state.game_id) do
       :ok

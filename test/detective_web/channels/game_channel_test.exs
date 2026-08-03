@@ -218,6 +218,65 @@ defmodule DetectiveWeb.GameChannelTest do
     assert_broadcast "game_resumed", %{version: ^resumed_version}
   end
 
+  test "an abnormal monitor crash self-heals while joined channels remain", context do
+    detective_id = player_id_for_role(context.lobby.players, "detective")
+    host_id = player_id_for_role(context.lobby.players, "chisel")
+
+    assert {:ok, %{state: paused}} =
+             Session.pause_for_disconnect(context.game.id, [detective_id])
+
+    assert {:ok, _reply, detective_game_socket} =
+             subscribe_and_join(
+               authenticated_socket(context.detective),
+               "game:#{context.game.id}",
+               %{}
+             )
+
+    assert {:ok, _reply, host_game_socket} =
+             subscribe_and_join(
+               authenticated_socket(context.host),
+               "game:#{context.game.id}",
+               %{}
+             )
+
+    await_presence_count(context.game.id, detective_id, &(&1 == 1))
+    await_presence_count(context.game.id, host_id, &(&1 == 1))
+
+    first_monitor_pid = monitor_pid!(context.game.id)
+    assert :sys.get_state(first_monitor_pid).game_status == :paused
+
+    resume_ref = push(host_game_socket, "command", resume_payload(paused.version))
+    assert_reply resume_ref, :ok, %{version: resumed_version}
+    assert_broadcast "game_resumed", %{version: ^resumed_version}
+    _ = :sys.get_state(first_monitor_pid)
+
+    monitor = Process.monitor(first_monitor_pid)
+    Process.exit(first_monitor_pid, :kill)
+    assert_receive {:DOWN, ^monitor, :process, ^first_monitor_pid, :killed}
+
+    second_monitor_pid = await_restarted_monitor(context.game.id, first_monitor_pid)
+    recovered = :sys.get_state(second_monitor_pid)
+
+    assert recovered.game_status == :active
+    assert recovered.game_version == resumed_version
+    assert recovered.player_ids == MapSet.new([detective_id, host_id])
+
+    flush_connection_states()
+    Process.unlink(detective_game_socket.channel_pid)
+    leave_ref = leave(detective_game_socket)
+    assert_reply leave_ref, :ok
+    await_presence_count(context.game.id, detective_id, &(&1 == 0))
+    await_offline_deadline(detective_id)
+
+    timer = :sys.get_state(second_monitor_pid).timers[detective_id]
+    send(second_monitor_pid, {:disconnect_timeout, detective_id, timer.token})
+
+    assert_broadcast "game_paused", %{version: paused_again_version}
+    assert paused_again_version == resumed_version + 1
+    assert {:ok, paused_again} = Session.get_state(context.game.id)
+    assert paused_again.status == :paused
+  end
+
   test "click-style placement command persists and broadcasts canonical projections", context do
     socket = authenticated_socket(context.detective)
 
@@ -545,6 +604,41 @@ defmodule DetectiveWeb.GameChannelTest do
     |> get_in([player_id, :metas])
     |> List.wrap()
     |> length()
+  end
+
+  defp monitor_pid!(game_id) do
+    [{pid, _value}] =
+      Registry.lookup(Detective.GameRegistry, {:connection_monitor, game_id})
+
+    pid
+  end
+
+  defp await_restarted_monitor(game_id, previous_pid, attempts_left \\ 100)
+
+  defp await_restarted_monitor(_game_id, _previous_pid, 0) do
+    flunk("connection monitor was not restarted")
+  end
+
+  defp await_restarted_monitor(game_id, previous_pid, attempts_left) do
+    _ = :sys.get_state(ConnectionMonitorSupervisor)
+
+    case Registry.lookup(Detective.GameRegistry, {:connection_monitor, game_id}) do
+      [{pid, _value}] when pid != previous_pid -> pid
+      _missing_or_previous -> await_restarted_monitor(game_id, previous_pid, attempts_left - 1)
+    end
+  end
+
+  defp await_offline_deadline(player_id) do
+    assert_receive %Phoenix.Socket.Broadcast{
+      event: "connection_state",
+      payload: payload
+    }
+
+    if is_integer(payload.offline_deadlines[player_id]) do
+      :ok
+    else
+      await_offline_deadline(player_id)
+    end
   end
 
   defp flush_connection_states do

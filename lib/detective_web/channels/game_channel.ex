@@ -21,6 +21,7 @@ defmodule DetectiveWeb.GameChannel do
           |> assign(:player_id, projection.private.player_id)
           |> assign(:game_player_ids, Enum.map(projection.public.players, & &1.id))
           |> assign(:game_status, game_status)
+          |> assign(:game_version, projection.public.version)
 
         send(self(), :after_join)
         {:ok, %{state: projection.public}, socket}
@@ -36,7 +37,8 @@ defmodule DetectiveWeb.GameChannel do
       ConnectionMonitor.ensure_monitor(
         socket.assigns.game_id,
         socket.assigns.game_player_ids,
-        socket.assigns.game_status
+        socket.assigns.game_status,
+        socket.assigns.game_version
       )
 
     {:ok, _ref} =

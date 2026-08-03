@@ -85,6 +85,39 @@ defmodule Detective.Games.ConnectionMonitorTest do
     assert state.status == :active
   end
 
+  test "a reconnect-at-expiry preserves every other player's timer" do
+    game_id = Ecto.UUID.generate()
+    [first_player_id, second_player_id] = player_ids()
+    first_tab = start_presence_holder(game_id, first_player_id)
+    second_tab = start_presence_holder(game_id, second_player_id)
+    {:ok, monitor_pid} = start_monitor(game_id, [first_player_id, second_player_id], :active)
+
+    stop_presence_holder(game_id, first_player_id, first_tab)
+    _ = ConnectionMonitor.sync(game_id)
+    first_timer = :sys.get_state(monitor_pid).timers[first_player_id]
+
+    stop_presence_holder(game_id, second_player_id, second_tab)
+    _ = ConnectionMonitor.sync(game_id)
+    staggered_state = :sys.get_state(monitor_pid)
+    second_timer = staggered_state.timers[second_player_id]
+    assert staggered_state.timers[first_player_id].token == first_timer.token
+
+    :ok = :sys.suspend(monitor_pid)
+    send(monitor_pid, {:disconnect_timeout, first_player_id, first_timer.token})
+    returned_first_tab = start_presence_holder(game_id, first_player_id)
+    :ok = :sys.resume(monitor_pid)
+    final_state = :sys.get_state(monitor_pid)
+
+    assert final_state.online_player_ids == MapSet.new([first_player_id])
+    refute Map.has_key?(final_state.timers, first_player_id)
+    assert final_state.timers[second_player_id].token == second_timer.token
+
+    assert final_state.timers[second_player_id].deadline_unix_ms ==
+             second_timer.deadline_unix_ms
+
+    stop_presence_holder(game_id, first_player_id, returned_first_tab)
+  end
+
   test "two simultaneous offline players yield one authoritative pause" do
     %{game: game, player_ids: player_ids} = active_game()
     [first_player_id, second_player_id] = player_ids
@@ -123,19 +156,19 @@ defmodule Detective.Games.ConnectionMonitorTest do
 
     assert :sys.get_state(monitor_pid).timers == %{}
 
-    :ok = ConnectionMonitor.game_status_changed(game_id, :active)
+    :ok = ConnectionMonitor.game_status_changed(game_id, :active, 2)
     _ = :sys.get_state(monitor_pid)
 
     assert is_integer(
              ConnectionMonitor.connection_state(game_id).offline_deadlines[offline_player_id]
            )
 
-    :ok = ConnectionMonitor.game_status_changed(game_id, :paused)
+    :ok = ConnectionMonitor.game_status_changed(game_id, :paused, 3)
     _ = :sys.get_state(monitor_pid)
     assert ConnectionMonitor.connection_state(game_id).offline_deadlines == %{}
 
     monitor = Process.monitor(monitor_pid)
-    :ok = ConnectionMonitor.game_status_changed(game_id, :finished)
+    :ok = ConnectionMonitor.game_status_changed(game_id, :finished, 4)
     assert_receive {:DOWN, ^monitor, :process, ^monitor_pid, :normal}
 
     stop_presence_holder(game_id, online_player_id, online_tab)
@@ -153,7 +186,12 @@ defmodule Detective.Games.ConnectionMonitorTest do
     assert_receive {:DOWN, ^monitor, :process, ^first_pid, :shutdown}
 
     {:ok, second_pid} =
-      ConnectionMonitor.ensure_monitor(game_id, [online_player_id, offline_player_id], :active)
+      ConnectionMonitor.ensure_monitor(
+        game_id,
+        [online_player_id, offline_player_id],
+        :active,
+        1
+      )
 
     assert second_pid != first_pid
 
@@ -171,14 +209,14 @@ defmodule Detective.Games.ConnectionMonitorTest do
     player_ids = player_ids()
     {:ok, first_pid} = start_monitor(game_id, player_ids, :active)
 
-    :ok = ConnectionMonitor.game_status_changed(game_id, :paused)
+    :ok = ConnectionMonitor.game_status_changed(game_id, :paused, 2)
     _ = :sys.get_state(first_pid)
 
     monitor = Process.monitor(first_pid)
     Process.exit(first_pid, :kill)
     assert_receive {:DOWN, ^monitor, :process, ^first_pid, :killed}
 
-    {:ok, second_pid} = ConnectionMonitor.ensure_monitor(game_id, player_ids, :paused)
+    {:ok, second_pid} = ConnectionMonitor.ensure_monitor(game_id, player_ids, :paused, 2)
     second_state = :sys.get_state(second_pid)
 
     assert second_pid != first_pid
@@ -199,7 +237,8 @@ defmodule Detective.Games.ConnectionMonitorTest do
 
     assert map_size(:sys.get_state(monitor_pid).timers) == length(player_ids)
 
-    assert {:ok, ^monitor_pid} = ConnectionMonitor.ensure_monitor(game_id, player_ids, :paused)
+    assert {:ok, ^monitor_pid} =
+             ConnectionMonitor.ensure_monitor(game_id, player_ids, :paused, 2)
 
     state = :sys.get_state(monitor_pid)
     assert state.game_status == :paused
@@ -213,9 +252,56 @@ defmodule Detective.Games.ConnectionMonitorTest do
     monitor = Process.monitor(monitor_pid)
 
     assert {:error, :game_finished} =
-             ConnectionMonitor.ensure_monitor(game_id, player_ids, :finished)
+             ConnectionMonitor.ensure_monitor(game_id, player_ids, :finished, 2)
 
     assert_receive {:DOWN, ^monitor, :process, ^monitor_pid, :normal}
+  end
+
+  test "a delayed paused after_join seed cannot overwrite a resumed monitor" do
+    %{game: game, host: host, player_ids: player_ids} = active_game()
+
+    assert {:ok, %{state: paused}} = Session.pause_for_disconnect(game.id, player_ids)
+
+    tabs = Enum.map(player_ids, &{&1, start_presence_holder(game.id, &1)})
+    {:ok, monitor_pid} = start_monitor(game.id, player_ids, :paused)
+
+    resume = %Command{
+      command_id: Ecto.UUID.generate(),
+      type: :resume_game,
+      expected_version: paused.version,
+      payload: %{}
+    }
+
+    assert {:ok, %{state: resumed}} = Session.execute(game.id, host.id, resume)
+    _ = :sys.get_state(monitor_pid)
+
+    assert {:ok, ^monitor_pid} =
+             ensure_monitor_versioned(game.id, player_ids, :paused, paused.version)
+
+    monitor_state = :sys.get_state(monitor_pid)
+    assert monitor_state.game_status == :active
+    assert Map.get(monitor_state, :game_version) == resumed.version
+
+    Enum.each(tabs, fn {player_id, pid} -> stop_presence_holder(game.id, player_id, pid) end)
+  end
+
+  test "a delayed active after_join seed cannot revive a finished monitor" do
+    %{game: game, detective: detective, player_ids: player_ids} = active_game()
+    assert {:ok, active} = Session.get_state(game.id)
+    {:ok, monitor_pid} = start_monitor(game.id, player_ids, :active)
+    monitor = Process.monitor(monitor_pid)
+
+    assert {:ok, %{state: finished}} = finish_game(game.id, detective.id, active.version)
+    assert finished.status == :finished
+    assert_receive {:DOWN, ^monitor, :process, ^monitor_pid, :normal}
+
+    assert {:error, :game_finished} =
+             ensure_monitor_versioned(game.id, player_ids, :active, active.version)
+
+    _ = :sys.get_state(ConnectionMonitorSupervisor)
+
+    assert [] ==
+             Registry.lookup(Detective.GameRegistry, {:connection_monitor, game.id})
   end
 
   test "Session startup errors keep the monitor alive with a fresh retry timer" do
@@ -303,9 +389,50 @@ defmodule Detective.Games.ConnectionMonitorTest do
 
   defp player_ids, do: [Ecto.UUID.generate(), Ecto.UUID.generate()]
 
-  defp start_monitor(game_id, player_ids, status) do
+  defp finish_game(game_id, detective_id, version) do
+    assert {:ok, %{version: placed_version}} =
+             Session.execute(game_id, detective_id, %Command{
+               command_id: Ecto.UUID.generate(),
+               type: :place,
+               expected_version: version,
+               payload: %{"location_id" => "central-precinct"}
+             })
+
+    assert {:ok, %{version: searched_version}} =
+             Session.execute(game_id, detective_id, %Command{
+               command_id: Ecto.UUID.generate(),
+               type: :search_location,
+               expected_version: placed_version,
+               payload: %{}
+             })
+
+    assert {:ok, %{version: next_day_version}} =
+             Session.execute(game_id, detective_id, %Command{
+               command_id: Ecto.UUID.generate(),
+               type: :end_turn,
+               expected_version: searched_version,
+               payload: %{}
+             })
+
+    Session.execute(game_id, detective_id, %Command{
+      command_id: Ecto.UUID.generate(),
+      type: :accuse,
+      expected_version: next_day_version,
+      payload: %{
+        "suspect_id" => "night-clerk",
+        "weapon_id" => "sealed-ledger",
+        "motive_id" => "cover-up"
+      }
+    })
+  end
+
+  defp ensure_monitor_versioned(game_id, player_ids, status, version) do
+    ConnectionMonitor.ensure_monitor(game_id, player_ids, status, version)
+  end
+
+  defp start_monitor(game_id, player_ids, status, version \\ 1) do
     cleanup_monitor_on_exit(game_id)
-    ConnectionMonitor.ensure_monitor(game_id, player_ids, status)
+    ConnectionMonitor.ensure_monitor(game_id, player_ids, status, version)
   end
 
   defp cleanup_game_processes(game_id) do
