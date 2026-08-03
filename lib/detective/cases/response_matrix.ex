@@ -37,6 +37,8 @@ defmodule Detective.Cases.ResponseMatrix do
         code: card["code"] || topic_code(index),
         title: card["title"],
         type: card["type"],
+        description: card["description"] || "",
+        takeable: card["takeable"] == true,
         initially_known: card["initially_known"] == true
       }
     end)
@@ -105,6 +107,7 @@ defmodule Detective.Cases.ResponseMatrix do
     is_map(card) and is_binary(card["id"]) and card["id"] != "" and
       is_binary(card["title"]) and card["title"] != "" and is_binary(card["type"]) and
       is_boolean(card["initially_known"]) and
+      (is_nil(card["takeable"]) or is_boolean(card["takeable"])) and
       (is_nil(card["code"]) or (is_binary(card["code"]) and card["code"] != ""))
   end
 

@@ -84,6 +84,70 @@ defmodule Detective.Games.ProjectionsTest do
     assert selected_detective.private.pending_interrogation.response_text == "secret answer"
   end
 
+  test "Search text, hidden card identity, and held evidence never enter public projection" do
+    detective_id = "10000000-0000-0000-0000-000000000001"
+    base = state_fixture()
+
+    state = %{
+      base
+      | archived_searches: ["location:precinct"],
+        taken_evidence: %{
+          "hidden-card" => %{
+            "player_id" => detective_id,
+            "taken_day" => 1,
+            "release_day" => 4
+          }
+        },
+        players:
+          Map.update!(base.players, detective_id, fn detective ->
+            detective
+            |> Map.put(:knowledge, ["topic", "hidden-card"])
+            |> Map.put(:evidence, ["hidden-card"])
+            |> Map.put(:search_notes, [
+              %{
+                "target_type" => "location",
+                "target_id" => "precinct",
+                "text" => "A fingerprint hides under the blotter.",
+                "case_card_ids" => ["hidden-card"],
+                "taken_case_card_ids" => ["hidden-card"],
+                "day" => 1
+              }
+            ])
+          end),
+        case_definition:
+          Map.update!(base.case_definition, "case_cards", fn cards ->
+            [
+              %{
+                "id" => "hidden-card",
+                "code" => "B",
+                "title" => "Hidden Fingerprint",
+                "type" => "evidence",
+                "description" => "A private clue.",
+                "takeable" => true,
+                "initially_known" => false
+              }
+              | cards
+            ]
+          end)
+    }
+
+    public = Public.render(state)
+    {:ok, detective} = Projections.for_user(state, detective_user_id())
+    {:ok, chisel} = Projections.for_user(state, chisel_user_id())
+
+    public_json = Jason.encode!(public)
+    refute public_json =~ "hidden-card"
+    refute public_json =~ "Hidden Fingerprint"
+    refute public_json =~ "fingerprint hides"
+    assert public.taken_evidence == [%{holder_player_id: detective_id, release_day: 4}]
+
+    assert hd(detective.private.search_notes)["text"] ==
+             "A fingerprint hides under the blotter."
+
+    assert Enum.map(detective.private.evidence, & &1.id) == ["hidden-card"]
+    assert Enum.map(chisel.private.casebook.case_cards, & &1["id"]) == ["hidden-card", "topic"]
+  end
+
   defp state_fixture do
     detective_id = "10000000-0000-0000-0000-000000000001"
     chisel_id = "10000000-0000-0000-0000-000000000002"
@@ -109,6 +173,12 @@ defmodule Detective.Games.ProjectionsTest do
           leverage_on_suspects: %{},
           knowledge: ["topic"],
           statements: [],
+          search_notes: [],
+          evidence: [],
+          free_question_suspect_id: nil,
+          solve_token_available: true,
+          solve_attempt: nil,
+          final_guess: nil,
           kickback_day: nil
         },
         chisel_id => %{
@@ -146,6 +216,7 @@ defmodule Detective.Games.ProjectionsTest do
             "code" => "A",
             "title" => "Known Topic",
             "type" => "information",
+            "description" => "Public topic.",
             "initially_known" => true
           }
         ],

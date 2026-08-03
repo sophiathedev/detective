@@ -58,7 +58,7 @@ defmodule Detective.Games.Game do
     |> validate_inclusion(:status, ~w(waiting active finished cancelled))
     |> validate_inclusion(
       :phase,
-      ~w(lobby briefing detective_turn waiting_for_chisel waiting_for_detective_decision resolving_challenge accusation paused finished)
+      ~w(lobby briefing detective_turn waiting_for_chisel waiting_for_snitches waiting_for_detective_decision resolving_challenge accusation paused finished)
     )
     |> validate_number(:current_version, greater_than_or_equal_to: 0)
   end

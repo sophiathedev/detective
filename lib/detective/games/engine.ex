@@ -7,7 +7,7 @@ defmodule Detective.Games.Engine do
   belong to more than one district and therefore bridges later Move actions.
   """
 
-  alias Detective.Cases.{ResponseMatrix, Validator}
+  alias Detective.Cases.{AccusationSheet, ResponseMatrix, SearchDeck, Validator}
   alias Detective.Games.{Command, Event, Rules, State}
 
   @actions_per_turn 4
@@ -48,6 +48,12 @@ defmodule Detective.Games.Engine do
              leverage_on_suspects: %{},
              knowledge: initial_knowledge,
              statements: [],
+             search_notes: [],
+             evidence: [],
+             free_question_suspect_id: nil,
+             solve_token_available: true,
+             solve_attempt: nil,
+             final_guess: nil,
              kickback_day: nil
            }}
         end)
@@ -74,7 +80,8 @@ defmodule Detective.Games.Engine do
          players: Map.put(detective_players, chisel.id, chisel_player),
          locations: locations,
          suspects: normalize_suspects(case_definition["suspects"]),
-         case_definition: case_definition
+         case_definition: case_definition,
+         public_case_card_ids: initial_knowledge
        }}
     else
       _invalid -> {:error, :invalid_initial_state}
@@ -88,8 +95,23 @@ defmodule Detective.Games.Engine do
     end
   end
 
-  defp dispatch(state, actor, %Command{type: :select_response} = command) do
-    with :ok <- validate_chisel_response_turn(state, actor) do
+  defp dispatch(state, actor, %Command{type: type} = command)
+       when type in [:allow_question, :block_question, :resolve_snitches, :select_response] do
+    with :ok <- validate_chisel_interrogation_turn(state, actor) do
+      execute(state, actor, command)
+    end
+  end
+
+  defp dispatch(state, actor, %Command{type: type} = command)
+       when type in [:accept_question_block, :bribe_goon] do
+    with :ok <- validate_blocked_question_decision(state, actor) do
+      execute(state, actor, command)
+    end
+  end
+
+  defp dispatch(state, actor, %Command{type: type} = command)
+       when type in [:choose_snitch, :decline_snitch] do
+    with :ok <- validate_snitch_turn(state, actor) do
       execute(state, actor, command)
     end
   end
@@ -101,8 +123,15 @@ defmodule Detective.Games.Engine do
     end
   end
 
+  defp dispatch(state, actor, %Command{type: :submit_final_guess} = command) do
+    with :ok <- validate_final_guess_turn(state, actor) do
+      execute(state, actor, command)
+    end
+  end
+
   defp dispatch(state, actor, command) do
-    with :ok <- validate_detective_turn(state, actor) do
+    with :ok <- validate_detective_turn(state, actor),
+         :ok <- validate_free_question_command(actor, command) do
       execute(state, actor, command)
     end
   end
@@ -248,6 +277,30 @@ defmodule Detective.Games.Engine do
     end
   end
 
+  defp execute(state, actor, %Command{type: :search_location}) do
+    with :ok <- validate_placed(actor),
+         :ok <- validate_action_point(actor),
+         {:ok, result} <- SearchDeck.location_result(state.case_definition, actor.location_id),
+         :ok <- validate_search_target_available(state, result),
+         :ok <- validate_evidence_available(state, result) do
+      resolve_search(state, actor, result, :location_searched)
+    end
+  end
+
+  defp execute(state, actor, %Command{type: :search_suspect, payload: payload}) do
+    suspect_id = payload_value(payload, "suspect_id")
+
+    with :ok <- validate_placed(actor),
+         :ok <- validate_action_point(actor),
+         {:ok, suspect} <- fetch_suspect(state, suspect_id),
+         :ok <- validate_suspect_location(actor, suspect),
+         {:ok, result} <- SearchDeck.suspect_result(state.case_definition, suspect.id),
+         :ok <- validate_search_target_available(state, result),
+         :ok <- validate_evidence_available(state, result) do
+      resolve_search(state, actor, result, :suspect_searched)
+    end
+  end
+
   defp execute(state, actor, %Command{
          type: :interrogate,
          command_id: command_id,
@@ -256,28 +309,44 @@ defmodule Detective.Games.Engine do
     suspect_id = payload_value(payload, "suspect_id")
     topic_id = payload_value(payload, "topic_id")
     spend_leverage = payload_value(payload, "spend_leverage") || false
+    free_question? = actor.free_question_suspect_id == suspect_id
 
     with :ok <- validate_placed(actor),
-         :ok <- validate_action_point(actor),
          {:ok, suspect} <- fetch_suspect(state, suspect_id),
          :ok <- validate_suspect_location(actor, suspect),
+         :ok <- validate_free_question_target(actor, suspect),
+         :ok <- validate_interrogation_action(actor, free_question?),
          {:ok, topic} <- ResponseMatrix.topic(state.case_definition, topic_id),
          :ok <- validate_topic_knowledge(actor, topic),
          {:ok, options} <-
            ResponseMatrix.response_options(state.case_definition, suspect.id, topic.id),
          :ok <- validate_spend_leverage(spend_leverage),
          {:ok, next_actor} <- spend_detective_leverage(actor, suspect.id, spend_leverage) do
-      next_actor = %{next_actor | actions_remaining: next_actor.actions_remaining - 1}
+      next_actor = %{
+        next_actor
+        | actions_remaining:
+            if(free_question?,
+              do: next_actor.actions_remaining,
+              else: next_actor.actions_remaining - 1
+            ),
+          free_question_suspect_id: nil
+      }
 
       pending_action = %{
         "id" => command_id,
         "type" => "interrogation",
+        "stage" => "block_decision",
         "detective_player_id" => actor.id,
         "detective_user_id" => actor.user_id,
         "suspect_id" => suspect.id,
         "topic_id" => topic.id,
         "topic_code" => topic.code,
+        "free_question" => free_question?,
         "forced_truthful" => spend_leverage,
+        "eligible_snitch_player_ids" => [],
+        "snitch_decisions" => %{},
+        "snitch_player_ids" => [],
+        "blocked_snitch_player_ids" => [],
         "selected_response_id" => nil,
         "selected_response_text" => nil,
         "selected_response_type" => nil
@@ -303,7 +372,8 @@ defmodule Detective.Games.Engine do
         detective_player_id: actor.id,
         suspect_id: suspect.id,
         topic_code: topic.code,
-        actions_remaining: next_actor.actions_remaining
+        actions_remaining: next_actor.actions_remaining,
+        free_question: free_question?
       }
 
       private_payload = %{
@@ -322,11 +392,284 @@ defmodule Detective.Games.Engine do
     end
   end
 
+  defp execute(state, _actor, %Command{type: :allow_question}) do
+    with :ok <- validate_pending_stage(state.pending_action, "block_decision") do
+      {next_state, pending, waiting_phase} = open_snitch_window(state)
+
+      next_state =
+        next_state
+        |> Map.put(:phase, waiting_phase)
+        |> Map.put(:pending_action, pending)
+        |> advance_version()
+        |> append_history(%{
+          type: "question_allowed",
+          player_id: pending["detective_player_id"],
+          suspect_id: pending["suspect_id"]
+        })
+
+      event = %Event{
+        type: :question_allowed,
+        public_payload: %{
+          interrogation_id: pending["id"],
+          detective_player_id: pending["detective_player_id"],
+          snitch_window_open: waiting_phase == :waiting_for_snitches
+        }
+      }
+
+      {:ok, next_state, [event]}
+    end
+  end
+
+  defp execute(state, chisel, %Command{type: :block_question}) do
+    pending = state.pending_action
+
+    with :ok <- validate_pending_stage(pending, "block_decision"),
+         detective <- Map.fetch!(state.players, pending["detective_player_id"]),
+         {:ok, next_chisel, next_detective} <- spend_chisel_leverage(chisel, detective) do
+      next_pending = Map.put(pending, "stage", "blocked_question")
+
+      next_state =
+        state
+        |> put_player(next_chisel)
+        |> put_player(next_detective)
+        |> Map.put(:phase, :waiting_for_detective_decision)
+        |> Map.put(:pending_action, next_pending)
+        |> advance_version()
+        |> append_history(%{
+          type: "question_blocked",
+          player_id: detective.id,
+          suspect_id: pending["suspect_id"]
+        })
+
+      event = %Event{
+        type: :question_blocked,
+        public_payload: %{
+          interrogation_id: pending["id"],
+          detective_player_id: detective.id,
+          suspect_id: pending["suspect_id"]
+        }
+      }
+
+      {:ok, next_state, [event]}
+    end
+  end
+
+  defp execute(state, actor, %Command{type: :accept_question_block}) do
+    pending = state.pending_action
+
+    with :ok <- validate_pending_stage(pending, "blocked_question") do
+      next_state =
+        state
+        |> Map.put(:phase, :detective_turn)
+        |> Map.put(:pending_action, nil)
+        |> advance_version()
+        |> append_history(%{
+          type: "question_abandoned",
+          player_id: actor.id,
+          suspect_id: pending["suspect_id"]
+        })
+
+      event = %Event{
+        type: :question_abandoned,
+        public_payload: %{
+          interrogation_id: pending["id"],
+          detective_player_id: actor.id,
+          suspect_id: pending["suspect_id"]
+        }
+      }
+
+      {:ok, next_state, [event]}
+    end
+  end
+
+  defp execute(state, actor, %Command{type: :bribe_goon}) do
+    pending = state.pending_action
+
+    with :ok <- validate_pending_stage(pending, "blocked_question"),
+         :ok <- validate_scratch(actor, 2) do
+      next_actor = %{actor | scratch: actor.scratch - 2}
+      state = put_player(state, next_actor)
+      {next_state, next_pending, waiting_phase} = open_snitch_window(state)
+
+      next_state =
+        next_state
+        |> Map.put(:phase, waiting_phase)
+        |> Map.put(:pending_action, next_pending)
+        |> advance_version()
+        |> append_history(%{
+          type: "goon_bribed",
+          player_id: actor.id,
+          suspect_id: pending["suspect_id"]
+        })
+
+      event = %Event{
+        type: :goon_bribed,
+        public_payload: %{
+          interrogation_id: pending["id"],
+          detective_player_id: actor.id,
+          snitch_window_open: waiting_phase == :waiting_for_snitches
+        },
+        private_payloads: %{
+          actor.user_id => %{type: "scratch_updated", scratch: next_actor.scratch, spent: 2}
+        }
+      }
+
+      {:ok, next_state, [event]}
+    end
+  end
+
+  defp execute(state, actor, %Command{type: type})
+       when type in [:choose_snitch, :decline_snitch] do
+    pending = state.pending_action
+    choice = type == :choose_snitch
+    decisions = Map.put(pending["snitch_decisions"] || %{}, actor.id, choice)
+    eligible_ids = pending["eligible_snitch_player_ids"] || []
+    remaining_ids = eligible_ids -- Map.keys(decisions)
+    chosen_ids = snitch_player_ids(eligible_ids, decisions)
+
+    {next_phase, next_stage} =
+      cond do
+        remaining_ids != [] -> {:waiting_for_snitches, "snitch_decisions"}
+        chosen_ids == [] -> {:waiting_for_chisel, "response"}
+        true -> {:waiting_for_chisel, "snitch_block"}
+      end
+
+    next_pending =
+      pending
+      |> Map.put("stage", next_stage)
+      |> Map.put("snitch_decisions", decisions)
+
+    next_state =
+      state
+      |> Map.put(:phase, next_phase)
+      |> Map.put(:pending_action, next_pending)
+      |> advance_version()
+      |> append_history(%{
+        type: "snitch_decision_recorded",
+        player_id: actor.id,
+        interrogation_id: pending["id"]
+      })
+
+    decision_event = %Event{
+      type: :snitch_decision_recorded,
+      public_payload: %{
+        interrogation_id: pending["id"],
+        decisions_recorded: map_size(decisions),
+        decisions_required: length(eligible_ids),
+        choices_revealed: remaining_ids == []
+      },
+      private_payloads: %{
+        actor.user_id => %{type: "snitch_choice_recorded", snitch: choice}
+      }
+    }
+
+    events =
+      if remaining_ids == [] do
+        close_event = %Event{
+          type: :snitch_window_closed,
+          public_payload: %{
+            interrogation_id: pending["id"],
+            snitch_request_count: length(chosen_ids)
+          }
+        }
+
+        [decision_event, close_event]
+      else
+        [decision_event]
+      end
+
+    {:ok, next_state, events}
+  end
+
+  defp execute(state, chisel, %Command{type: :resolve_snitches, payload: payload}) do
+    pending = state.pending_action
+    blocked_ids = payload_value(payload, "blocked_player_ids")
+    eligible_ids = pending["eligible_snitch_player_ids"] || []
+    chosen_ids = snitch_player_ids(eligible_ids, pending["snitch_decisions"] || %{})
+
+    with :ok <- validate_pending_stage(pending, "snitch_block"),
+         :ok <- validate_blocked_snitch_ids(blocked_ids, chosen_ids),
+         :ok <- validate_chisel_leverage_for(chisel, blocked_ids) do
+      {next_state, next_chisel} = spend_snitch_block_leverage(state, chisel, blocked_ids)
+      allowed_ids = chosen_ids -- blocked_ids
+
+      next_pending =
+        pending
+        |> Map.put("stage", "response")
+        |> Map.put("snitch_player_ids", allowed_ids)
+        |> Map.put("blocked_snitch_player_ids", blocked_ids)
+
+      next_state =
+        next_state
+        |> put_player(next_chisel)
+        |> Map.put(:phase, :waiting_for_chisel)
+        |> Map.put(:pending_action, next_pending)
+        |> advance_version()
+        |> append_history(%{
+          type: "snitches_resolved",
+          interrogation_id: pending["id"],
+          allowed_count: length(allowed_ids),
+          blocked_count: length(blocked_ids)
+        })
+
+      private_payloads =
+        Map.new(chosen_ids, fn player_id ->
+          detective = Map.fetch!(next_state.players, player_id)
+
+          {detective.user_id,
+           %{
+             type: "snitch_resolved",
+             blocked: player_id in blocked_ids,
+             scratch_cost: if(player_id in blocked_ids, do: 0, else: 3)
+           }}
+        end)
+
+      event = %Event{
+        type: :snitches_resolved,
+        public_payload: %{
+          interrogation_id: pending["id"],
+          requested_count: length(chosen_ids),
+          blocked_count: length(blocked_ids),
+          allowed_count: length(allowed_ids)
+        },
+        private_payloads: private_payloads
+      }
+
+      {:ok, next_state, [event]}
+    end
+  end
+
+  defp execute(state, actor, %Command{type: :skip_free_question}) do
+    with suspect_id when is_binary(suspect_id) <- actor.free_question_suspect_id do
+      next_actor = %{actor | free_question_suspect_id: nil}
+
+      next_state =
+        state
+        |> put_player(next_actor)
+        |> advance_version()
+        |> append_history(%{
+          type: "free_question_declined",
+          player_id: actor.id,
+          suspect_id: suspect_id
+        })
+
+      event = %Event{
+        type: :free_question_declined,
+        public_payload: %{player_id: actor.id, suspect_id: suspect_id}
+      }
+
+      {:ok, next_state, [event]}
+    else
+      _none -> {:error, :free_question_not_available}
+    end
+  end
+
   defp execute(state, _actor, %Command{type: :select_response, payload: payload}) do
     pending = state.pending_action
     response_id = payload_value(payload, "response_id")
 
     with :ok <- validate_pending_interrogation(pending),
+         :ok <- validate_pending_stage(pending, "response"),
          {:ok, option} <-
            ResponseMatrix.response_option(
              state.case_definition,
@@ -337,7 +680,8 @@ defmodule Detective.Games.Engine do
          :ok <- validate_forced_response(pending, option) do
       next_pending = %{
         pending
-        | "selected_response_id" => option.id,
+        | "stage" => "response_decision",
+          "selected_response_id" => option.id,
           "selected_response_text" => option.text,
           "selected_response_type" => option.type
       }
@@ -379,9 +723,15 @@ defmodule Detective.Games.Engine do
 
   defp execute(state, actor, %Command{type: :accept_response}) do
     pending = state.pending_action
+    response_text = pending["selected_response_text"]
+
+    {state, snitch_private_payloads} =
+      deliver_snitch_results(state, pending, response_text, "snitched")
 
     next_actor =
-      append_statement(actor, pending, pending["selected_response_text"], "accepted")
+      state.players
+      |> Map.fetch!(actor.id)
+      |> append_statement(pending, response_text, "accepted")
 
     next_state =
       state
@@ -402,8 +752,10 @@ defmodule Detective.Games.Engine do
         interrogation_id: pending["id"],
         detective_player_id: actor.id,
         suspect_id: pending["suspect_id"],
-        topic_code: pending["topic_code"]
-      }
+        topic_code: pending["topic_code"],
+        snitch_count: length(pending["snitch_player_ids"] || [])
+      },
+      private_payloads: snitch_private_payloads
     }
 
     {:ok, next_state, [event]}
@@ -430,6 +782,22 @@ defmodule Detective.Games.Engine do
           if(succeeded, do: "challenge_succeeded", else: "challenge_failed")
         )
 
+      state =
+        state
+        |> put_player(next_actor)
+        |> put_player(next_chisel)
+
+      {state, snitch_private_payloads} =
+        deliver_snitch_results(
+          state,
+          pending,
+          most_useful.text,
+          if(succeeded, do: "snitch_challenge_succeeded", else: "snitch_challenge_failed")
+        )
+
+      next_actor = Map.fetch!(state.players, actor.id)
+      next_chisel = Map.fetch!(state.players, state.chisel_player_id)
+
       next_state =
         state
         |> put_player(next_actor)
@@ -453,18 +821,18 @@ defmodule Detective.Games.Engine do
           detective_player_id: actor.id,
           suspect_id: pending["suspect_id"],
           topic_code: pending["topic_code"],
-          succeeded: succeeded
+          succeeded: succeeded,
+          snitch_count: length(pending["snitch_player_ids"] || [])
         },
-        private_payloads: %{
-          actor.user_id => %{
+        private_payloads:
+          Map.put(snitch_private_payloads, actor.user_id, %{
             type: "challenge_resolved",
             interrogation_id: pending["id"],
             succeeded: succeeded,
             final_response_text: most_useful.text,
             leverage_supply: next_actor.leverage_supply,
             suspect_leverage: Map.get(next_actor.leverage_on_suspects, pending["suspect_id"], 0)
-          }
-        }
+          })
       }
 
       {:ok, next_state, [event]}
@@ -485,7 +853,263 @@ defmodule Detective.Games.Engine do
     end
   end
 
+  defp execute(state, actor, %Command{type: :accuse, payload: payload}) do
+    with :ok <- validate_accusation_start(state, actor),
+         {:ok, guess} <- AccusationSheet.build_guess(state.case_definition, payload),
+         :ok <- validate_accusation_discovery(state, actor, guess),
+         {:ok, correct_count} <- AccusationSheet.correct_count(state.case_definition, guess) do
+      next_actor = %{
+        actor
+        | solve_token_available: false,
+          solve_attempt: Map.put(guess, "correct_count", correct_count)
+      }
+
+      state = put_player(state, next_actor)
+
+      submitted = %Event{
+        type: :accusation_submitted,
+        public_payload: %{player_id: actor.id},
+        private_payloads: %{
+          actor.user_id => %{
+            type: "accusation_result",
+            correct_count: correct_count,
+            solved: correct_count == 3
+          }
+        }
+      }
+
+      if correct_count == 3 do
+        {finished, finished_event} = finish_game(state, "detective", actor.id, "case_solved")
+
+        next_state =
+          finished
+          |> advance_version()
+          |> append_history(%{type: "game_finished", winner_player_id: actor.id})
+
+        {:ok, next_state, [submitted, finished_event]}
+      else
+        next_state =
+          state
+          |> advance_version()
+          |> append_history(%{type: "accusation_rejected", player_id: actor.id})
+
+        rejected = %Event{
+          type: :accusation_rejected,
+          public_payload: %{player_id: actor.id},
+          private_payloads: submitted.private_payloads
+        }
+
+        {:ok, next_state, [rejected]}
+      end
+    end
+  end
+
+  defp execute(state, actor, %Command{type: :submit_final_guess, payload: payload}) do
+    with {:ok, guess} <- AccusationSheet.build_guess(state.case_definition, payload),
+         :ok <- validate_accusation_discovery(state, actor, guess) do
+      next_actor = %{actor | final_guess: guess}
+      state = put_player(state, next_actor)
+      submitted_count = Enum.count(detective_players(state), &is_map(&1.final_guess))
+      required_count = length(state.detective_order)
+
+      submitted = %Event{
+        type: :final_guess_submitted,
+        public_payload: %{
+          player_id: actor.id,
+          submitted_count: submitted_count,
+          required_count: required_count
+        },
+        private_payloads: %{
+          actor.user_id => %{type: "final_guess_recorded", guess: guess}
+        }
+      }
+
+      if submitted_count == required_count do
+        {finished, finished_event} = resolve_final_guesses(state)
+
+        next_state =
+          finished
+          |> advance_version()
+          |> append_history(%{
+            type: "game_finished",
+            winner_player_id: finished.winner["player_id"]
+          })
+
+        {:ok, next_state, [submitted, finished_event]}
+      else
+        next_state =
+          state
+          |> advance_version()
+          |> append_history(%{type: "final_guess_submitted", player_id: actor.id})
+
+        {:ok, next_state, [submitted]}
+      end
+    end
+  end
+
   defp execute(_state, _actor, %Command{}), do: {:error, :command_not_allowed}
+
+  defp resolve_search(state, actor, result, event_type) do
+    {:ok, revealed_cards} =
+      SearchDeck.case_cards(state.case_definition, result.reveal_case_card_ids)
+
+    newly_revealed_suspects =
+      result.reveal_suspect_ids
+      |> Enum.filter(fn suspect_id ->
+        case Map.get(state.suspects, suspect_id) do
+          %{revealed: false} -> true
+          _other -> false
+        end
+      end)
+
+    free_question_suspect_id = List.first(newly_revealed_suspects)
+
+    next_actor = %{
+      actor
+      | actions_remaining: actor.actions_remaining - 1,
+        knowledge: Enum.uniq(actor.knowledge ++ result.reveal_case_card_ids),
+        evidence: Enum.uniq(actor.evidence ++ result.take_case_card_ids),
+        free_question_suspect_id: free_question_suspect_id,
+        search_notes:
+          Enum.take(
+            [
+              %{
+                "target_type" => result.target_type,
+                "target_id" => result.target_id,
+                "text" => result.text,
+                "case_card_ids" => result.reveal_case_card_ids,
+                "taken_case_card_ids" => result.take_case_card_ids,
+                "day" => state.day
+              }
+              | actor.search_notes
+            ],
+            50
+          )
+    }
+
+    archived_searches =
+      if result.archive do
+        Enum.uniq([SearchDeck.target_key(result) | state.archived_searches])
+      else
+        state.archived_searches
+      end
+
+    suspects =
+      Enum.reduce(newly_revealed_suspects, state.suspects, fn suspect_id, suspects ->
+        Map.update!(suspects, suspect_id, &%{&1 | revealed: true})
+      end)
+
+    taken_evidence =
+      Enum.reduce(result.take_case_card_ids, state.taken_evidence, fn card_id, taken ->
+        release_day = if state.days_remaining > 3, do: state.day + 3
+
+        Map.put(taken, card_id, %{
+          "player_id" => actor.id,
+          "taken_day" => state.day,
+          "release_day" => release_day
+        })
+      end)
+
+    next_state = %{
+      state
+      | archived_searches: archived_searches,
+        suspects: suspects,
+        taken_evidence: taken_evidence
+    }
+
+    {next_state, newly_public_card_ids} =
+      next_state
+      |> put_player(next_actor)
+      |> promote_shared_knowledge()
+
+    next_actor = Map.fetch!(next_state.players, actor.id)
+
+    next_state =
+      next_state
+      |> advance_version()
+      |> append_history(%{
+        type: Atom.to_string(event_type),
+        player_id: actor.id,
+        target_type: result.target_type,
+        target_id: result.target_id
+      })
+
+    event = %Event{
+      type: event_type,
+      public_payload: %{
+        player_id: actor.id,
+        target_type: result.target_type,
+        target_id: result.target_id,
+        archived: result.archive,
+        actions_remaining: next_actor.actions_remaining,
+        revealed_case_card_codes: case_card_codes(state, newly_public_card_ids),
+        evidence_taken_count: length(result.take_case_card_ids),
+        revealed_suspect_ids: newly_revealed_suspects,
+        free_question_available: is_binary(free_question_suspect_id)
+      },
+      private_payloads: %{
+        actor.user_id => %{
+          type: "search_result",
+          target_type: result.target_type,
+          target_id: result.target_id,
+          text: result.text,
+          case_cards: revealed_cards,
+          taken_case_card_ids: result.take_case_card_ids,
+          free_question_suspect_id: free_question_suspect_id
+        }
+      }
+    }
+
+    {:ok, next_state, [event]}
+  end
+
+  defp promote_shared_knowledge(state) do
+    detectives =
+      state.players
+      |> Map.values()
+      |> Enum.filter(&(&1.role == "detective"))
+
+    shared_ids =
+      state.case_definition
+      |> ResponseMatrix.topics()
+      |> Enum.map(& &1.id)
+      |> Enum.filter(fn card_id ->
+        Enum.all?(detectives, &(card_id in &1.knowledge))
+      end)
+
+    newly_public_ids = shared_ids -- state.public_case_card_ids
+    public_ids = Enum.uniq(state.public_case_card_ids ++ shared_ids)
+
+    players =
+      Map.new(state.players, fn
+        {player_id, %{role: "detective"} = player} ->
+          evidence = player.evidence -- newly_public_ids
+
+          {player_id,
+           %{player | knowledge: Enum.uniq(player.knowledge ++ shared_ids), evidence: evidence}}
+
+        entry ->
+          entry
+      end)
+
+    taken_evidence = Map.drop(state.taken_evidence, newly_public_ids)
+
+    {%{
+       state
+       | public_case_card_ids: public_ids,
+         players: players,
+         taken_evidence: taken_evidence
+     }, newly_public_ids}
+  end
+
+  defp case_card_codes(state, card_ids) do
+    topics = ResponseMatrix.topics(state.case_definition)
+
+    card_ids
+    |> Enum.map(fn card_id -> Enum.find(topics, &(&1.id == card_id)) end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(& &1.code)
+  end
 
   defp advance_turn(state, actor) do
     current_index = Enum.find_index(state.detective_order, &(&1 == actor.id))
@@ -526,15 +1150,61 @@ defmodule Detective.Games.Engine do
         players: Map.put(state.players, next_id, next_player)
     }
 
+    {next_state, evidence_events} = release_due_evidence(next_state)
+
     events = [
       %Event{
         type: :day_advanced,
         public_payload: %{day: next_state.day, days_remaining: next_state.days_remaining}
-      },
-      %Event{type: :turn_started, public_payload: %{player_id: next_id, day: next_state.day}}
+      }
+      | evidence_events
     ]
 
+    events =
+      events ++
+        [%Event{type: :turn_started, public_payload: %{player_id: next_id, day: next_state.day}}]
+
     {next_state, events}
+  end
+
+  defp release_due_evidence(state) do
+    due_evidence =
+      Enum.filter(state.taken_evidence, fn {_card_id, evidence} ->
+        evidence["release_day"] == state.day
+      end)
+
+    Enum.reduce(due_evidence, {state, []}, fn {card_id, evidence}, {next_state, events} ->
+      players =
+        Map.new(next_state.players, fn
+          {player_id, %{role: "detective"} = player} ->
+            {player_id,
+             %{
+               player
+               | knowledge: Enum.uniq([card_id | player.knowledge]),
+                 evidence: List.delete(player.evidence, card_id)
+             }}
+
+          entry ->
+            entry
+        end)
+
+      updated_state = %{
+        next_state
+        | players: players,
+          public_case_card_ids: Enum.uniq([card_id | next_state.public_case_card_ids]),
+          taken_evidence: Map.delete(next_state.taken_evidence, card_id)
+      }
+
+      event = %Event{
+        type: :evidence_submitted,
+        public_payload: %{
+          case_card_code: List.first(case_card_codes(next_state, [card_id])),
+          former_holder_player_id: evidence["player_id"]
+        }
+      }
+
+      {updated_state, events ++ [event]}
+    end)
   end
 
   defp reset_actions(player), do: %{player | actions_remaining: @actions_per_turn}
@@ -600,7 +1270,8 @@ defmodule Detective.Games.Engine do
          id: suspect["id"],
          name: suspect["name"],
          occupation: suspect["occupation"],
-         location_id: suspect["location_id"]
+         location_id: suspect["location_id"],
+         revealed: suspect["initially_known"] != false
        }}
     end)
   end
@@ -623,16 +1294,87 @@ defmodule Detective.Games.Engine do
   defp validate_detective_turn(_state, %{role: "chisel"}), do: {:error, :wrong_role}
   defp validate_detective_turn(_state, _actor), do: {:error, :not_your_turn}
 
-  defp validate_chisel_response_turn(%State{phase: :waiting_for_chisel}, %{
+  defp validate_final_guess_turn(
+         %State{phase: :accusation} = state,
+         %{
+           role: "detective"
+         } = actor
+       ) do
+    cond do
+      not AccusationSheet.configured?(state.case_definition) ->
+        {:error, :accusation_not_available}
+
+      is_map(actor.final_guess) ->
+        {:error, :final_guess_already_submitted}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_final_guess_turn(_state, %{role: role}) when role != "detective",
+    do: {:error, :wrong_role}
+
+  defp validate_final_guess_turn(_state, _actor), do: {:error, :wrong_phase}
+
+  defp validate_free_question_command(%{free_question_suspect_id: nil}, _command), do: :ok
+
+  defp validate_free_question_command(_actor, %Command{type: type})
+       when type in [:interrogate, :skip_free_question],
+       do: :ok
+
+  defp validate_free_question_command(_actor, _command), do: {:error, :free_question_pending}
+
+  defp validate_chisel_interrogation_turn(%State{phase: :waiting_for_chisel}, %{
          role: "chisel"
        }),
        do: :ok
 
-  defp validate_chisel_response_turn(%State{phase: phase}, _actor)
+  defp validate_chisel_interrogation_turn(_state, %{role: role}) when role != "chisel",
+    do: {:error, :wrong_role}
+
+  defp validate_chisel_interrogation_turn(%State{phase: phase}, _actor)
        when phase != :waiting_for_chisel,
        do: {:error, :wrong_phase}
 
-  defp validate_chisel_response_turn(_state, _actor), do: {:error, :wrong_role}
+  defp validate_chisel_interrogation_turn(_state, _actor), do: {:error, :wrong_role}
+
+  defp validate_blocked_question_decision(
+         %State{phase: :waiting_for_detective_decision, pending_action: pending},
+         %{id: player_id, role: "detective"}
+       ) do
+    cond do
+      not is_map(pending) -> {:error, :invalid_pending_action}
+      pending_stage(pending) != "blocked_question" -> {:error, :question_not_blocked}
+      pending["detective_player_id"] != player_id -> {:error, :not_interrogating_detective}
+      true -> :ok
+    end
+  end
+
+  defp validate_blocked_question_decision(_state, %{role: role}) when role != "detective",
+    do: {:error, :wrong_role}
+
+  defp validate_blocked_question_decision(_state, _actor), do: {:error, :wrong_phase}
+
+  defp validate_snitch_turn(
+         %State{phase: :waiting_for_snitches, pending_action: pending},
+         %{id: player_id, role: "detective"}
+       ) do
+    eligible_ids = pending["eligible_snitch_player_ids"] || []
+    decisions = pending["snitch_decisions"] || %{}
+
+    cond do
+      pending_stage(pending) != "snitch_decisions" -> {:error, :wrong_phase}
+      player_id not in eligible_ids -> {:error, :not_snitch_eligible}
+      Map.has_key?(decisions, player_id) -> {:error, :snitch_choice_recorded}
+      true -> :ok
+    end
+  end
+
+  defp validate_snitch_turn(_state, %{role: role}) when role != "detective",
+    do: {:error, :wrong_role}
+
+  defp validate_snitch_turn(_state, _actor), do: {:error, :wrong_phase}
 
   defp validate_detective_decision(
          %State{phase: :waiting_for_detective_decision, pending_action: pending},
@@ -641,6 +1383,7 @@ defmodule Detective.Games.Engine do
     cond do
       not is_map(pending) -> {:error, :invalid_pending_action}
       pending["detective_player_id"] != player_id -> {:error, :not_interrogating_detective}
+      pending_stage(pending) != "response_decision" -> {:error, :response_not_selected}
       is_nil(pending["selected_response_id"]) -> {:error, :response_not_selected}
       true -> :ok
     end
@@ -661,6 +1404,41 @@ defmodule Detective.Games.Engine do
   defp validate_action_point(%{actions_remaining: actions}) when actions > 0, do: :ok
   defp validate_action_point(_actor), do: {:error, :no_actions_remaining}
 
+  defp validate_accusation_start(state, actor) do
+    cond do
+      not AccusationSheet.configured?(state.case_definition) ->
+        {:error, :accusation_not_available}
+
+      not Map.get(actor, :solve_token_available, true) ->
+        {:error, :solve_token_spent}
+
+      actor.actions_remaining != @actions_per_turn ->
+        {:error, :accusation_must_start_turn}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_accusation_discovery(state, actor, guess) do
+    suspect = Map.get(state.suspects, guess["suspect_id"])
+
+    cond do
+      not is_map(suspect) or not Map.get(suspect, :revealed, true) ->
+        {:error, :accusation_suspect_unknown}
+
+      true ->
+        with {:ok, weapon} <-
+               AccusationSheet.weapon(state.case_definition, guess["weapon_id"]),
+             true <- weapon["case_card_id"] in actor.knowledge do
+          :ok
+        else
+          false -> {:error, :accusation_weapon_unknown}
+          {:error, reason} -> {:error, reason}
+        end
+    end
+  end
+
   defp validate_police_station(%{type: "police_station"}), do: :ok
   defp validate_police_station(_location), do: {:error, :police_station_required}
 
@@ -675,13 +1453,23 @@ defmodule Detective.Games.Engine do
     end
   end
 
+  defp validate_suspect_location(_actor, %{revealed: false}), do: {:error, :invalid_suspect}
+
   defp validate_suspect_location(actor, suspect) do
-    if actor.location_id == suspect.location_id do
-      :ok
-    else
-      {:error, :suspect_not_at_location}
-    end
+    if actor.location_id == suspect.location_id,
+      do: :ok,
+      else: {:error, :suspect_not_at_location}
   end
+
+  defp validate_free_question_target(%{free_question_suspect_id: nil}, _suspect), do: :ok
+
+  defp validate_free_question_target(%{free_question_suspect_id: suspect_id}, %{id: suspect_id}),
+    do: :ok
+
+  defp validate_free_question_target(_actor, _suspect), do: {:error, :free_question_pending}
+
+  defp validate_interrogation_action(_actor, true), do: :ok
+  defp validate_interrogation_action(actor, false), do: validate_action_point(actor)
 
   defp validate_topic_knowledge(actor, topic) do
     if topic.id in actor.knowledge do
@@ -713,6 +1501,20 @@ defmodule Detective.Games.Engine do
 
   defp validate_pending_interrogation(%{"type" => "interrogation"}), do: :ok
   defp validate_pending_interrogation(_pending), do: {:error, :invalid_pending_action}
+
+  defp validate_pending_stage(pending, expected_stage) do
+    if pending_stage(pending) == expected_stage,
+      do: :ok,
+      else: {:error, :command_not_allowed}
+  end
+
+  defp pending_stage(%{"stage" => stage}) when is_binary(stage), do: stage
+
+  defp pending_stage(%{"selected_response_id" => response_id}) when is_binary(response_id),
+    do: "response_decision"
+
+  defp pending_stage(%{"type" => "interrogation"}), do: "response"
+  defp pending_stage(_pending), do: nil
 
   defp validate_forced_response(%{"forced_truthful" => true}, %{type: "most_useful"}), do: :ok
 
@@ -764,6 +1566,240 @@ defmodule Detective.Games.Engine do
     }
 
     %{actor | statements: Enum.take([statement | actor.statements], 50)}
+  end
+
+  defp open_snitch_window(state) do
+    pending = state.pending_action
+
+    eligible_ids =
+      state.players
+      |> Map.values()
+      |> Enum.filter(fn player ->
+        player.role == "detective" and player.id != pending["detective_player_id"] and
+          player.scratch >= 3
+      end)
+      |> Enum.sort_by(& &1.seat)
+      |> Enum.map(& &1.id)
+
+    if pending["forced_truthful"] or eligible_ids == [] do
+      pending =
+        pending
+        |> Map.put("stage", "response")
+        |> Map.put("eligible_snitch_player_ids", [])
+
+      {state, pending, :waiting_for_chisel}
+    else
+      pending =
+        pending
+        |> Map.put("stage", "snitch_decisions")
+        |> Map.put("eligible_snitch_player_ids", eligible_ids)
+        |> Map.put("snitch_decisions", %{})
+
+      {state, pending, :waiting_for_snitches}
+    end
+  end
+
+  defp snitch_player_ids(eligible_ids, decisions) do
+    Enum.filter(eligible_ids, &(Map.get(decisions, &1) == true))
+  end
+
+  defp spend_chisel_leverage(chisel, detective) do
+    leverage = Map.get(chisel.leverage_by_detective, detective.id, 0)
+
+    if leverage > 0 do
+      next_chisel = %{
+        chisel
+        | leverage_by_detective: Map.put(chisel.leverage_by_detective, detective.id, leverage - 1)
+      }
+
+      next_detective = %{detective | leverage_supply: detective.leverage_supply + 1}
+      {:ok, next_chisel, next_detective}
+    else
+      {:error, :question_block_unavailable}
+    end
+  end
+
+  defp validate_scratch(%{scratch: scratch}, cost) when scratch >= cost, do: :ok
+  defp validate_scratch(_actor, _cost), do: {:error, :insufficient_scratch}
+
+  defp validate_blocked_snitch_ids(blocked_ids, chosen_ids)
+       when is_list(blocked_ids) do
+    valid_ids? =
+      Enum.all?(blocked_ids, &(is_binary(&1) and &1 in chosen_ids)) and
+        Enum.uniq(blocked_ids) == blocked_ids
+
+    if valid_ids?, do: :ok, else: {:error, :invalid_snitch_resolution}
+  end
+
+  defp validate_blocked_snitch_ids(_blocked_ids, _chosen_ids),
+    do: {:error, :invalid_snitch_resolution}
+
+  defp validate_chisel_leverage_for(chisel, player_ids) do
+    if Enum.all?(player_ids, &(Map.get(chisel.leverage_by_detective, &1, 0) > 0)),
+      do: :ok,
+      else: {:error, :insufficient_chisel_leverage}
+  end
+
+  defp spend_snitch_block_leverage(state, chisel, blocked_ids) do
+    Enum.reduce(blocked_ids, {state, chisel}, fn player_id, {next_state, next_chisel} ->
+      detective = Map.fetch!(next_state.players, player_id)
+      leverage = Map.fetch!(next_chisel.leverage_by_detective, player_id)
+
+      next_detective = %{detective | leverage_supply: detective.leverage_supply + 1}
+
+      next_chisel = %{
+        next_chisel
+        | leverage_by_detective:
+            Map.put(next_chisel.leverage_by_detective, player_id, leverage - 1)
+      }
+
+      {put_player(next_state, next_detective), next_chisel}
+    end)
+  end
+
+  defp deliver_snitch_results(state, pending, response_text, resolution) do
+    pending
+    |> Map.get("snitch_player_ids", [])
+    |> Enum.reduce({state, %{}}, fn player_id, {next_state, private_payloads} ->
+      detective = Map.fetch!(next_state.players, player_id)
+
+      next_detective =
+        detective
+        |> Map.put(:scratch, detective.scratch - 3)
+        |> append_statement(pending, response_text, resolution)
+
+      private_payload = %{
+        type: "snitch_result",
+        interrogation_id: pending["id"],
+        response_text: response_text,
+        scratch: next_detective.scratch,
+        scratch_spent: 3
+      }
+
+      {put_player(next_state, next_detective),
+       Map.put(private_payloads, detective.user_id, private_payload)}
+    end)
+  end
+
+  defp detective_players(state) do
+    state.detective_order
+    |> Enum.map(&Map.fetch!(state.players, &1))
+  end
+
+  defp resolve_final_guesses(state) do
+    results =
+      Map.new(state.detective_order, fn player_id ->
+        detective = Map.fetch!(state.players, player_id)
+
+        {:ok, correct_count} =
+          AccusationSheet.correct_count(state.case_definition, detective.final_guess)
+
+        {player_id, correct_count}
+      end)
+
+    players =
+      Map.new(state.players, fn
+        {player_id, %{role: "detective"} = detective} ->
+          final_guess =
+            Map.put(detective.final_guess, "correct_count", Map.fetch!(results, player_id))
+
+          {player_id, %{detective | final_guess: final_guess}}
+
+        entry ->
+          entry
+      end)
+
+    state = %{state | players: players}
+
+    winning_detective_id =
+      state.detective_order
+      |> Enum.reverse()
+      |> Enum.find(&(Map.fetch!(results, &1) == 3))
+
+    if winning_detective_id do
+      finish_game(state, "detective", winning_detective_id, "final_guess")
+    else
+      finish_game(state, "chisel", state.chisel_player_id, "time_expired")
+    end
+  end
+
+  defp finish_game(state, role, player_id, reason) do
+    winner = %{
+      "role" => role,
+      "player_id" => player_id,
+      "reason" => reason
+    }
+
+    next_state = %{
+      state
+      | status: :finished,
+        phase: :finished,
+        current_detective_id: nil,
+        pending_action: nil,
+        winner: winner
+    }
+
+    private_payloads =
+      state
+      |> detective_players()
+      |> Map.new(fn detective ->
+        {detective.user_id,
+         %{
+           type: "game_result",
+           winner: winner,
+           correct_count: private_correct_count(detective)
+         }}
+      end)
+
+    event = %Event{
+      type: :game_finished,
+      public_payload: game_result_payload(state.case_definition, winner),
+      private_payloads: private_payloads
+    }
+
+    {next_state, event}
+  end
+
+  defp private_correct_count(%{final_guess: final_guess}) when is_map(final_guess),
+    do: final_guess["correct_count"]
+
+  defp private_correct_count(%{solve_attempt: solve_attempt}) when is_map(solve_attempt),
+    do: solve_attempt["correct_count"]
+
+  defp private_correct_count(_detective), do: nil
+
+  defp game_result_payload(case_definition, winner) do
+    {:ok, solution} = AccusationSheet.revealed_solution(case_definition)
+
+    %{
+      winner: winner,
+      solution: solution,
+      epilogue: case_definition["epilogue"]
+    }
+  end
+
+  defp validate_search_target_available(state, result) do
+    if SearchDeck.target_key(result) in state.archived_searches,
+      do: {:error, :search_archived},
+      else: :ok
+  end
+
+  defp validate_evidence_available(state, result) do
+    with {:ok, cards} <- SearchDeck.case_cards(state.case_definition, result.take_case_card_ids) do
+      cond do
+        not Enum.all?(cards, & &1.takeable) ->
+          {:error, :evidence_not_takeable}
+
+        Enum.any?(result.take_case_card_ids, &Map.has_key?(state.taken_evidence, &1)) ->
+          {:error, :evidence_unavailable}
+
+        Enum.any?(result.take_case_card_ids, &(&1 in state.public_case_card_ids)) ->
+          {:error, :evidence_unavailable}
+
+        true ->
+          :ok
+      end
+    end
   end
 
   defp validate_destination(state, actor, destination) do

@@ -210,12 +210,21 @@ defmodule Detective.Games.RuntimeTest do
     assert {:ok, restored_question} = Session.get_state(game.id)
     assert restored_question.phase == :waiting_for_chisel
     assert restored_question.pending_action["suspect_id"] == "night-clerk"
+    assert restored_question.pending_action["stage"] == "block_decision"
+
+    {:ok, %{version: response_version}} =
+      Session.execute(game.id, host.id, %Command{
+        command_id: Ecto.UUID.generate(),
+        type: :allow_question,
+        expected_version: interrogation_version,
+        payload: %{}
+      })
 
     {:ok, %{version: decision_version}} =
       Session.execute(game.id, host.id, %Command{
         command_id: Ecto.UUID.generate(),
         type: :select_response,
-        expected_version: interrogation_version,
+        expected_version: response_version,
         payload: %{"response_id" => "clerk-a-misdirection-2"}
       })
 
@@ -239,6 +248,174 @@ defmodule Detective.Games.RuntimeTest do
     assert resolved.phase == :detective_turn
     assert resolved.pending_action == nil
     assert hd(player.statements)["resolution"] == "challenge_succeeded"
+  end
+
+  test "a correct persisted accusation closes the game and restores its public result" do
+    %{host: host, detective: detective, game: game, version: version} = ready_game()
+
+    {:ok, %{lobby: lobby}} =
+      Games.start_game(
+        Scope.for_user(host),
+        game.id,
+        Ecto.UUID.generate(),
+        version
+      )
+
+    {:ok, %{version: placed_version}} =
+      Session.execute(game.id, detective.id, %Command{
+        command_id: Ecto.UUID.generate(),
+        type: :place,
+        expected_version: lobby.current_version,
+        payload: %{"location_id" => "central-precinct"}
+      })
+
+    {:ok, %{version: searched_version}} =
+      Session.execute(game.id, detective.id, %Command{
+        command_id: Ecto.UUID.generate(),
+        type: :search_location,
+        expected_version: placed_version,
+        payload: %{}
+      })
+
+    {:ok, %{version: next_day_version}} =
+      Session.execute(game.id, detective.id, %Command{
+        command_id: Ecto.UUID.generate(),
+        type: :end_turn,
+        expected_version: searched_version,
+        payload: %{}
+      })
+
+    assert {:ok, %{version: finished_version, events: events}} =
+             Session.execute(game.id, detective.id, %Command{
+               command_id: Ecto.UUID.generate(),
+               type: :accuse,
+               expected_version: next_day_version,
+               payload: %{
+                 "suspect_id" => "night-clerk",
+                 "weapon_id" => "sealed-ledger",
+                 "motive_id" => "cover-up"
+               }
+             })
+
+    assert Enum.map(events, & &1.type) == [:accusation_submitted, :game_finished]
+
+    assert %Game{status: "finished", phase: "finished", current_version: ^finished_version} =
+             Repo.get!(Game, game.id)
+
+    restart_session(game.id)
+    assert {:ok, restored} = Session.get_state(game.id)
+    assert restored.status == :finished
+    assert restored.phase == :finished
+    assert restored.winner["player_id"] == State.player_by_user_id(restored, detective.id).id
+  end
+
+  test "the multi-Detective Snitch phase persists, restores, and delivers the final response" do
+    host = user_fixture()
+    first = user_fixture()
+    second = user_fixture()
+    %{game: game, invite_token: token} = game_fixture(host)
+
+    assert {:ok, _result} = Invitations.accept(Scope.for_user(first), token)
+    assert {:ok, _result} = Invitations.accept(Scope.for_user(second), token)
+
+    assert {:ok, %{lobby: first_ready}} =
+             Games.set_ready(Scope.for_user(first), game.id, 0, true)
+
+    assert {:ok, %{lobby: both_ready}} =
+             Games.set_ready(
+               Scope.for_user(second),
+               game.id,
+               first_ready.current_version,
+               true
+             )
+
+    on_exit(fn ->
+      case Registry.lookup(Detective.GameRegistry, game.id) do
+        [{pid, _value}] -> DynamicSupervisor.terminate_child(SessionSupervisor, pid)
+        [] -> :ok
+      end
+    end)
+
+    {:ok, %{lobby: lobby}} =
+      Games.start_game(
+        Scope.for_user(host),
+        game.id,
+        Ecto.UUID.generate(),
+        both_ready.current_version
+      )
+
+    {:ok, %{version: placed_version}} =
+      Session.execute(game.id, first.id, %Command{
+        command_id: Ecto.UUID.generate(),
+        type: :place,
+        expected_version: lobby.current_version,
+        payload: %{"location_id" => "central-precinct"}
+      })
+
+    {:ok, %{version: question_version}} =
+      Session.execute(game.id, first.id, %Command{
+        command_id: Ecto.UUID.generate(),
+        type: :interrogate,
+        expected_version: placed_version,
+        payload: %{
+          "suspect_id" => "night-clerk",
+          "topic_id" => "victim-file",
+          "spend_leverage" => false
+        }
+      })
+
+    {:ok, %{version: snitch_window_version}} =
+      Session.execute(game.id, host.id, %Command{
+        command_id: Ecto.UUID.generate(),
+        type: :allow_question,
+        expected_version: question_version,
+        payload: %{}
+      })
+
+    assert %Game{phase: "waiting_for_snitches"} = Repo.get!(Game, game.id)
+    restart_session(game.id)
+    assert {:ok, restored_window} = Session.get_state(game.id)
+    assert restored_window.phase == :waiting_for_snitches
+
+    {:ok, %{version: reveal_version}} =
+      Session.execute(game.id, second.id, %Command{
+        command_id: Ecto.UUID.generate(),
+        type: :choose_snitch,
+        expected_version: snitch_window_version,
+        payload: %{}
+      })
+
+    second_player = State.player_by_user_id(restored_window, second.id)
+
+    {:ok, %{version: response_version}} =
+      Session.execute(game.id, host.id, %Command{
+        command_id: Ecto.UUID.generate(),
+        type: :resolve_snitches,
+        expected_version: reveal_version,
+        payload: %{"blocked_player_ids" => []}
+      })
+
+    {:ok, %{version: decision_version}} =
+      Session.execute(game.id, host.id, %Command{
+        command_id: Ecto.UUID.generate(),
+        type: :select_response,
+        expected_version: response_version,
+        payload: %{"response_id" => "clerk-a-misdirection-1"}
+      })
+
+    assert {:ok, %{state: finished_question}} =
+             Session.execute(game.id, first.id, %Command{
+               command_id: Ecto.UUID.generate(),
+               type: :accept_response,
+               expected_version: decision_version,
+               payload: %{}
+             })
+
+    snitch = Map.fetch!(finished_question.players, second_player.id)
+    assert snitch.scratch == 2
+
+    assert hd(snitch.statements)["response_text"] ==
+             "The register was blank when I locked the archive."
   end
 
   defp ready_game do

@@ -30,6 +30,21 @@ defmodule Detective.Games.SnapshotCodecTest do
           leverage_on_suspects: %{},
           knowledge: ["signal-log"],
           statements: [],
+          search_notes: [
+            %{
+              "target_type" => "location",
+              "target_id" => "precinct",
+              "text" => "A private search result.",
+              "case_card_ids" => ["signal-log"],
+              "taken_case_card_ids" => ["signal-log"],
+              "day" => 2
+            }
+          ],
+          evidence: ["signal-log"],
+          free_question_suspect_id: "witness",
+          solve_token_available: false,
+          solve_attempt: %{"suspect_id" => "witness"},
+          final_guess: nil,
           kickback_day: nil
         }
       },
@@ -46,6 +61,15 @@ defmodule Detective.Games.SnapshotCodecTest do
       case_definition: %{
         "solution" => %{"suspect_id" => "secret"},
         "published" => true
+      },
+      public_case_card_ids: ["public-log"],
+      archived_searches: ["location:precinct"],
+      taken_evidence: %{
+        "signal-log" => %{
+          "player_id" => player_id,
+          "taken_day" => 2,
+          "release_day" => 5
+        }
       }
     }
 
@@ -59,8 +83,14 @@ defmodule Detective.Games.SnapshotCodecTest do
     assert restored.phase == :detective_turn
     assert restored.version == 7
     assert restored.players[player_id].scratch == 5
+    assert restored.players[player_id].evidence == ["signal-log"]
+    assert restored.players[player_id].free_question_suspect_id == "witness"
+    refute restored.players[player_id].solve_token_available
     assert restored.locations["precinct"].district_ids == ["central"]
     assert restored.case_definition["solution"]["suspect_id"] == "secret"
+    assert restored.public_case_card_ids == ["public-log"]
+    assert restored.archived_searches == ["location:precinct"]
+    assert restored.taken_evidence["signal-log"]["release_day"] == 5
   end
 
   test "round-trips a pending interrogation with string keys" do

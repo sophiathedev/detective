@@ -133,6 +133,131 @@ map_locations = [
   }
 ]
 
+additional_case_cards = [
+  %{
+    "id" => "receiver-cable",
+    "type" => "evidence",
+    "title" => "Cut Receiver Cable",
+    "description" =>
+      "A weighted receiver cable cut from the array console and scrubbed with solvent.",
+    "initially_known" => false
+  },
+  %{
+    "id" => "harbor-flare",
+    "type" => "evidence",
+    "title" => "Harbor Signal Flare",
+    "description" =>
+      "A brass signal flare recovered near the breakwater with fresh impact damage.",
+    "initially_known" => false
+  }
+]
+
+upgrade_case_cards = fn case_cards ->
+  existing_ids = MapSet.new(case_cards, & &1["id"])
+
+  added_cards =
+    Enum.reject(additional_case_cards, &MapSet.member?(existing_ids, &1["id"]))
+
+  case_cards
+  |> Kernel.++(added_cards)
+  |> Enum.map(fn
+    %{"id" => "copper-tuning-key"} = card -> Map.put(card, "takeable", true)
+    card -> card
+  end)
+  |> add_case_codes.()
+end
+
+search_results = %{
+  "locations" => %{
+    "meridian-array" => %{
+      "text" =>
+        "A torn calibration sleeve leads to the copper tuning key beneath the receiver dais.",
+      "archive" => true,
+      "reveal_case_card_ids" => ["copper-tuning-key"],
+      "take_case_card_ids" => ["copper-tuning-key"],
+      "reveal_suspect_ids" => []
+    },
+    "telegraph-exchange" => %{
+      "text" =>
+        "A routing clerk identifies a cut receiver cable hidden among condemned switchboard parts.",
+      "archive" => true,
+      "reveal_case_card_ids" => ["receiver-cable"],
+      "take_case_card_ids" => [],
+      "reveal_suspect_ids" => []
+    },
+    "mariner-social-club" => %{
+      "text" =>
+        "The coatroom ledger links an abandoned harbor flare to a private table used after midnight.",
+      "archive" => true,
+      "reveal_case_card_ids" => ["harbor-flare"],
+      "take_case_card_ids" => [],
+      "reveal_suspect_ids" => []
+    }
+  },
+  "suspects" => %{
+    "iona-pike" => %{
+      "text" => "Iona's tool roll is missing one heavy calibration key and one sleeve.",
+      "archive" => true,
+      "reveal_case_card_ids" => [],
+      "take_case_card_ids" => [],
+      "reveal_suspect_ids" => []
+    },
+    "tomas-vale" => %{
+      "text" => "Tomas carries harbor permits, grease pencils, and no concealed case evidence.",
+      "archive" => true,
+      "reveal_case_card_ids" => [],
+      "take_case_card_ids" => [],
+      "reveal_suspect_ids" => []
+    },
+    "celeste-rook" => %{
+      "text" =>
+        "Celeste's press satchel contains labeled photographs already copied into the file.",
+      "archive" => true,
+      "reveal_case_card_ids" => [],
+      "take_case_card_ids" => [],
+      "reveal_suspect_ids" => []
+    }
+  },
+  "all_other_locations" => %{
+    "text" => "The search turns up no material connected to the midnight signal.",
+    "archive" => false,
+    "reveal_case_card_ids" => [],
+    "take_case_card_ids" => [],
+    "reveal_suspect_ids" => []
+  }
+}
+
+accusation_options = %{
+  "weapons" => [
+    %{
+      "id" => "copper-tuning-key",
+      "label" => "Copper Tuning Key",
+      "case_card_id" => "copper-tuning-key"
+    },
+    %{
+      "id" => "receiver-cable",
+      "label" => "Cut Receiver Cable",
+      "case_card_id" => "receiver-cable"
+    },
+    %{
+      "id" => "harbor-flare",
+      "label" => "Harbor Signal Flare",
+      "case_card_id" => "harbor-flare"
+    }
+  ],
+  "motives" => [
+    %{"id" => "relay-code-cover-up", "label" => "Conceal the sale of the harbor relay code"},
+    %{"id" => "silence-a-witness", "label" => "Silence a witness to harbor smuggling"},
+    %{"id" => "steal-the-recording", "label" => "Steal the original midnight recording"}
+  ]
+}
+
+solution = %{
+  "suspect_id" => "iona-pike",
+  "weapon_id" => "copper-tuning-key",
+  "motive_id" => "relay-code-cover-up"
+}
+
 {:ok, _result} =
   Repo.transaction(fn ->
     case Repo.get_by(CaseFile, slug: slug) do
@@ -166,6 +291,7 @@ map_locations = [
               "title" => "Copper Tuning Key",
               "description" =>
                 "A heavy calibration tool wiped clean except for a trace of marine grease.",
+              "takeable" => true,
               "initially_known" => false
             },
             %{
@@ -176,6 +302,7 @@ map_locations = [
                 "A station ledger with the 00:17 transmission overwritten by a maintenance entry.",
               "initially_known" => true
             }
+            | additional_case_cards
           ],
           "suspects" => [
             %{
@@ -272,11 +399,9 @@ map_locations = [
               }
             }
           },
-          "solution" => %{
-            "suspect_id" => "iona-pike",
-            "weapon_id" => "copper-tuning-key",
-            "motive" => "conceal the sale of the harbor relay code"
-          },
+          "search_results" => search_results,
+          "accusation_options" => accusation_options,
+          "solution" => solution,
           "epilogue" =>
             "Mara traced the midnight broadcast to a smuggling route enabled by Iona's stolen relay code. When Mara prepared to expose the scheme, Iona struck her with the tuning key and rewrote the signal log. The preserved recording and Celeste's photograph reveal the cover-up."
         }
@@ -296,10 +421,11 @@ map_locations = [
         version
 
       case_file ->
-        case Repo.get_by(CaseVersion, case_id: case_file.id, version: 4) do
+        case Repo.get_by(CaseVersion, case_id: case_file.id, version: 5) do
           nil ->
             legacy_version =
-              Repo.get_by(CaseVersion, case_id: case_file.id, version: 3) ||
+              Repo.get_by(CaseVersion, case_id: case_file.id, version: 4) ||
+                Repo.get_by(CaseVersion, case_id: case_file.id, version: 3) ||
                 Repo.get_by(CaseVersion, case_id: case_file.id, version: 2) ||
                 Repo.get_by!(CaseVersion, case_id: case_file.id, version: 1)
 
@@ -307,12 +433,15 @@ map_locations = [
               legacy_version.content
               |> Map.put("max_days", 6)
               |> Map.put("locations", map_locations)
-              |> Map.update!("case_cards", add_case_codes)
+              |> Map.update!("case_cards", upgrade_case_cards)
               |> Map.update!("response_matrix", author_response_decks)
+              |> Map.put("search_results", search_results)
+              |> Map.put("accusation_options", accusation_options)
+              |> Map.put("solution", solution)
 
             {:ok, version} =
               Cases.create_version(case_file, %{
-                version: 4,
+                version: 5,
                 content: upgraded_content,
                 published_at: DateTime.utc_now() |> DateTime.truncate(:second)
               })

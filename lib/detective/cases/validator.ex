@@ -5,7 +5,7 @@ defmodule Detective.Cases.Validator do
 
   @location_types ~w(standard police_station mob_joint)
 
-  alias Detective.Cases.ResponseMatrix
+  alias Detective.Cases.{AccusationSheet, ResponseMatrix, SearchDeck}
 
   def validate(case_definition) when is_map(case_definition) do
     locations = case_definition["locations"]
@@ -15,7 +15,9 @@ defmodule Detective.Cases.Validator do
          :ok <- validate_police_station(locations),
          :ok <- validate_three_move_reachability(locations),
          :ok <- validate_suspect_locations(case_definition["suspects"], locations),
-         :ok <- ResponseMatrix.validate(case_definition) do
+         :ok <- ResponseMatrix.validate(case_definition),
+         :ok <- SearchDeck.validate(case_definition),
+         :ok <- AccusationSheet.validate(case_definition) do
       :ok
     end
   end

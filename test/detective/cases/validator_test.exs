@@ -58,6 +58,96 @@ defmodule Detective.Cases.ValidatorTest do
     assert {:error, :invalid_response_matrix} = Validator.validate(without_truth)
   end
 
+  test "validates server-owned Search cards and their reveal instructions" do
+    valid =
+      valid_case()
+      |> Map.put("case_cards", [
+        %{
+          "id" => "receipt",
+          "code" => "A",
+          "title" => "Receipt",
+          "type" => "evidence",
+          "takeable" => true,
+          "initially_known" => false
+        }
+      ])
+      |> Map.put("search_results", %{
+        "locations" => %{
+          "precinct" => search_result(["receipt"], ["receipt"])
+        },
+        "suspects" => %{
+          "suspect" => search_result([], [])
+        },
+        "all_other_locations" => search_result([], [])
+      })
+
+    assert :ok = Validator.validate(valid)
+
+    invalid_target =
+      put_in(valid["search_results"]["locations"]["nowhere"], search_result([], []))
+
+    assert {:error, :invalid_search_results} = Validator.validate(invalid_target)
+
+    invalid_card =
+      put_in(
+        valid["search_results"]["locations"]["precinct"]["reveal_case_card_ids"],
+        ["missing"]
+      )
+
+    assert {:error, :invalid_search_results} = Validator.validate(invalid_card)
+
+    taken_without_reveal =
+      put_in(valid["search_results"]["locations"]["precinct"]["reveal_case_card_ids"], [])
+
+    assert {:error, :invalid_search_results} = Validator.validate(taken_without_reveal)
+
+    missing_suspect_card =
+      update_in(valid["search_results"]["suspects"], &Map.delete(&1, "suspect"))
+
+    assert {:error, :invalid_search_results} = Validator.validate(missing_suspect_card)
+  end
+
+  test "validates finite accusation options and solution references" do
+    valid =
+      valid_case()
+      |> Map.put("case_cards", [
+        %{
+          "id" => "letter-opener",
+          "code" => "A",
+          "title" => "Letter Opener",
+          "type" => "evidence",
+          "initially_known" => true
+        }
+      ])
+      |> Map.put("accusation_options", %{
+        "weapons" => [
+          %{
+            "id" => "letter-opener",
+            "label" => "Letter Opener",
+            "case_card_id" => "letter-opener"
+          }
+        ],
+        "motives" => [%{"id" => "blackmail", "label" => "Stop the blackmail"}]
+      })
+      |> Map.put("solution", %{
+        "suspect_id" => "suspect",
+        "weapon_id" => "letter-opener",
+        "motive_id" => "blackmail"
+      })
+
+    assert :ok = Validator.validate(valid)
+
+    invalid_weapon = put_in(valid["solution"]["weapon_id"], "missing")
+    assert {:error, :invalid_accusation_options} = Validator.validate(invalid_weapon)
+
+    invalid_case_card =
+      update_in(valid["accusation_options"]["weapons"], fn [weapon] ->
+        [Map.put(weapon, "case_card_id", "missing")]
+      end)
+
+    assert {:error, :invalid_accusation_options} = Validator.validate(invalid_case_card)
+  end
+
   defp valid_case do
     %{
       "locations" => [
@@ -77,6 +167,16 @@ defmodule Detective.Cases.ValidatorTest do
       "district_ids" => districts,
       "x" => 0.5,
       "y" => 0.5
+    }
+  end
+
+  defp search_result(reveal_ids, take_ids) do
+    %{
+      "text" => "A case-owned Search card.",
+      "archive" => true,
+      "reveal_case_card_ids" => reveal_ids,
+      "take_case_card_ids" => take_ids,
+      "reveal_suspect_ids" => []
     }
   end
 end

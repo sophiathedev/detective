@@ -3,7 +3,7 @@ defmodule Detective.Games.Rules do
   Pure queries for turn actions and district-based movement.
   """
 
-  alias Detective.Cases.ResponseMatrix
+  alias Detective.Cases.{AccusationSheet, ResponseMatrix, SearchDeck}
   alias Detective.Games.State
 
   def available_actions(%State{} = state, actor_user_id) do
@@ -15,10 +15,18 @@ defmodule Detective.Games.Rules do
       %{id: player_id, role: "detective"} = player
       when player_id == state.current_detective_id and
              state.phase == :waiting_for_detective_decision ->
-        decision_actions(state, player)
+        blocked_or_response_actions(state, player)
 
-      %{role: "chisel"} when state.phase == :waiting_for_chisel ->
-        ["select_response"]
+      %{role: "detective"} = player when state.phase == :waiting_for_snitches ->
+        snitch_actions(state, player)
+
+      %{role: "detective"} = player when state.phase == :accusation ->
+        if is_nil(Map.get(player, :final_guess)) and accusation_ready?(state, player),
+          do: ["submit_final_guess"],
+          else: []
+
+      %{role: "chisel"} = player when state.phase == :waiting_for_chisel ->
+        chisel_actions(state, player)
 
       _other ->
         []
@@ -26,12 +34,18 @@ defmodule Detective.Games.Rules do
   end
 
   def interrogation_options(%State{} = state, %{role: "detective"} = player) do
-    if player.location_id && player.actions_remaining > 0 do
+    free_question_suspect_id = Map.get(player, :free_question_suspect_id)
+    can_question? = player.actions_remaining > 0 or is_binary(free_question_suspect_id)
+
+    if player.location_id && can_question? do
       known_topics = ResponseMatrix.known_topics(state.case_definition, player.knowledge)
 
       state.suspects
       |> Map.values()
-      |> Enum.filter(&(&1.location_id == player.location_id))
+      |> Enum.filter(fn suspect ->
+        Map.get(suspect, :revealed, true) and suspect.location_id == player.location_id and
+          (is_nil(free_question_suspect_id) or free_question_suspect_id == suspect.id)
+      end)
       |> Enum.map(fn suspect ->
         topics =
           Enum.filter(known_topics, fn topic ->
@@ -80,6 +94,24 @@ defmodule Detective.Games.Rules do
     |> Enum.sort_by(& &1.name)
   end
 
+  def searchable_suspects(%State{} = state, %{role: "detective"} = player) do
+    if player.location_id && player.actions_remaining > 0 &&
+         SearchDeck.configured?(state.case_definition) do
+      state.suspects
+      |> Map.values()
+      |> Enum.filter(fn suspect ->
+        Map.get(suspect, :revealed, true) and suspect.location_id == player.location_id and
+          "suspect:#{suspect.id}" not in state.archived_searches and
+          match?({:ok, _result}, SearchDeck.suspect_result(state.case_definition, suspect.id))
+      end)
+      |> Enum.sort_by(& &1.name)
+    else
+      []
+    end
+  end
+
+  def searchable_suspects(%State{}, _player), do: []
+
   def same_district?(location_a, location_b) do
     location_a.district_ids
     |> MapSet.new()
@@ -87,7 +119,33 @@ defmodule Detective.Games.Rules do
     |> Kernel.not()
   end
 
+  def accusation_options(%State{} = state, %{role: "detective"} = player) do
+    revealed_suspect_ids =
+      state.suspects
+      |> Map.values()
+      |> Enum.filter(&Map.get(&1, :revealed, true))
+      |> Enum.map(& &1.id)
+
+    AccusationSheet.public_options(
+      state.case_definition,
+      player.knowledge,
+      revealed_suspect_ids
+    )
+  end
+
+  def accusation_options(%State{}, _player),
+    do: %{suspects: [], weapons: [], motives: []}
+
   defp detective_actions(_state, %{location_id: nil}), do: ["place"]
+
+  defp detective_actions(state, %{free_question_suspect_id: suspect_id} = player)
+       when is_binary(suspect_id) do
+    if interrogation_options(state, player) == [] do
+      ["skip_free_question"]
+    else
+      ["interrogate", "skip_free_question"]
+    end
+  end
 
   defp detective_actions(state, player) do
     actions = ["end_turn"]
@@ -113,30 +171,111 @@ defmodule Detective.Games.Rules do
         actions
       end
 
+    actions =
+      if player.actions_remaining > 0 and SearchDeck.configured?(state.case_definition) and
+           "location:#{player.location_id}" not in state.archived_searches do
+        ["search_location" | actions]
+      else
+        actions
+      end
+
+    actions =
+      if searchable_suspects(state, player) != [] do
+        ["search_suspect" | actions]
+      else
+        actions
+      end
+
     current_location = Map.get(state.locations, player.location_id)
 
-    if player.actions_remaining > 0 and current_location.type == "mob_joint" and
-         player.kickback_day != state.day do
-      ["kickback" | actions]
+    actions =
+      if player.actions_remaining > 0 and current_location.type == "mob_joint" and
+           player.kickback_day != state.day do
+        ["kickback" | actions]
+      else
+        actions
+      end
+
+    if Map.get(player, :solve_token_available, true) and
+         player.actions_remaining == 4 and accusation_ready?(state, player) do
+      ["accuse" | actions]
     else
       actions
     end
   end
 
-  defp decision_actions(state, player) do
+  defp blocked_or_response_actions(state, player) do
     pending = state.pending_action
 
-    if is_map(pending) and pending["detective_player_id"] == player.id and
-         is_binary(pending["selected_response_id"]) do
-      actions = ["accept_response"]
+    cond do
+      not is_map(pending) or pending["detective_player_id"] != player.id ->
+        []
 
-      if player.leverage_supply > 0 do
-        ["challenge_response" | actions]
-      else
-        actions
-      end
+      pending_stage(pending) == "blocked_question" ->
+        if player.scratch >= 2,
+          do: ["bribe_goon", "accept_question_block"],
+          else: ["accept_question_block"]
+
+      pending_stage(pending) == "response_decision" and
+          is_binary(pending["selected_response_id"]) ->
+        actions = ["accept_response"]
+
+        if player.leverage_supply > 0 do
+          ["challenge_response" | actions]
+        else
+          actions
+        end
+
+      true ->
+        []
+    end
+  end
+
+  defp snitch_actions(state, player) do
+    pending = state.pending_action || %{}
+    eligible_ids = pending["eligible_snitch_player_ids"] || []
+    decisions = pending["snitch_decisions"] || %{}
+
+    if player.id in eligible_ids and not Map.has_key?(decisions, player.id) do
+      ["choose_snitch", "decline_snitch"]
     else
       []
     end
+  end
+
+  defp chisel_actions(state, player) do
+    pending = state.pending_action || %{}
+
+    case pending_stage(pending) do
+      "block_decision" ->
+        detective_id = pending["detective_player_id"]
+        actions = ["allow_question"]
+
+        if Map.get(player.leverage_by_detective, detective_id, 0) > 0,
+          do: ["block_question" | actions],
+          else: actions
+
+      "snitch_block" ->
+        ["resolve_snitches"]
+
+      "response" ->
+        ["select_response"]
+
+      _stage ->
+        []
+    end
+  end
+
+  defp pending_stage(%{"stage" => stage}) when is_binary(stage), do: stage
+
+  defp pending_stage(%{"selected_response_id" => response_id}) when is_binary(response_id),
+    do: "response_decision"
+
+  defp pending_stage(%{"type" => "interrogation"}), do: "response"
+  defp pending_stage(_pending), do: nil
+
+  defp accusation_ready?(state, player) do
+    options = accusation_options(state, player)
+    options.suspects != [] and options.weapons != [] and options.motives != []
   end
 end

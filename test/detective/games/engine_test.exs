@@ -195,6 +195,203 @@ defmodule Detective.Games.EngineTest do
              })
   end
 
+  test "searching a location costs one action while its result and evidence stay private" do
+    state = placed_state()
+
+    assert "search_location" in Rules.available_actions(state, user_id("detective-1"))
+
+    assert {:ok, searched, [event]} =
+             apply_command(state, "detective-1", :search_location)
+
+    detective = player(searched, "detective-1")
+    chisel = player(searched, "chisel")
+
+    assert detective.actions_remaining == 3
+    assert detective.knowledge == ["victim-file", "sealed-ledger"]
+    assert detective.evidence == ["sealed-ledger"]
+    assert hd(detective.search_notes)["text"] == "The ledger was hidden behind the duty roster."
+    assert searched.archived_searches == ["location:central-precinct"]
+
+    assert searched.taken_evidence["sealed-ledger"] == %{
+             "player_id" => detective.id,
+             "taken_day" => 1,
+             "release_day" => nil
+           }
+
+    assert event.type == :location_searched
+    assert event.public_payload.evidence_taken_count == 1
+    refute Map.has_key?(event.public_payload, :taken_case_card_codes)
+    refute Jason.encode!(event.public_payload) =~ "sealed-ledger"
+    refute Jason.encode!(event.public_payload) =~ "ledger was hidden"
+
+    assert event.private_payloads[detective.user_id].case_cards == [
+             %{
+               id: "sealed-ledger",
+               code: "B",
+               title: "Sealed Ledger",
+               type: "evidence",
+               description: "A ledger removed from the station records.",
+               takeable: true,
+               initially_known: false
+             }
+           ]
+
+    refute Map.has_key?(event.private_payloads, chisel.user_id)
+
+    assert {:error, :search_archived} =
+             apply_command(searched, "detective-1", :search_location)
+  end
+
+  test "searching a suspect is location-bound and an Archive result locks the target" do
+    state = placed_state()
+
+    assert {:error, :invalid_suspect} =
+             apply_command(state, "detective-1", :search_suspect, %{
+               "suspect_id" => "unknown"
+             })
+
+    assert {:ok, searched, [event]} =
+             apply_command(state, "detective-1", :search_suspect, %{
+               "suspect_id" => "night-clerk"
+             })
+
+    assert event.type == :suspect_searched
+    assert event.public_payload.target_id == "night-clerk"
+    assert "suspect:night-clerk" in searched.archived_searches
+
+    assert {:error, :search_archived} =
+             apply_command(searched, "detective-1", :search_suspect, %{
+               "suspect_id" => "night-clerk"
+             })
+  end
+
+  test "taken evidence is submitted faceup exactly three Day advances later" do
+    state =
+      placed_state()
+      |> Map.put(:days_remaining, 5)
+
+    assert {:ok, searched, _events} =
+             apply_command(state, "detective-1", :search_location)
+
+    holder = player(searched, "detective-1")
+    assert searched.taken_evidence["sealed-ledger"]["release_day"] == 4
+    assert "sealed-ledger" in holder.evidence
+    refute "sealed-ledger" in searched.public_case_card_ids
+
+    {:ok, day_one_second, _events} = apply_command(searched, "detective-1", :end_turn)
+
+    {:ok, day_two, events} =
+      day_one_second
+      |> place_second_detective()
+      |> apply_command("detective-2", :end_turn)
+
+    refute Enum.any?(events, &(&1.type == :evidence_submitted))
+
+    {:ok, day_two_second, _events} = apply_command(day_two, "detective-1", :end_turn)
+    {:ok, day_three, events} = apply_command(day_two_second, "detective-2", :end_turn)
+    refute Enum.any?(events, &(&1.type == :evidence_submitted))
+
+    {:ok, day_three_second, _events} = apply_command(day_three, "detective-1", :end_turn)
+    {:ok, day_four, events} = apply_command(day_three_second, "detective-2", :end_turn)
+
+    assert Enum.map(events, & &1.type) == [
+             :turn_ended,
+             :day_advanced,
+             :evidence_submitted,
+             :turn_started
+           ]
+
+    assert "sealed-ledger" in day_four.public_case_card_ids
+    assert day_four.taken_evidence == %{}
+    refute "sealed-ledger" in player(day_four, "detective-1").evidence
+    assert "sealed-ledger" in player(day_four, "detective-2").knowledge
+  end
+
+  test "discovering a hidden suspect grants an immediate free question or decline" do
+    hidden_case =
+      case_definition()
+      |> update_in(["suspects"], fn suspects ->
+        [
+          %{
+            "id" => "dock-runner",
+            "name" => "Dock Runner",
+            "occupation" => "courier",
+            "location_id" => "central-precinct",
+            "initially_known" => false
+          }
+          | suspects
+        ]
+      end)
+      |> put_in(
+        ["response_matrix", "dock-runner"],
+        %{
+          "victim-file" => %{
+            "most_useful" => "I carried the victim's parcel before midnight.",
+            "misdirections" => ["I never saw the parcel."]
+          }
+        }
+      )
+      |> put_in(
+        ["search_results", "locations", "central-precinct", "reveal_suspect_ids"],
+        ["dock-runner"]
+      )
+      |> put_in(
+        ["search_results", "suspects", "dock-runner"],
+        search_result("The courier has no loose property.", true)
+      )
+
+    assert {:ok, initial} = Engine.new(game(), players(), hidden_case)
+
+    {:ok, placed, _events} =
+      apply_command(initial, "detective-1", :place, %{"location_id" => "central-precinct"})
+
+    refute Map.fetch!(placed.suspects, "dock-runner").revealed
+
+    assert {:ok, discovered, [event]} =
+             apply_command(placed, "detective-1", :search_location)
+
+    detective = player(discovered, "detective-1")
+    assert Map.fetch!(discovered.suspects, "dock-runner").revealed
+    assert detective.free_question_suspect_id == "dock-runner"
+    assert event.public_payload.free_question_available
+
+    assert Rules.available_actions(discovered, detective.user_id) == [
+             "interrogate",
+             "skip_free_question"
+           ]
+
+    assert {:error, :free_question_pending} =
+             apply_command(discovered, "detective-1", :move, %{"location_id" => "archive"})
+
+    actions_before = detective.actions_remaining
+
+    assert {:ok, asking, [question]} =
+             apply_command(discovered, "detective-1", :interrogate, %{
+               "suspect_id" => "dock-runner",
+               "topic_id" => "victim-file"
+             })
+
+    assert player(asking, "detective-1").actions_remaining == actions_before
+    assert asking.pending_action["free_question"]
+    assert question.public_payload.free_question
+
+    assert {:ok, initial_again} = Engine.new(game(), players(), hidden_case)
+
+    {:ok, placed_again, _events} =
+      apply_command(initial_again, "detective-1", :place, %{
+        "location_id" => "central-precinct"
+      })
+
+    {:ok, discovered_again, _events} =
+      apply_command(placed_again, "detective-1", :search_location)
+
+    assert {:ok, declined, [decline]} =
+             apply_command(discovered_again, "detective-1", :skip_free_question)
+
+    assert player(declined, "detective-1").free_question_suspect_id == nil
+    assert decline.type == :free_question_declined
+  end
+
   test "successful challenge is resolved by the server and returns the most useful statement" do
     state = awaiting_chisel_state()
 
@@ -231,6 +428,306 @@ defmodule Detective.Games.EngineTest do
              "The victim signed the register shortly before midnight."
 
     assert hd(detective.statements)["resolution"] == "challenge_succeeded"
+  end
+
+  test "Chisel may block a question and the active Detective may pay two Scratch to proceed" do
+    state = interrogation_open_state()
+    detective_before = player(state, "detective-1")
+    chisel_before = player(state, "chisel")
+
+    assert Rules.available_actions(state, chisel_before.user_id) == [
+             "block_question",
+             "allow_question"
+           ]
+
+    assert {:ok, blocked, [event]} = apply_command(state, "chisel", :block_question)
+    detective = player(blocked, "detective-1")
+    chisel = player(blocked, "chisel")
+
+    assert event.type == :question_blocked
+    assert blocked.phase == :waiting_for_detective_decision
+    assert blocked.pending_action["stage"] == "blocked_question"
+    assert detective.actions_remaining == detective_before.actions_remaining
+    assert detective.leverage_supply == detective_before.leverage_supply + 1
+
+    assert chisel.leverage_by_detective[detective.id] ==
+             chisel_before.leverage_by_detective[detective.id] - 1
+
+    assert Rules.available_actions(blocked, detective.user_id) == [
+             "bribe_goon",
+             "accept_question_block"
+           ]
+
+    assert {:ok, bribed, [bribe]} = apply_command(blocked, "detective-1", :bribe_goon)
+    assert bribe.type == :goon_bribed
+    assert player(bribed, "detective-1").scratch == detective.scratch - 2
+    assert bribed.phase == :waiting_for_snitches
+
+    assert {:ok, blocked_again, _events} =
+             interrogation_open_state()
+             |> apply_command("chisel", :block_question)
+
+    assert {:ok, abandoned, [abandon_event]} =
+             apply_command(blocked_again, "detective-1", :accept_question_block)
+
+    assert abandon_event.type == :question_abandoned
+    assert abandoned.phase == :detective_turn
+    assert abandoned.pending_action == nil
+  end
+
+  test "Snitch choice stays facedown, costs three Scratch only when allowed, and gets final response" do
+    state = interrogation_open_state()
+
+    assert {:ok, snitch_window, [allowed]} =
+             apply_command(state, "chisel", :allow_question)
+
+    assert allowed.type == :question_allowed
+    assert snitch_window.phase == :waiting_for_snitches
+    assert Rules.available_actions(snitch_window, user_id("detective-1")) == []
+
+    assert Rules.available_actions(snitch_window, user_id("detective-2")) == [
+             "choose_snitch",
+             "decline_snitch"
+           ]
+
+    assert {:ok, awaiting_chisel, events} =
+             apply_command(snitch_window, "detective-2", :choose_snitch)
+
+    assert Enum.map(events, & &1.type) == [
+             :snitch_decision_recorded,
+             :snitch_window_closed
+           ]
+
+    assert awaiting_chisel.phase == :waiting_for_chisel
+    assert awaiting_chisel.pending_action["stage"] == "snitch_block"
+    assert Rules.available_actions(awaiting_chisel, user_id("chisel")) == ["resolve_snitches"]
+
+    assert {:ok, response_stage, [resolved]} =
+             apply_command(awaiting_chisel, "chisel", :resolve_snitches, %{
+               "blocked_player_ids" => []
+             })
+
+    assert resolved.public_payload == %{
+             interrogation_id: state.pending_action["id"],
+             requested_count: 1,
+             blocked_count: 0,
+             allowed_count: 1
+           }
+
+    assert player(response_stage, "detective-2").scratch == 5
+
+    {:ok, decision, _events} =
+      apply_command(response_stage, "chisel", :select_response, %{
+        "response_id" => "response-1"
+      })
+
+    assert {:ok, finished, [accepted]} =
+             apply_command(decision, "detective-1", :accept_response)
+
+    snitch = player(finished, "detective-2")
+    assert snitch.scratch == 2
+    assert hd(snitch.statements)["response_text"] == "I never worked the midnight desk."
+    assert hd(snitch.statements)["resolution"] == "snitched"
+
+    assert accepted.private_payloads[snitch.user_id] == %{
+             type: "snitch_result",
+             interrogation_id: state.pending_action["id"],
+             response_text: "I never worked the midnight desk.",
+             scratch: 2,
+             scratch_spent: 3
+           }
+  end
+
+  test "Chisel may spend matching leverage to block an individual Snitch" do
+    state = interrogation_open_state()
+    {:ok, snitch_window, _events} = apply_command(state, "chisel", :allow_question)
+
+    {:ok, awaiting_chisel, _events} =
+      apply_command(snitch_window, "detective-2", :choose_snitch)
+
+    snitch_before = player(awaiting_chisel, "detective-2")
+
+    assert {:ok, response_stage, [resolved]} =
+             apply_command(awaiting_chisel, "chisel", :resolve_snitches, %{
+               "blocked_player_ids" => [snitch_before.id]
+             })
+
+    snitch_after_block = player(response_stage, "detective-2")
+    chisel_after_block = player(response_stage, "chisel")
+
+    assert resolved.public_payload.blocked_count == 1
+    assert snitch_after_block.leverage_supply == snitch_before.leverage_supply + 1
+    assert chisel_after_block.leverage_by_detective[snitch_before.id] == 0
+
+    {:ok, decision, _events} =
+      apply_command(response_stage, "chisel", :select_response, %{
+        "response_id" => "response-0"
+      })
+
+    {:ok, finished, [accepted]} = apply_command(decision, "detective-1", :accept_response)
+
+    blocked_snitch = player(finished, "detective-2")
+    assert blocked_snitch.scratch == snitch_before.scratch
+    assert blocked_snitch.statements == []
+    refute Map.has_key?(accepted.private_payloads, blocked_snitch.user_id)
+  end
+
+  test "Detective leverage forces the most useful response and closes the Snitch window" do
+    state = placed_state()
+    detective_id = player_id("detective-1")
+
+    state =
+      update_in(state.players[detective_id], fn detective ->
+        %{
+          detective
+          | leverage_on_suspects: %{"night-clerk" => 1},
+            leverage_supply: detective.leverage_supply - 1
+        }
+      end)
+
+    assert {:ok, open, _events} =
+             apply_command(state, "detective-1", :interrogate, %{
+               "suspect_id" => "night-clerk",
+               "topic_id" => "victim-file",
+               "spend_leverage" => true
+             })
+
+    assert {:ok, response_stage, [event]} = apply_command(open, "chisel", :allow_question)
+    refute event.public_payload.snitch_window_open
+    assert response_stage.phase == :waiting_for_chisel
+    assert response_stage.pending_action["stage"] == "response"
+
+    assert {:error, :response_forced_truthful} =
+             apply_command(response_stage, "chisel", :select_response, %{
+               "response_id" => "response-1"
+             })
+  end
+
+  test "a beginning-of-turn accusation consumes the Solve token and returns only a private count" do
+    state = state_with_known_weapon()
+    detective = player(state, "detective-1")
+    assert "accuse" in Rules.available_actions(state, detective.user_id)
+
+    assert {:ok, rejected, [event]} =
+             apply_command(state, "detective-1", :accuse, %{
+               "suspect_id" => "night-clerk",
+               "weapon_id" => "sealed-ledger",
+               "motive_id" => "robbery"
+             })
+
+    next_detective = player(rejected, "detective-1")
+    refute next_detective.solve_token_available
+    assert next_detective.actions_remaining == 4
+    assert next_detective.solve_attempt["correct_count"] == 2
+    assert rejected.phase == :detective_turn
+    assert event.type == :accusation_rejected
+    refute Map.has_key?(event.public_payload, :correct_count)
+    refute Jason.encode!(event.public_payload) =~ "sealed-ledger"
+    assert event.private_payloads[next_detective.user_id].correct_count == 2
+
+    assert {:error, :solve_token_spent} =
+             apply_command(rejected, "detective-1", :accuse, %{
+               "suspect_id" => "night-clerk",
+               "weapon_id" => "sealed-ledger",
+               "motive_id" => "cover-up"
+             })
+
+    assert {:ok, analyzed, _events} = apply_command(state, "detective-1", :analyze)
+
+    assert {:error, :accusation_must_start_turn} =
+             apply_command(analyzed, "detective-1", :accuse, %{
+               "suspect_id" => "night-clerk",
+               "weapon_id" => "sealed-ledger",
+               "motive_id" => "cover-up"
+             })
+  end
+
+  test "a correct Solve accusation finishes the game and reveals the case result" do
+    state = state_with_known_weapon()
+
+    assert {:ok, finished, [submitted, result]} =
+             apply_command(state, "detective-1", :accuse, %{
+               "suspect_id" => "night-clerk",
+               "weapon_id" => "sealed-ledger",
+               "motive_id" => "cover-up"
+             })
+
+    assert submitted.type == :accusation_submitted
+    assert result.type == :game_finished
+    assert result.public_payload.solution["suspect_id"] == "night-clerk"
+    assert finished.status == :finished
+    assert finished.phase == :finished
+    assert finished.current_detective_id == nil
+
+    assert finished.winner == %{
+             "role" => "detective",
+             "player_id" => player_id("detective-1"),
+             "reason" => "case_solved"
+           }
+  end
+
+  test "final guesses stay private until all Detectives submit and ties resolve in reverse order" do
+    state =
+      state_with_known_weapon()
+      |> put_known_weapon("detective-2")
+      |> Map.put(:phase, :accusation)
+      |> Map.put(:current_detective_id, nil)
+
+    solution = %{
+      "suspect_id" => "night-clerk",
+      "weapon_id" => "sealed-ledger",
+      "motive_id" => "cover-up"
+    }
+
+    assert {:ok, one_submitted, [first_event]} =
+             apply_command(state, "detective-1", :submit_final_guess, solution)
+
+    assert first_event.type == :final_guess_submitted
+    refute Jason.encode!(first_event.public_payload) =~ "night-clerk"
+    assert one_submitted.phase == :accusation
+    assert player(one_submitted, "detective-1").final_guess == solution
+
+    assert {:error, :final_guess_already_submitted} =
+             apply_command(one_submitted, "detective-1", :submit_final_guess, solution)
+
+    assert {:ok, finished, [second_event, result]} =
+             apply_command(one_submitted, "detective-2", :submit_final_guess, solution)
+
+    assert second_event.type == :final_guess_submitted
+    assert result.type == :game_finished
+    assert finished.status == :finished
+
+    assert finished.winner == %{
+             "role" => "detective",
+             "player_id" => player_id("detective-2"),
+             "reason" => "final_guess"
+           }
+
+    assert player(finished, "detective-1").final_guess["correct_count"] == 3
+    assert player(finished, "detective-2").final_guess["correct_count"] == 3
+  end
+
+  test "Chisel wins after the final guesses when no Detective solves the case" do
+    state =
+      state_with_known_weapon()
+      |> put_known_weapon("detective-2")
+      |> Map.put(:phase, :accusation)
+      |> Map.put(:current_detective_id, nil)
+
+    wrong_guess = %{
+      "suspect_id" => "night-clerk",
+      "weapon_id" => "victim-file",
+      "motive_id" => "robbery"
+    }
+
+    {:ok, one_submitted, _events} =
+      apply_command(state, "detective-1", :submit_final_guess, wrong_guess)
+
+    assert {:ok, finished, [_submitted, result]} =
+             apply_command(one_submitted, "detective-2", :submit_final_guess, wrong_guess)
+
+    assert result.public_payload.winner["role"] == "chisel"
+    assert finished.winner["player_id"] == player_id("chisel")
   end
 
   test "failed challenge transfers the staked marker to the Chisel" do
@@ -297,7 +794,7 @@ defmodule Detective.Games.EngineTest do
     placed
   end
 
-  defp awaiting_chisel_state do
+  defp interrogation_open_state do
     state = placed_state()
 
     assert {:ok, awaiting_chisel, _events} =
@@ -307,6 +804,39 @@ defmodule Detective.Games.EngineTest do
              })
 
     awaiting_chisel
+  end
+
+  defp awaiting_chisel_state do
+    state = interrogation_open_state()
+
+    assert {:ok, snitch_window, _events} = apply_command(state, "chisel", :allow_question)
+
+    assert {:ok, awaiting_chisel, _events} =
+             apply_command(snitch_window, "detective-2", :decline_snitch)
+
+    awaiting_chisel
+  end
+
+  defp place_second_detective(state) do
+    assert {:ok, placed, _events} =
+             apply_command(state, "detective-2", :place, %{
+               "location_id" => "harbor-precinct"
+             })
+
+    placed
+  end
+
+  defp state_with_known_weapon do
+    placed_state()
+    |> put_known_weapon("detective-1")
+  end
+
+  defp put_known_weapon(state, detective_key) do
+    detective_id = player_id(detective_key)
+
+    update_in(state.players[detective_id], fn detective ->
+      %{detective | knowledge: Enum.uniq(["sealed-ledger" | detective.knowledge])}
+    end)
   end
 
   defp apply_command(state, actor, type, payload \\ %{}) do
@@ -365,6 +895,7 @@ defmodule Detective.Games.EngineTest do
           "code" => "A",
           "title" => "Victim File",
           "type" => "victim",
+          "description" => "The victim's movements before midnight.",
           "initially_known" => true
         },
         %{
@@ -372,6 +903,8 @@ defmodule Detective.Games.EngineTest do
           "code" => "B",
           "title" => "Sealed Ledger",
           "type" => "evidence",
+          "description" => "A ledger removed from the station records.",
+          "takeable" => true,
           "initially_known" => false
         }
       ],
@@ -407,7 +940,57 @@ defmodule Detective.Games.EngineTest do
             ]
           }
         }
+      },
+      "accusation_options" => %{
+        "weapons" => [
+          %{
+            "id" => "sealed-ledger",
+            "label" => "Sealed Ledger",
+            "case_card_id" => "sealed-ledger"
+          },
+          %{
+            "id" => "victim-file",
+            "label" => "Victim File",
+            "case_card_id" => "victim-file"
+          }
+        ],
+        "motives" => [
+          %{"id" => "cover-up", "label" => "Cover up the forged register"},
+          %{"id" => "robbery", "label" => "Robbery"}
+        ]
+      },
+      "solution" => %{
+        "suspect_id" => "night-clerk",
+        "weapon_id" => "sealed-ledger",
+        "motive_id" => "cover-up"
+      },
+      "epilogue" => "The clerk used the ledger to conceal the forged register.",
+      "search_results" => %{
+        "locations" => %{
+          "central-precinct" =>
+            search_result(
+              "The ledger was hidden behind the duty roster.",
+              true,
+              ["sealed-ledger"],
+              ["sealed-ledger"]
+            )
+        },
+        "suspects" => %{
+          "night-clerk" => search_result("The clerk carries only a brass pencil.", true)
+        },
+        "all_other_locations" =>
+          search_result("A careful search uncovers nothing connected to the case.", false)
       }
+    }
+  end
+
+  defp search_result(text, archive, reveal_card_ids \\ [], take_card_ids \\ []) do
+    %{
+      "text" => text,
+      "archive" => archive,
+      "reveal_case_card_ids" => reveal_card_ids,
+      "take_case_card_ids" => take_card_ids,
+      "reveal_suspect_ids" => []
     }
   end
 

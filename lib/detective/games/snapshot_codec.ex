@@ -12,7 +12,7 @@ defmodule Detective.Games.SnapshotCodec do
   end
 
   def load(%{"schema_version" => schema_version} = data)
-      when schema_version == @schema_version do
+      when schema_version in [1, @schema_version] do
     with {:ok, status} <- status(data["status"]),
          {:ok, phase} <- phase(data["phase"]),
          {:ok, players} <- load_players(data["players"]),
@@ -20,7 +20,7 @@ defmodule Detective.Games.SnapshotCodec do
          {:ok, suspects} <- load_suspects(data["suspects"]) do
       {:ok,
        %State{
-         schema_version: schema_version,
+         schema_version: @schema_version,
          game_id: data["game_id"],
          case_version_id: data["case_version_id"],
          status: status,
@@ -35,6 +35,9 @@ defmodule Detective.Games.SnapshotCodec do
          locations: locations,
          suspects: suspects,
          case_definition: data["case_definition"],
+         public_case_card_ids: data["public_case_card_ids"] || [],
+         archived_searches: data["archived_searches"] || [],
+         taken_evidence: data["taken_evidence"] || %{},
          pending_action: data["pending_action"],
          winner: data["winner"],
          public_history: data["public_history"] || []
@@ -89,6 +92,12 @@ defmodule Detective.Games.SnapshotCodec do
        leverage_on_suspects: player["leverage_on_suspects"] || %{},
        knowledge: player["knowledge"] || [],
        statements: player["statements"] || [],
+       search_notes: player["search_notes"] || [],
+       evidence: player["evidence"] || [],
+       free_question_suspect_id: player["free_question_suspect_id"],
+       solve_token_available: Map.get(player, "solve_token_available", true),
+       solve_attempt: player["solve_attempt"],
+       final_guess: player["final_guess"],
        kickback_day: player["kickback_day"]
      }}
   end
@@ -131,7 +140,8 @@ defmodule Detective.Games.SnapshotCodec do
           id: suspect["id"],
           name: suspect["name"],
           occupation: suspect["occupation"],
-          location_id: suspect["location_id"]
+          location_id: suspect["location_id"],
+          revealed: Map.get(suspect, "revealed", true)
         }}
      end)}
   end
@@ -145,6 +155,7 @@ defmodule Detective.Games.SnapshotCodec do
 
   defp phase("detective_turn"), do: {:ok, :detective_turn}
   defp phase("waiting_for_chisel"), do: {:ok, :waiting_for_chisel}
+  defp phase("waiting_for_snitches"), do: {:ok, :waiting_for_snitches}
   defp phase("waiting_for_detective_decision"), do: {:ok, :waiting_for_detective_decision}
   defp phase("resolving_challenge"), do: {:ok, :resolving_challenge}
   defp phase("accusation"), do: {:ok, :accusation}

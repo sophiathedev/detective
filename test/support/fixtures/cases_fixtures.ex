@@ -33,6 +33,7 @@ defmodule Detective.CasesFixtures do
               "code" => "A",
               "type" => "victim",
               "title" => "Victim File",
+              "description" => "The victim signed into the archive shortly before midnight.",
               "initially_known" => true
             },
             %{
@@ -40,6 +41,8 @@ defmodule Detective.CasesFixtures do
               "code" => "B",
               "type" => "evidence",
               "title" => "Sealed Ledger",
+              "description" => "A ledger page removed from the archive binding.",
+              "takeable" => true,
               "initially_known" => false
             }
           ],
@@ -98,7 +101,58 @@ defmodule Detective.CasesFixtures do
               }
             }
           },
-          "solution" => %{}
+          "search_results" => %{
+            "locations" => %{
+              "central-precinct" => %{
+                "text" =>
+                  "Behind the intake desk, a loose floorboard conceals the sealed ledger.",
+                "archive" => true,
+                "reveal_case_card_ids" => ["sealed-ledger"],
+                "take_case_card_ids" => ["sealed-ledger"],
+                "reveal_suspect_ids" => []
+              }
+            },
+            "suspects" => %{
+              "night-clerk" => %{
+                "text" => "The clerk carries a duplicate archive key but no additional evidence.",
+                "archive" => true,
+                "reveal_case_card_ids" => [],
+                "take_case_card_ids" => [],
+                "reveal_suspect_ids" => []
+              }
+            },
+            "all_other_locations" => %{
+              "text" => "The search turns up nothing connected to the case.",
+              "archive" => false,
+              "reveal_case_card_ids" => [],
+              "take_case_card_ids" => [],
+              "reveal_suspect_ids" => []
+            }
+          },
+          "accusation_options" => %{
+            "weapons" => [
+              %{
+                "id" => "sealed-ledger",
+                "label" => "Sealed Ledger",
+                "case_card_id" => "sealed-ledger"
+              },
+              %{
+                "id" => "victim-file",
+                "label" => "Victim File",
+                "case_card_id" => "victim-file"
+              }
+            ],
+            "motives" => [
+              %{"id" => "cover-up", "label" => "Cover up the altered register"},
+              %{"id" => "robbery", "label" => "Robbery"}
+            ]
+          },
+          "solution" => %{
+            "suspect_id" => "night-clerk",
+            "weapon_id" => "sealed-ledger",
+            "motive_id" => "cover-up"
+          },
+          "epilogue" => "The clerk used the ledger to conceal the forged register."
         }
       })
 

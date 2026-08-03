@@ -179,6 +179,72 @@ defmodule DetectiveWeb.GameChannelTest do
     refute Map.has_key?(reply.state, :actions_remaining)
   end
 
+  test "Search broadcasts only a safe public shell and files the card on the Detective topic",
+       context do
+    socket = authenticated_socket(context.detective)
+
+    assert {:ok, %{state: public_state}, game_socket} =
+             subscribe_and_join(socket, "game:#{context.game.id}", %{})
+
+    assert {:ok, _private_reply, _user_socket} =
+             subscribe_and_join(socket, "user:#{context.detective.id}", %{
+               "game_id" => context.game.id
+             })
+
+    place_ref =
+      push(game_socket, "command", %{
+        "command_id" => Ecto.UUID.generate(),
+        "type" => "place",
+        "expected_version" => public_state.version,
+        "payload" => %{"location_id" => "central-precinct"}
+      })
+
+    assert_reply place_ref, :ok, %{version: placed_version}
+
+    search_ref =
+      push(game_socket, "command", %{
+        "command_id" => Ecto.UUID.generate(),
+        "type" => "search_location",
+        "expected_version" => placed_version,
+        "payload" => %{}
+      })
+
+    assert_reply search_ref, :ok, %{version: searched_version}
+
+    assert_broadcast "location_searched", %{
+      version: ^searched_version,
+      payload: search_public
+    }
+
+    refute Map.has_key?(search_public, :text)
+    refute Map.has_key?(search_public, :case_cards)
+    refute Map.has_key?(search_public, :taken_case_card_codes)
+    refute Jason.encode!(search_public) =~ "loose floorboard"
+
+    assert_broadcast "private_event", %{
+      type: "location_searched",
+      payload: %{
+        type: "search_result",
+        text: "Behind the intake desk, a loose floorboard conceals the sealed ledger.",
+        case_cards: [%{id: "sealed-ledger"}]
+      }
+    }
+
+    assert_broadcast "game_state", %{version: ^searched_version, state: searched_public}
+    assert "location:central-precinct" in searched_public.archived_searches
+    assert Enum.any?(searched_public.case_cards, &(&1.id == "sealed-ledger"))
+
+    repeated_ref =
+      push(game_socket, "command", %{
+        "command_id" => Ecto.UUID.generate(),
+        "type" => "search_location",
+        "expected_version" => searched_version,
+        "payload" => %{}
+      })
+
+    assert_reply repeated_ref, :error, %{code: "search_archived"}
+  end
+
   test "interrogation delivers ARC options privately and resolves a server-owned challenge",
        context do
     detective_socket = authenticated_socket(context.detective)
@@ -234,11 +300,22 @@ defmodule DetectiveWeb.GameChannelTest do
 
     assert length(options) == 3
 
+    allow_ref =
+      push(host_game_socket, "command", %{
+        "command_id" => Ecto.UUID.generate(),
+        "type" => "allow_question",
+        "expected_version" => interrogation_version,
+        "payload" => %{}
+      })
+
+    assert_reply allow_ref, :ok, %{version: response_version}
+    assert_broadcast "question_allowed", %{version: ^response_version}
+
     select_ref =
       push(host_game_socket, "command", %{
         "command_id" => Ecto.UUID.generate(),
         "type" => "select_response",
-        "expected_version" => interrogation_version,
+        "expected_version" => response_version,
         "payload" => %{"response_id" => "clerk-a-misdirection-1"}
       })
 
