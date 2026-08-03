@@ -24,6 +24,7 @@ defmodule Detective.Application do
           DetectiveWeb.Presence,
           {Registry, keys: :unique, name: Detective.GameRegistry},
           Detective.Games.SessionSupervisor,
+          Detective.Games.ConnectionMonitorSupervisor,
           # Start a worker by calling: Detective.Worker.start_link(arg)
           # {Detective.Worker, arg},
           # Start to serve requests, typically the last entry

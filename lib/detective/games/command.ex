@@ -77,6 +77,7 @@ defmodule Detective.Games.Command do
   defp command_type("challenge_response"), do: {:ok, :challenge_response}
   defp command_type("accuse"), do: {:ok, :accuse}
   defp command_type("submit_final_guess"), do: {:ok, :submit_final_guess}
+  defp command_type("resume_game"), do: {:ok, :resume_game}
   defp command_type("end_turn"), do: {:ok, :end_turn}
   defp command_type(_type), do: :error
 end

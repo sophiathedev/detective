@@ -24,6 +24,8 @@ config :detective,
   ecto_repos: [Detective.Repo],
   generators: [timestamp_type: :utc_datetime, binary_id: true]
 
+config :detective, :disconnect_grace_ms, 180_000
+
 # Configure the endpoint
 config :detective, DetectiveWeb.Endpoint,
   url: [host: "localhost"],

@@ -24,6 +24,14 @@ config :detective, DetectiveWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
 if config_env() == :dev do
+  case Integer.parse(System.get_env("GAME_DISCONNECT_GRACE_MS", "")) do
+    {milliseconds, ""} when milliseconds > 0 ->
+      config :detective, :disconnect_grace_ms, milliseconds
+
+    _other ->
+      :ok
+  end
+
   # Reload browser tabs when matching files change.
   config :detective, DetectiveWeb.Endpoint,
     live_reload: [

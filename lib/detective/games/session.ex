@@ -1,7 +1,14 @@
 defmodule Detective.Games.Session do
   use GenServer
 
-  alias Detective.Games.{Command, Engine, GameBroadcaster, Persistence, SessionSupervisor}
+  alias Detective.Games.{
+    Command,
+    ConnectionMonitor,
+    Engine,
+    GameBroadcaster,
+    Persistence,
+    SessionSupervisor
+  }
 
   def start_link(game_id) do
     GenServer.start_link(__MODULE__, game_id, name: via(game_id))
@@ -102,10 +109,12 @@ defmodule Detective.Games.Session do
   end
 
   defp execute_new_command(state, actor_id, command) do
-    with {:ok, next_state, events} <- Engine.apply(state, actor_id, command),
+    with :ok <- validate_connection_gate(state, command),
+         {:ok, next_state, events} <- Engine.apply(state, actor_id, command),
          {:ok, changes} <-
            Persistence.persist_command(state.game_id, actor_id, command, next_state, events) do
       events = Persistence.attach_delivery_metadata(events, changes, next_state.version)
+      :ok = ConnectionMonitor.game_status_changed(state.game_id, next_state.status)
 
       reply = %{
         version: next_state.version,
@@ -138,6 +147,7 @@ defmodule Detective.Games.Session do
                  "active"
                ) do
           events = Persistence.attach_delivery_metadata(events, changes, next_state.version)
+          :ok = ConnectionMonitor.game_status_changed(state.game_id, next_state.status)
 
           {:ok,
            %{
@@ -150,6 +160,22 @@ defmodule Detective.Games.Session do
         end
     end
   end
+
+  defp validate_connection_gate(state, %Command{type: :resume_game}) do
+    with {:ok, _pid} <-
+           ConnectionMonitor.ensure_monitor(
+             state.game_id,
+             Map.keys(state.players),
+             state.status
+           ),
+         true <- ConnectionMonitor.all_players_online?(state.game_id) do
+      :ok
+    else
+      _reason -> {:error, :players_offline}
+    end
+  end
+
+  defp validate_connection_gate(_state, _command), do: :ok
 
   defp session_call(game_id, message, timeout, attempts_left) do
     with {:ok, pid} <- SessionSupervisor.ensure_session(game_id) do

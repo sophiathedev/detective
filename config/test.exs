@@ -5,6 +5,8 @@ config :bcrypt_elixir, :log_rounds, 1
 
 config :live_svelte, ssr: false
 
+config :detective, :disconnect_grace_ms, 50
+
 # Configure your database
 #
 # The MIX_TEST_PARTITION environment variable can be used
