@@ -384,6 +384,27 @@ defmodule Detective.Games.RuntimeTest do
     assert restored.winner["player_id"] == State.player_by_user_id(restored, detective.id).id
   end
 
+  test "game projection fails closed when the authoritative session is terminal" do
+    %{host: host, game: game, version: version} = ready_game()
+
+    assert {:ok, _result} =
+             Games.start_game(
+               Scope.for_user(host),
+               game.id,
+               Ecto.UUID.generate(),
+               version
+             )
+
+    {:ok, session_pid} = SessionSupervisor.ensure_session(game.id)
+
+    :sys.replace_state(session_pid, fn state ->
+      %{state | status: :finished, phase: :finished}
+    end)
+
+    assert {:error, :game_not_active} =
+             Games.game_projection(Scope.for_user(host), game.id)
+  end
+
   test "the multi-Detective Snitch phase persists, restores, and delivers the final response" do
     host = user_fixture()
     first = user_fixture()

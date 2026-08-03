@@ -17,7 +17,8 @@ defmodule Detective.Games do
     Persistence,
     Projections,
     Session,
-    SessionSupervisor
+    SessionSupervisor,
+    State
   }
 
   alias Detective.Invitations
@@ -229,6 +230,7 @@ defmodule Detective.Games do
     with {:ok, lobby} <- get_lobby(scope, game_id),
          :ok <- validate_playable_game(lobby),
          {:ok, state} <- Session.get_state(lobby.id),
+         :ok <- validate_playable_state(state),
          {:ok, projection} <- Projections.for_user(state, user.id) do
       {:ok, projection}
     end
@@ -350,6 +352,9 @@ defmodule Detective.Games do
 
   defp validate_playable_game(%{status: status}) when status in ["active", "paused"], do: :ok
   defp validate_playable_game(_lobby), do: {:error, :game_not_active}
+
+  defp validate_playable_state(%State{status: status}) when status in [:active, :paused], do: :ok
+  defp validate_playable_state(%State{}), do: {:error, :game_not_active}
 
   defp cast_game_id(game_id) do
     case Ecto.UUID.cast(game_id) do

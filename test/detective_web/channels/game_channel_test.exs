@@ -172,6 +172,15 @@ defmodule DetectiveWeb.GameChannelTest do
 
     paused_version = paused.version
 
+    assert {:ok, paused_private_reply, _detective_user_socket} =
+             subscribe_and_join(
+               authenticated_socket(context.detective),
+               "user:#{context.detective.id}",
+               %{"game_id" => context.game.id}
+             )
+
+    assert paused_private_reply.state.role == "detective"
+
     detective_resume =
       push(detective_game_socket, "command", resume_payload(paused_version))
 
