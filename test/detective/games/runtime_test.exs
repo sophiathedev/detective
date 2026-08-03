@@ -250,6 +250,81 @@ defmodule Detective.Games.RuntimeTest do
     assert hd(player.statements)["resolution"] == "challenge_succeeded"
   end
 
+  test "disconnect pause persists the pending interrogation and is idempotent" do
+    %{host: host, detective: detective, game: game, version: version} = ready_game()
+
+    {:ok, %{lobby: lobby}} =
+      Games.start_game(
+        Scope.for_user(host),
+        game.id,
+        Ecto.UUID.generate(),
+        version
+      )
+
+    {:ok, %{version: placed_version}} =
+      Session.execute(game.id, detective.id, %Command{
+        command_id: Ecto.UUID.generate(),
+        type: :place,
+        expected_version: lobby.current_version,
+        payload: %{"location_id" => "central-precinct"}
+      })
+
+    {:ok, %{version: _interrogation_version}} =
+      Session.execute(game.id, detective.id, %Command{
+        command_id: Ecto.UUID.generate(),
+        type: :interrogate,
+        expected_version: placed_version,
+        payload: %{
+          "suspect_id" => "night-clerk",
+          "topic_id" => "victim-file",
+          "spend_leverage" => false
+        }
+      })
+
+    assert {:ok, before_pause} = Session.get_state(game.id)
+    pending_action = before_pause.pending_action
+    command_count = Repo.aggregate(CommandRecord, :count)
+    event_count = Repo.aggregate(GameEvent, :count)
+    snapshot_count = Repo.aggregate(GameSnapshot, :count)
+
+    assert {:ok, %{version: paused_version, events: [event]}} =
+             Session.pause_for_disconnect(game.id, [detective.id])
+
+    assert event.type == :game_paused
+
+    assert %Game{status: "paused", phase: "paused", current_version: ^paused_version} =
+             Repo.get!(Game, game.id)
+
+    assert Repo.aggregate(CommandRecord, :count) == command_count
+    assert Repo.aggregate(GameEvent, :count) == event_count + 1
+    assert Repo.aggregate(GameSnapshot, :count) == snapshot_count + 1
+    assert Repo.get_by!(GameEvent, game_id: game.id, event_type: "game_paused").sequence > 0
+
+    assert Enum.count(
+             Repo.all(GameEvent),
+             &(&1.game_id == game.id and &1.event_type == "game_paused")
+           ) ==
+             1
+
+    assert Enum.count(
+             Repo.all(GameSnapshot),
+             &(&1.game_id == game.id and &1.version == paused_version)
+           ) ==
+             1
+
+    restart_session(game.id)
+    assert {:ok, restored} = Session.get_state(game.id)
+    assert restored.paused_from_phase == :waiting_for_chisel
+    assert restored.pending_action == pending_action
+
+    assert {:ok, %{version: ^paused_version, events: []}} =
+             Session.pause_for_disconnect(game.id, [detective.id])
+
+    assert Repo.aggregate(CommandRecord, :count) == command_count
+    assert Repo.aggregate(GameEvent, :count) == event_count + 1
+    assert Repo.aggregate(GameSnapshot, :count) == snapshot_count + 1
+  end
+
   test "a correct persisted accusation closes the game and restores its public result" do
     %{host: host, detective: detective, game: game, version: version} = ready_game()
 

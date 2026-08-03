@@ -35,7 +35,9 @@ defmodule Detective.Games.GameBroadcaster do
     turn_ended: "turn_ended",
     turn_started: "turn_started",
     day_advanced: "day_advanced",
-    accusation_opened: "accusation_opened"
+    accusation_opened: "accusation_opened",
+    game_paused: "game_paused",
+    game_resumed: "game_resumed"
   }
 
   def broadcast(%State{} = state, events) when is_list(events) do

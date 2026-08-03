@@ -48,7 +48,9 @@ defmodule Detective.Games.Persistence do
     "turn_ended" => :turn_ended,
     "turn_started" => :turn_started,
     "day_advanced" => :day_advanced,
-    "accusation_opened" => :accusation_opened
+    "accusation_opened" => :accusation_opened,
+    "game_paused" => :game_paused,
+    "game_resumed" => :game_resumed
   }
 
   def load_state(game_id) do
@@ -146,7 +148,7 @@ defmodule Detective.Games.Persistence do
         cond do
           game == nil -> {:error, :game_not_found}
           game.current_version != command.expected_version -> {:error, :stale_version}
-          game.status != "active" -> {:error, :game_not_active}
+          not command_status_valid?(game.status, command.type) -> {:error, :game_not_active}
           true -> {:ok, game}
         end
       end)
@@ -188,6 +190,59 @@ defmodule Detective.Games.Persistence do
       {:ok, changes} -> {:ok, changes}
       {:error, :game, reason, _changes} -> {:error, reason}
       {:error, :command, changeset, _changes} -> command_insert_error(changeset)
+      {:error, _operation, reason, _changes} -> {:error, reason}
+    end
+  end
+
+  def persist_system_transition(
+        game_id,
+        expected_version,
+        transition_id,
+        %State{} = next_state,
+        events,
+        expected_status
+      )
+      when is_list(events) do
+    multi =
+      Multi.new()
+      |> Multi.run(:game, fn repo, _changes ->
+        game =
+          Game
+          |> where([game], game.id == ^game_id)
+          |> lock("FOR UPDATE")
+          |> repo.one()
+
+        cond do
+          game == nil -> {:error, :game_not_found}
+          game.current_version != expected_version -> {:error, :stale_version}
+          game.status != expected_status -> {:error, :game_not_active}
+          true -> {:ok, game}
+        end
+      end)
+      |> Multi.run(:last_sequence, fn repo, _changes ->
+        sequence =
+          GameEvent
+          |> where([event], event.game_id == ^game_id)
+          |> select([event], coalesce(max(event.sequence), 0))
+          |> repo.one()
+
+        {:ok, sequence}
+      end)
+      |> Multi.merge(fn %{last_sequence: last_sequence} ->
+        event_multi(game_id, transition_id, last_sequence, events)
+      end)
+      |> Multi.insert(:snapshot, snapshot_changeset(game_id, next_state))
+      |> Multi.update(:updated_game, fn %{game: game} ->
+        Game.transition_changeset(game, %{
+          status: Atom.to_string(next_state.status),
+          phase: Atom.to_string(next_state.phase),
+          current_version: next_state.version
+        })
+      end)
+
+    case Repo.transact(multi) do
+      {:ok, changes} -> {:ok, changes}
+      {:error, :game, reason, _changes} -> {:error, reason}
       {:error, _operation, reason, _changes} -> {:error, reason}
     end
   end
@@ -293,4 +348,8 @@ defmodule Detective.Games.Persistence do
       {:error, changeset}
     end
   end
+
+  defp command_status_valid?("active", type) when type != :resume_game, do: true
+  defp command_status_valid?("paused", :resume_game), do: true
+  defp command_status_valid?(_status, _type), do: false
 end

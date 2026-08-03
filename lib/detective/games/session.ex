@@ -1,7 +1,7 @@
 defmodule Detective.Games.Session do
   use GenServer
 
-  alias Detective.Games.{Command, Engine, Persistence, SessionSupervisor}
+  alias Detective.Games.{Command, Engine, GameBroadcaster, Persistence, SessionSupervisor}
 
   def start_link(game_id) do
     GenServer.start_link(__MODULE__, game_id, name: via(game_id))
@@ -24,6 +24,17 @@ defmodule Detective.Games.Session do
     session_call(game_id, :get_state, 5_000, 1)
   end
 
+  def pause_for_disconnect(game_id, player_ids) do
+    session_call(game_id, {:pause_for_disconnect, player_ids}, 15_000, 1)
+  end
+
+  def request_pause_for_disconnect(game_id, player_ids) do
+    with {:ok, pid} <- SessionSupervisor.ensure_session(game_id) do
+      GenServer.cast(pid, {:pause_for_disconnect, player_ids})
+      :ok
+    end
+  end
+
   def via(game_id), do: {:via, Registry, {Detective.GameRegistry, game_id}}
 
   @impl true
@@ -36,6 +47,13 @@ defmodule Detective.Games.Session do
 
   @impl true
   def handle_call(:get_state, _from, state), do: {:reply, {:ok, state}, state}
+
+  def handle_call({:pause_for_disconnect, player_ids}, _from, state) do
+    case pause_for_disconnect_transition(state, player_ids) do
+      {:ok, reply, next_state} -> {:reply, {:ok, reply}, next_state}
+      {:error, reason, next_state} -> {:reply, {:error, reason}, next_state}
+    end
+  end
 
   def handle_call({:execute, actor_id, command}, _from, state) do
     case Persistence.lookup_command(state.game_id, command.command_id) do
@@ -68,6 +86,21 @@ defmodule Detective.Games.Session do
     end
   end
 
+  @impl true
+  def handle_cast({:pause_for_disconnect, player_ids}, state) do
+    case pause_for_disconnect_transition(state, player_ids) do
+      {:ok, %{events: []}, next_state} ->
+        {:noreply, next_state}
+
+      {:ok, reply, next_state} ->
+        :ok = GameBroadcaster.broadcast(reply.state, reply.events)
+        {:noreply, next_state}
+
+      {:error, _reason, next_state} ->
+        {:noreply, next_state}
+    end
+  end
+
   defp execute_new_command(state, actor_id, command) do
     with {:ok, next_state, events} <- Engine.apply(state, actor_id, command),
          {:ok, changes} <-
@@ -84,6 +117,37 @@ defmodule Detective.Games.Session do
       {:reply, {:ok, reply}, next_state}
     else
       {:error, reason} -> {:reply, {:error, reason}, state}
+    end
+  end
+
+  defp pause_for_disconnect_transition(state, player_ids) do
+    case Engine.apply_system(state, {:pause_for_disconnect, player_ids}) do
+      {:ok, _next_state, []} ->
+        {:ok, %{version: state.version, events: [], state: state}, state}
+
+      {:ok, next_state, events} ->
+        transition_id = Ecto.UUID.generate()
+
+        with {:ok, changes} <-
+               Persistence.persist_system_transition(
+                 state.game_id,
+                 state.version,
+                 transition_id,
+                 next_state,
+                 events,
+                 "active"
+               ) do
+          events = Persistence.attach_delivery_metadata(events, changes, next_state.version)
+
+          {:ok,
+           %{
+             version: next_state.version,
+             events: events,
+             state: next_state
+           }, next_state}
+        else
+          {:error, reason} -> {:error, reason, state}
+        end
     end
   end
 
