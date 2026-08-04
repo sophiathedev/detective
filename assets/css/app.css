@@ -186,7 +186,21 @@
 }
 
 .game-map-board {
+  display: block;
   isolation: isolate;
+}
+
+.game-board-frame {
+  position: relative;
+  min-width: 0;
+}
+
+.map-location-marker {
+  touch-action: manipulation;
+}
+
+.map-hotspot-target {
+  pointer-events: all;
 }
 
 .map-location-marker:focus-visible {

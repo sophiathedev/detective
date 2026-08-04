@@ -1,5 +1,6 @@
 <script>
   import { onDestroy, onMount } from "svelte"
+  import GameBoard from "./game/GameBoard.svelte"
 
   let { game_id, user_id, initial_public, initial_private } = $props()
 
@@ -48,6 +49,7 @@
   )
   let moveLocationIds = $derived(new Set(privateState.valid_move_location_ids ?? []))
   let placementLocationIds = $derived(new Set(privateState.placement_location_ids ?? []))
+  let legalLocationIds = $derived([...placementLocationIds, ...moveLocationIds])
   let availableActions = $derived(new Set(privateState.available_actions ?? []))
   let interrogationOptions = $derived(privateState.interrogation_options ?? [])
   let searchableSuspectIds = $derived(new Set(privateState.searchable_suspect_ids ?? []))
@@ -77,43 +79,15 @@
   let selectedSuspectLeverage = $derived(
     privateState.leverage_on_suspects?.[selectedSuspectId] ?? 0,
   )
-  let travelPath = $derived.by(() => {
-    if (!lastTravel?.from_location_id || !lastTravel?.location_id) return null
-
-    const from = publicState.locations.find(
-      (location) => location.id === lastTravel.from_location_id,
-    )
-    const destination = publicState.locations.find(
-      (location) => location.id === lastTravel.location_id,
-    )
-
-    return from && destination ? { from, destination, key: lastTravel.key } : null
-  })
   let mapStatus = $derived(
     privateState.role !== "detective"
       ? "Field map · only the active Detective can issue movement commands."
       : mapIntent
       ? `${mapIntent.type === "place" ? "Placing" : "Moving to"} ${locationName(mapIntent.locationId)}…`
       : ownPlayer?.location_id
-        ? "Click a red-ringed location to spend 1 Move action."
-        : "Choose any blue Police Station to enter the city for free.",
+        ? "Select a red-ringed location to review a one-action Move."
+        : "Select any available Police Station to review free placement.",
   )
-
-  let mapConnections = $derived.by(() => {
-    const connections = []
-
-    for (let leftIndex = 0; leftIndex < publicState.locations.length; leftIndex += 1) {
-      for (let rightIndex = leftIndex + 1; rightIndex < publicState.locations.length; rightIndex += 1) {
-        const left = publicState.locations[leftIndex]
-        const right = publicState.locations[rightIndex]
-        const sharesDistrict = left.district_ids.some((district) => right.district_ids.includes(district))
-
-        if (sharesDistrict) connections.push({ left, right })
-      }
-    }
-
-    return connections
-  })
 
   function applyPublic(nextState) {
     if (nextState.version < publicState.version) return
@@ -152,28 +126,6 @@
 
   function locationAction(location) {
     selectedLocationId = location.id
-
-    if (commandPending || connectionState !== "online") return
-
-    if (placementLocationIds.has(location.id) && availableActions.has("place")) {
-      mapIntent = { type: "place", locationId: location.id, commandId: null }
-      sendCommand("place", { location_id: location.id })
-    } else if (moveLocationIds.has(location.id) && availableActions.has("move")) {
-      mapIntent = {
-        type: "move",
-        locationId: location.id,
-        fromLocationId: ownPlayer?.location_id,
-        commandId: null,
-      }
-      sendCommand("move", { location_id: location.id })
-    }
-  }
-
-  function locationKeydown(event, location) {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault()
-      locationAction(location)
-    }
   }
 
   function sendCommand(type, payload, existingCommand = null) {
@@ -263,16 +215,6 @@
     }
 
     return messages[code] ?? "The server rejected this action."
-  }
-
-  function legalLocation(locationId) {
-    return moveLocationIds.has(locationId) || placementLocationIds.has(locationId)
-  }
-
-  function locationLabel(location) {
-    if (placementLocationIds.has(location.id)) return `${location.name}. Place here for free.`
-    if (moveLocationIds.has(location.id)) return `${location.name}. Move here for one action.`
-    return location.name
   }
 
   function locationType(type) {
@@ -640,136 +582,19 @@
           >
             {mapStatus}
           </div>
-          <svg
-            id="game-map"
-            class="game-map-board aspect-[2048/1331] w-full select-none border border-[#6e5c48] bg-[#c9b998]"
-            viewBox="0 0 2048 1331"
-            preserveAspectRatio="xMidYMid meet"
-            role="img"
-            aria-labelledby="game-map-title game-map-description"
-          >
-            <title id="game-map-title">Investigation map with clickable locations</title>
-            <desc id="game-map-description">A 1932 Library of Congress map with original game locations, travel links, and Detective tokens.</desc>
-            <defs>
-              <filter id="map-ink">
-                <feColorMatrix type="saturate" values="0.42" />
-                <feComponentTransfer>
-                  <feFuncR type="linear" slope="0.88" intercept="0.06" />
-                  <feFuncG type="linear" slope="0.82" intercept="0.08" />
-                  <feFuncB type="linear" slope="0.7" intercept="0.1" />
-                </feComponentTransfer>
-              </filter>
-              <filter id="token-shadow" x="-80%" y="-80%" width="260%" height="260%">
-                <feDropShadow dx="0" dy="9" stdDeviation="7" flood-color="#211810" flood-opacity="0.6" />
-              </filter>
-            </defs>
+          <GameBoard
+            locations={publicState.locations}
+            {detectives}
+            {legalLocationIds}
+            {selectedLocationId}
+            pendingLocationId={mapIntent?.locationId ?? null}
+            {lastTravel}
+            disabled={commandPending || connectionState !== "online" || publicState.status === "paused"}
+            onSelect={locationAction}
+          />
 
-            <image
-              href="/images/maps/leuschner-1932/map-2048.jpg"
-              width="2048"
-              height="1331"
-              filter="url(#map-ink)"
-              opacity="0.9"
-            />
-            <rect width="2048" height="1331" fill="#8c6e3c" opacity="0.08" />
-
-            <g id="district-links" opacity="0.52">
-              {#each mapConnections as connection}
-                <line
-                  x1={connection.left.x * 2048}
-                  y1={connection.left.y * 1331}
-                  x2={connection.right.x * 2048}
-                  y2={connection.right.y * 1331}
-                  stroke="#6b3027"
-                  stroke-width="4"
-                  stroke-dasharray="12 16"
-                  vector-effect="non-scaling-stroke"
-                />
-              {/each}
-            </g>
-
-            {#if travelPath}
-              {#key travelPath.key}
-                <g id="latest-travel-trace" class="map-travel-trace" aria-hidden="true">
-                  <line
-                    x1={travelPath.from.x * 2048}
-                    y1={travelPath.from.y * 1331}
-                    x2={travelPath.destination.x * 2048}
-                    y2={travelPath.destination.y * 1331}
-                    pathLength="1"
-                    class="map-travel-line"
-                    vector-effect="non-scaling-stroke"
-                  />
-                  <circle
-                    cx={travelPath.destination.x * 2048}
-                    cy={travelPath.destination.y * 1331}
-                    r="48"
-                    class="map-arrival-pulse"
-                    vector-effect="non-scaling-stroke"
-                  />
-                </g>
-              {/key}
-            {/if}
-
-            <g id="map-locations">
-              {#each publicState.locations as location}
-                <g
-                  id={`map-location-${location.id}`}
-                  transform={`translate(${location.x * 2048} ${location.y * 1331})`}
-                  class={`map-location-marker ${legalLocation(location.id) ? "map-location-legal cursor-pointer" : "cursor-default"} ${mapIntent?.locationId === location.id ? "map-location-pending" : ""}`}
-                  role="button"
-                  tabindex="0"
-                  aria-label={locationLabel(location)}
-                  aria-disabled={!legalLocation(location.id)}
-                  aria-busy={mapIntent?.locationId === location.id}
-                  onclick={() => locationAction(location)}
-                  onkeydown={(event) => locationKeydown(event, location)}
-                >
-                  {#if legalLocation(location.id)}
-                    <circle class="map-legal-ring" r="42" fill="none" stroke="#c94f3e" stroke-width="7" />
-                  {/if}
-                  <circle
-                    r={selectedLocationId === location.id ? 25 : 20}
-                    fill={location.type === "police_station" ? "#243c48" : location.type === "mob_joint" ? "#6f2d2b" : "#e4d5b4"}
-                    stroke={selectedLocationId === location.id ? "#f6ead0" : "#3c2b20"}
-                    stroke-width="6"
-                    vector-effect="non-scaling-stroke"
-                  />
-                  <path d="M-7-2h14M0-9v14" stroke="#f4e8ce" stroke-width="3" opacity={location.type === "police_station" ? 1 : 0} />
-                  <text
-                    y="48"
-                    text-anchor="middle"
-                    fill="#241b14"
-                    stroke="#eadfca"
-                    stroke-width="8"
-                    paint-order="stroke"
-                    font-family="IBM Plex Sans, sans-serif"
-                    font-size="23"
-                    font-weight="600"
-                  >{location.name}</text>
-                </g>
-              {/each}
-            </g>
-
-            <g id="detective-tokens" filter="url(#token-shadow)">
-              {#each detectives as detective}
-                {@const tokenLocation = publicState.locations.find((location) => location.id === detective.location_id)}
-                {#if tokenLocation}
-                  <g
-                    id={`detective-map-token-${detective.id}`}
-                    class={`map-detective-token ${lastTravel?.player_id === detective.id ? "map-detective-token-active" : ""}`}
-                    style={`transform: translate(${tokenLocation.x * 2048 + (detective.seat - 1) * 22}px, ${tokenLocation.y * 1331 - 28}px);`}
-                  >
-                    <path d="M0-32 27-14 20 25 0 39-20 25-27-14Z" fill={["#28485c", "#724438", "#3f5d44", "#6b5535"][detective.seat - 1]} stroke="#f2e4c8" stroke-width="5" />
-                    <text y="8" text-anchor="middle" fill="#f8ecd2" font-family="IBM Plex Mono, monospace" font-size="22" font-weight="600">D{detective.seat}</text>
-                  </g>
-                {/if}
-              {/each}
-            </g>
-          </svg>
-
-          <p class="absolute bottom-4 left-5 max-w-[72%] bg-[#e4d7bd]/92 px-2 py-1 font-mono text-[8px] leading-3 text-[#594936] sm:text-[9px]">
-            Map: K. M. Leuschner and Metropolitan Surveys, 1932. Library of Congress, Geography and Map Division.
+          <p class="mt-2 font-mono text-[8px] leading-3 text-[#594936] sm:text-[9px]">
+            Board artwork © Van Ryder Games / Vincent Dutrait. Unofficial non-commercial fan project; not affiliated with or endorsed by the publisher.
           </p>
         </div>
 
@@ -786,7 +611,7 @@
               <div class="border-t border-[#9e876a] pt-2"><dt>Blue cross</dt><dd class="mt-1 text-[#2f4551]">Police Station</dd></div>
               <div class="border-t border-[#9e876a] pt-2"><dt>Red marker</dt><dd class="mt-1 text-[#7a302c]">Mob Joint</dd></div>
               <div class="border-t border-[#9e876a] pt-2"><dt>Red ring</dt><dd class="mt-1 text-[#9e3f34]">Legal command</dd></div>
-              <div class="border-t border-[#9e876a] pt-2"><dt>Dashed ink</dt><dd class="mt-1">Shared district</dd></div>
+              <div class="border-t border-[#9e876a] pt-2"><dt>Border stop</dt><dd class="mt-1">Two districts</dd></div>
             </dl>
           </div>
 
