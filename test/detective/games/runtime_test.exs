@@ -13,6 +13,7 @@ defmodule Detective.Games.RuntimeTest do
     Event,
     Game,
     GameEvent,
+    GamePlayer,
     GamePrivateEvent,
     GameSnapshot,
     Persistence,
@@ -109,11 +110,11 @@ defmodule Detective.Games.RuntimeTest do
     assert Repo.aggregate(GameEvent, :count) == 1
   end
 
-  test "start rejects missing and unready Detectives" do
+  test "Classic start requires at least two ready Detectives" do
     host = user_fixture()
     %{game: empty_game} = game_fixture(host)
 
-    assert {:error, :no_detectives} =
+    assert {:error, :not_enough_detectives} =
              Games.start_game(
                Scope.for_user(host),
                empty_game.id,
@@ -122,15 +123,84 @@ defmodule Detective.Games.RuntimeTest do
              )
 
     detective = user_fixture()
-    %{game: unready_game, invite_token: token} = game_fixture(host)
+    %{game: one_detective_game, invite_token: token} = game_fixture(host)
     assert {:ok, _result} = Invitations.accept(Scope.for_user(detective), token)
+
+    assert {:ok, %{lobby: lobby}} =
+             Games.set_ready(Scope.for_user(detective), one_detective_game.id, 0, true)
+
+    assert {:error, :not_enough_detectives} =
+             Games.start_game(
+               Scope.for_user(host),
+               one_detective_game.id,
+               Ecto.UUID.generate(),
+               lobby.current_version
+             )
+  end
+
+  test "Classic start requires every Detective to be ready" do
+    host = user_fixture()
+    ready_detective = user_fixture()
+    unready_detective = user_fixture()
+    %{game: game, invite_token: token} = game_fixture(host)
+    assert {:ok, _result} = Invitations.accept(Scope.for_user(ready_detective), token)
+    assert {:ok, _result} = Invitations.accept(Scope.for_user(unready_detective), token)
+
+    assert {:ok, %{lobby: lobby}} =
+             Games.set_ready(Scope.for_user(ready_detective), game.id, 0, true)
 
     assert {:error, :detectives_not_ready} =
              Games.start_game(
                Scope.for_user(host),
-               unready_game.id,
+               game.id,
                Ecto.UUID.generate(),
-               0
+               lobby.current_version
+             )
+  end
+
+  test "Classic start rejects more than four ready Detectives" do
+    host = user_fixture()
+    %{game: game, invite_token: token} = game_fixture(host, %{max_detectives: 4})
+
+    lobby =
+      Enum.reduce(1..4, %{current_version: 0}, fn _seat, lobby ->
+        detective = user_fixture()
+        assert {:ok, _result} = Invitations.accept(Scope.for_user(detective), token)
+
+        assert {:ok, %{lobby: ready_lobby}} =
+                 Games.set_ready(
+                   Scope.for_user(detective),
+                   game.id,
+                   lobby.current_version,
+                   true
+                 )
+
+        ready_lobby
+      end)
+
+    extra_detective = user_fixture()
+
+    Repo.insert!(
+      GamePlayer.changeset(
+        %GamePlayer{
+          game_id: game.id,
+          user_id: extra_detective.id,
+          role: "detective",
+          seat: 5,
+          ready: true,
+          status: "active",
+          joined_at: DateTime.utc_now(:second)
+        },
+        %{}
+      )
+    )
+
+    assert {:error, :too_many_detectives} =
+             Games.start_game(
+               Scope.for_user(host),
+               game.id,
+               Ecto.UUID.generate(),
+               lobby.current_version
              )
   end
 
@@ -638,6 +708,7 @@ defmodule Detective.Games.RuntimeTest do
     %{
       host: host,
       detective: detective,
+      detectives: [detective, second_detective],
       second_detective: second_detective,
       game: game,
       version: lobby.current_version

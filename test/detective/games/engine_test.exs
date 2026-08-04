@@ -29,6 +29,37 @@ defmodule Detective.Games.EngineTest do
     end)
   end
 
+  for {detective_count, expected_days} <- [{2, 9}, {3, 8}, {4, 7}] do
+    test "#{detective_count} Detectives start with #{expected_days} Days" do
+      count = unquote(detective_count)
+      expected = unquote(expected_days)
+
+      assert {:ok, state} =
+               Engine.new(
+                 game(),
+                 classic_players(count),
+                 Map.delete(case_definition(), "max_days")
+               )
+
+      assert state.days_remaining == expected
+      assert state.day == 1
+    end
+  end
+
+  test "positive case max_days overrides the Classic default" do
+    assert {:ok, state} =
+             Engine.new(game(), classic_players(2), Map.put(case_definition(), "max_days", 5))
+
+    assert state.days_remaining == 5
+  end
+
+  test "nonpositive case max_days keeps the Classic default" do
+    assert {:ok, state} =
+             Engine.new(game(), classic_players(2), Map.put(case_definition(), "max_days", 0))
+
+    assert state.days_remaining == 9
+  end
+
   test "initializes runtime locations from the canonical board catalog" do
     assert {:ok, state} = Engine.new(game(), players(), case_definition())
 
@@ -977,6 +1008,30 @@ defmodule Detective.Games.EngineTest do
       participant("chisel", "chisel", nil),
       participant("detective-1", "detective", 1),
       participant("detective-2", "detective", 2)
+    ]
+  end
+
+  defp classic_players(count) do
+    detectives =
+      for seat <- 1..count do
+        %{
+          id: Ecto.UUID.generate(),
+          user_id: Ecto.UUID.generate(),
+          display_name: "Detective #{seat}",
+          role: "detective",
+          seat: seat
+        }
+      end
+
+    [
+      %{
+        id: Ecto.UUID.generate(),
+        user_id: Ecto.UUID.generate(),
+        display_name: "Chisel",
+        role: "chisel",
+        seat: nil
+      }
+      | detectives
     ]
   end
 

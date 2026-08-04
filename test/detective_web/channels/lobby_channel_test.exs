@@ -10,6 +10,7 @@ defmodule DetectiveWeb.LobbyChannelTest do
   alias Detective.Accounts
   alias Detective.Accounts.Scope
   alias Detective.Games
+  alias Detective.Games.GamePlayer
   alias Detective.Games.SessionSupervisor
   alias Detective.Invitations
   alias DetectiveWeb.UserSocket
@@ -136,6 +137,86 @@ defmodule DetectiveWeb.LobbyChannelTest do
     }
 
     assert game_id == game.id
+  end
+
+  test "start_game reports not enough Detectives" do
+    host = user_fixture()
+    detective = user_fixture()
+    %{game: game, invite_token: token} = game_fixture(host)
+    assert {:ok, _result} = Invitations.accept(Scope.for_user(detective), token)
+
+    assert {:ok, %{lobby: ready_lobby}} =
+             Games.set_ready(Scope.for_user(detective), game.id, 0, true)
+
+    assert {:ok, %{lobby: lobby}, socket} =
+             host
+             |> authenticated_socket()
+             |> subscribe_and_join("lobby:#{game.id}", %{})
+
+    assert lobby.current_version == ready_lobby.current_version
+    assert_push "presence_state", _presence
+
+    ref =
+      push(socket, "start_game", %{
+        "command_id" => Ecto.UUID.generate(),
+        "expected_version" => lobby.current_version
+      })
+
+    assert_reply ref, :error, %{code: "not_enough_detectives"}
+  end
+
+  test "start_game reports too many Detectives" do
+    host = user_fixture()
+    %{game: game, invite_token: token} = game_fixture(host, %{max_detectives: 4})
+
+    ready_lobby =
+      Enum.reduce(1..4, %{current_version: 0}, fn _seat, lobby ->
+        detective = user_fixture()
+        assert {:ok, _result} = Invitations.accept(Scope.for_user(detective), token)
+
+        assert {:ok, %{lobby: next_lobby}} =
+                 Games.set_ready(
+                   Scope.for_user(detective),
+                   game.id,
+                   lobby.current_version,
+                   true
+                 )
+
+        next_lobby
+      end)
+
+    extra_detective = user_fixture()
+
+    Repo.insert!(
+      GamePlayer.changeset(
+        %GamePlayer{
+          game_id: game.id,
+          user_id: extra_detective.id,
+          role: "detective",
+          seat: 5,
+          ready: true,
+          status: "active",
+          joined_at: DateTime.utc_now(:second)
+        },
+        %{}
+      )
+    )
+
+    assert {:ok, %{lobby: lobby}, socket} =
+             host
+             |> authenticated_socket()
+             |> subscribe_and_join("lobby:#{game.id}", %{})
+
+    assert lobby.current_version == ready_lobby.current_version
+    assert_push "presence_state", _presence
+
+    ref =
+      push(socket, "start_game", %{
+        "command_id" => Ecto.UUID.generate(),
+        "expected_version" => lobby.current_version
+      })
+
+    assert_reply ref, :error, %{code: "too_many_detectives"}
   end
 
   defp authenticated_socket(user) do

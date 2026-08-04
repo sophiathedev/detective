@@ -416,7 +416,8 @@ defmodule Detective.Games do
 
       cond do
         length(chisels) != 1 -> {:error, :invalid_chisel_count}
-        detectives == [] -> {:error, :no_detectives}
+        length(detectives) < 2 -> {:error, :not_enough_detectives}
+        length(detectives) > 4 -> {:error, :too_many_detectives}
         Enum.any?(detectives, &(not &1.ready)) -> {:error, :detectives_not_ready}
         true -> {:ok, players}
       end

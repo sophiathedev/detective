@@ -20,6 +20,7 @@ defmodule Detective.Games.Engine do
 
   @actions_per_turn 4
   @starting_scratch [4, 5, 6, 9]
+  @classic_days %{2 => 9, 3 => 8, 4 => 7}
 
   def new(game, players, case_definition) when is_map(case_definition) do
     detectives =
@@ -77,7 +78,8 @@ defmodule Detective.Games.Engine do
       }
 
       detective_order = Enum.map(detectives, & &1.id)
-      max_days = positive_integer(case_definition["max_days"], 6)
+      default_days = Map.fetch!(@classic_days, length(detectives))
+      max_days = positive_integer(case_definition["max_days"], default_days)
 
       {:ok,
        %State{

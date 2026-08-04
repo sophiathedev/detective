@@ -99,6 +99,8 @@ defmodule DetectiveWeb.LobbyChannel do
               :stale_version,
               :invalid_command,
               :no_detectives,
+              :not_enough_detectives,
+              :too_many_detectives,
               :detectives_not_ready,
               :command_id_conflict,
               :duplicate_command,
