@@ -184,6 +184,91 @@ defmodule Detective.Games.ProjectionsTest do
     end
   end
 
+  test "active unplaced Detective receives only placement destination IDs" do
+    state = movable_state_fixture()
+
+    assert {:ok, projection} = Projections.for_user(state, detective_user_id())
+
+    assert "place" in projection.private.available_actions
+    refute "move" in projection.private.available_actions
+    assert projection.private.placement_location_ids == ["51"]
+    assert projection.private.valid_move_location_ids == []
+  end
+
+  test "active placed Detective with move action receives only move destination IDs" do
+    state =
+      movable_state_fixture()
+      |> put_in(
+        [Access.key!(:players), "10000000-0000-0000-0000-000000000001", :location_id],
+        "51"
+      )
+
+    assert {:ok, projection} = Projections.for_user(state, detective_user_id())
+
+    assert "move" in projection.private.available_actions
+    refute "place" in projection.private.available_actions
+    assert projection.private.placement_location_ids == []
+    assert projection.private.valid_move_location_ids == ["48"]
+  end
+
+  test "Detective private projection suppresses map IDs when their actions are unavailable" do
+    placed_state =
+      movable_state_fixture()
+      |> put_in(
+        [Access.key!(:players), "10000000-0000-0000-0000-000000000001", :location_id],
+        "51"
+      )
+
+    inactive = %{movable_state_fixture() | current_detective_id: nil}
+
+    zero_actions =
+      put_in(
+        placed_state,
+        [Access.key!(:players), "10000000-0000-0000-0000-000000000001", :actions_remaining],
+        0
+      )
+
+    free_question =
+      put_in(
+        placed_state,
+        [
+          Access.key!(:players),
+          "10000000-0000-0000-0000-000000000001",
+          :free_question_suspect_id
+        ],
+        "suspect"
+      )
+
+    cases = [
+      paused: %{movable_state_fixture() | status: :paused, phase: :paused},
+      inactive: inactive,
+      zero_actions: zero_actions,
+      free_question: free_question
+    ]
+
+    for {state_name, state} <- cases do
+      assert {:ok, projection} = Projections.for_user(state, detective_user_id())
+
+      refute "place" in projection.private.available_actions,
+             "#{state_name} unexpectedly allows place"
+
+      refute "move" in projection.private.available_actions,
+             "#{state_name} unexpectedly allows move"
+
+      assert projection.private.placement_location_ids == [], "#{state_name} leaked placement IDs"
+      assert projection.private.valid_move_location_ids == [], "#{state_name} leaked move IDs"
+    end
+  end
+
+  test "Chisel and nonmembers never receive Detective map destination fields" do
+    state = movable_state_fixture()
+
+    assert {:ok, chisel} = Projections.for_user(state, chisel_user_id())
+    refute Map.has_key?(chisel.private, :placement_location_ids)
+    refute Map.has_key?(chisel.private, :valid_move_location_ids)
+    assert {:error, :not_a_member} = Projections.for_user(state, "not-a-member")
+  end
+
   defp state_fixture do
     detective_id = "10000000-0000-0000-0000-000000000001"
     chisel_id = "10000000-0000-0000-0000-000000000002"
@@ -261,6 +346,20 @@ defmodule Detective.Games.ProjectionsTest do
         }
       }
     }
+  end
+
+  defp movable_state_fixture do
+    state_fixture()
+    |> Map.update!(:locations, fn locations ->
+      Map.put(locations, "48", %{
+        id: "48",
+        name: "Los Angeles Public Library",
+        type: "library",
+        district_ids: ["central_la"],
+        x: 0.612,
+        y: 0.557
+      })
+    end)
   end
 
   defp pending_interrogation do

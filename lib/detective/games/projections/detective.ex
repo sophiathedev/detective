@@ -7,6 +7,8 @@ defmodule Detective.Games.Projections.Detective do
   def render_private(%State{} = state, actor_user_id) do
     case State.player_by_user_id(state, actor_user_id) do
       %{role: "detective"} = player ->
+        available_actions = Rules.available_actions(state, actor_user_id)
+
         %{
           role: "detective",
           player_id: player.id,
@@ -23,7 +25,7 @@ defmodule Detective.Games.Projections.Detective do
           solve_attempt: Map.get(player, :solve_attempt),
           final_guess: Map.get(player, :final_guess),
           accusation_options: Rules.accusation_options(state, player),
-          available_actions: Rules.available_actions(state, actor_user_id),
+          available_actions: available_actions,
           searchable_suspect_ids:
             state
             |> Rules.searchable_suspects(player)
@@ -31,11 +33,12 @@ defmodule Detective.Games.Projections.Detective do
           interrogation_options: Rules.interrogation_options(state, player),
           pending_interrogation: pending_interrogation(state, player),
           valid_move_location_ids:
-            state
-            |> Rules.valid_move_destinations(player)
-            |> Enum.map(& &1.id),
+            if("move" in available_actions,
+              do: state |> Rules.valid_move_destinations(player) |> Enum.map(& &1.id),
+              else: []
+            ),
           placement_location_ids:
-            if(player.location_id == nil,
+            if("place" in available_actions,
               do: state |> Rules.police_stations() |> Enum.map(& &1.id),
               else: []
             )
