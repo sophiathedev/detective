@@ -1,0 +1,33 @@
+{
+  "generated_at": "2026-08-04",
+  "generator": "OpenAI built-in image generation",
+  "output": {
+    "format": "WebP",
+    "width": 512,
+    "height": 512,
+    "quality": 88
+  },
+  "rights_note": "Original generated interface art; not copied from commercial card artwork",
+  "assets": [
+    {
+      "file": "detective-1.webp",
+      "prompt": "Use case: stylized-concept. Asset type: square webgame portrait token. Create one original 1940s Los Angeles noir board-game detective character: a sharp-eyed Black woman private investigator in a weathered midnight-blue trench coat and understated period blouse, waist-up, three-quarter view, calm alert expression. Painterly gouache fused with fine engraved paper texture, hard cinematic side lighting, muted charred-ebony, antique-gold, sepia, and blue palette, clean near-black background, strong readable silhouette, centered consistent camera and crop, polished premium game art. No text, no logo, no frame, no UI, no watermark, no existing character, no copied commercial board-game illustration. Square composition."
+    },
+    {
+      "file": "detective-2.webp",
+      "prompt": "Use case: stylized-concept. Asset type: square webgame portrait token. Create one original 1940s Los Angeles noir board-game detective character: a lean East Asian male investigative reporter in a worn oxblood-red overcoat over a period shirt and tie, waist-up, three-quarter view, skeptical focused expression. Painterly gouache fused with fine engraved paper texture, hard cinematic side lighting, muted charred-ebony, antique-gold, sepia, and oxblood palette, clean near-black background, strong readable silhouette, centered consistent camera and crop, polished premium game art. No text, no logo, no frame, no UI, no watermark, no existing character, no copied commercial board-game illustration. Square composition."
+    },
+    {
+      "file": "detective-3.webp",
+      "prompt": "Use case: stylized-concept. Asset type: square webgame portrait token. Create one original 1940s Los Angeles noir board-game detective character: a determined Latina former police detective in a tailored deep forest-green coat and practical period shirt, waist-up, three-quarter view, observant guarded expression. Painterly gouache fused with fine engraved paper texture, hard cinematic side lighting, muted charred-ebony, antique-gold, sepia, and forest-green palette, clean near-black background, strong readable silhouette, centered consistent camera and crop, polished premium game art. No text, no logo, no frame, no UI, no watermark, no existing character, no copied commercial board-game illustration. Square composition."
+    },
+    {
+      "file": "detective-4.webp",
+      "prompt": "Use case: stylized-concept. Asset type: square webgame portrait token. Create one original 1940s Los Angeles noir board-game detective character: a seasoned white male crime-scene photographer in a rumpled ochre-brown coat over a period waistcoat, waist-up, three-quarter view, weathered thoughtful expression, compact vintage camera held low and unobtrusively. Painterly gouache fused with fine engraved paper texture, hard cinematic side lighting, muted charred-ebony, antique-gold, sepia, and ochre palette, clean near-black background, strong readable silhouette, centered consistent camera and crop, polished premium game art. No text, no logo, no frame, no UI, no watermark, no existing character, no copied commercial board-game illustration. Square composition."
+    },
+    {
+      "file": "chisel.webp",
+      "prompt": "Use case: stylized-concept. Asset type: square webgame portrait token. Create one original 1940s Los Angeles noir board-game Chisel game-master character: an enigmatic older woman in a charcoal-black tailored suit and shadowed wide-brim period hat, subtle oxblood scarf accent, waist-up, three-quarter view, controlled unreadable expression, one gloved hand resting near a closed casebook. Painterly gouache fused with fine engraved paper texture, hard cinematic side lighting, muted charred-ebony, antique-gold, sepia, and oxblood palette, clean near-black background, strong readable silhouette, centered consistent camera and crop, polished premium game art. No text, no logo, no frame, no UI, no watermark, no existing character, no copied commercial board-game illustration. Square composition."
+    }
+  ]
+}

@@ -24,6 +24,121 @@
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
+:root {
+  --noir-ebony-950: #090807;
+  --noir-ebony-900: #0f0d0c;
+  --noir-ebony-800: #1c1815;
+  --noir-ebony-700: #2b251f;
+  --noir-gold-500: #c2a35f;
+  --noir-gold-700: #746039;
+  --noir-paper-100: #eadbbd;
+  --noir-paper-300: #ccb68d;
+  --noir-paper-500: #a98d63;
+  --noir-ink-900: #251c16;
+  --noir-red-500: #aa392f;
+  --noir-red-700: #641d18;
+  --noir-focus: #f2d890;
+}
+
+.noir-wood-frame {
+  position: relative;
+  border: 1px solid var(--noir-gold-700);
+  border-radius: 1rem;
+  background-color: var(--noir-ebony-800);
+  background-image: url("/images/ui/noir/wood-grain.svg");
+  box-shadow: 0 1.5rem 3.5rem rgb(0 0 0 / 0.42), inset 0 0 0 3px var(--noir-ebony-950);
+}
+
+.noir-paper-sheet {
+  position: relative;
+  color: var(--noir-ink-900);
+  background-color: var(--noir-paper-300);
+  background-image: url("/images/ui/noir/paper-fiber.svg");
+  box-shadow: 0 1rem 2.25rem rgb(0 0 0 / 0.34), inset 0 0 2rem rgb(92 58 34 / 0.12);
+}
+
+.noir-paper-sheet[data-tilt="left"] { rotate: -0.35deg; }
+.noir-paper-sheet[data-tilt="right"] { rotate: 0.35deg; }
+
+.noir-status-stamp {
+  display: inline-flex;
+  border: 2px solid currentColor;
+  padding: 0.3rem 0.5rem;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.noir-status-stamp-ready { color: #355844; }
+.noir-status-stamp-danger { color: var(--noir-red-700); }
+.noir-status-stamp-sealed { color: var(--noir-red-500); rotate: -2deg; }
+.noir-status-stamp-neutral { color: #68563f; }
+
+.noir-physical-button {
+  min-height: 2.75rem;
+  cursor: pointer;
+  border: 1px solid var(--noir-gold-700);
+  border-radius: 0.45rem;
+  background: linear-gradient(#332b24, #15120f);
+  box-shadow: 0 0.25rem 0 var(--noir-ebony-950), inset 0 0 0 1px rgb(194 163 95 / 0.2);
+  color: #f2e2c3;
+  transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+}
+
+.noir-physical-button:hover:not(:disabled) {
+  border-color: var(--noir-gold-500);
+  transform: translateY(-1px);
+}
+
+.noir-physical-button:active:not(:disabled) {
+  box-shadow: 0 0.1rem 0 var(--noir-ebony-950);
+  transform: translateY(2px);
+}
+
+.noir-physical-button:focus-visible {
+  outline: 3px solid var(--noir-focus);
+  outline-offset: 3px;
+}
+
+.noir-physical-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.noir-field {
+  min-height: 2.75rem;
+  width: 100%;
+  border: 1px solid var(--noir-paper-500);
+  border-radius: 0.3rem;
+  background: var(--noir-paper-100) url("/images/ui/noir/paper-fiber.svg");
+  color: var(--noir-ink-900);
+  box-shadow: inset 0 0.15rem 0.35rem rgb(73 48 29 / 0.16);
+}
+
+.noir-field:focus {
+  border-color: var(--noir-red-500);
+  outline: 3px solid var(--noir-focus);
+  outline-offset: 2px;
+}
+
+.noir-portrait {
+  aspect-ratio: 1;
+  display: block;
+  border: 2px solid var(--noir-gold-500);
+  border-radius: 50%;
+  background: var(--noir-ebony-900);
+  box-shadow: 0 0.35rem 0.8rem rgb(0 0 0 / 0.45), inset 0 0 0 2px var(--noir-ebony-950);
+  object-fit: cover;
+  user-select: none;
+}
+
+.noir-portrait-sm { width: 2.5rem; }
+.noir-portrait-md { width: 3.5rem; }
+.noir-portrait-lg { width: 5rem; }
+
 @custom-variant phx-click-loading (.phx-click-loading&, .phx-click-loading &);
 @custom-variant phx-submit-loading (.phx-submit-loading&, .phx-submit-loading &);
 @custom-variant phx-change-loading (.phx-change-loading&, .phx-change-loading &);

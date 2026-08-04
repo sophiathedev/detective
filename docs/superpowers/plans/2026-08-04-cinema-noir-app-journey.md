@@ -83,14 +83,14 @@
 - Create: `assets/svelte/ui/StatusStamp.svelte`
 - Create: `assets/svelte/ui/PortraitToken.svelte`
 - Create: `assets/svelte/ui/NoirPrimitives.test.js`
-- Create: `priv/static/images/ui/noir/wood-grain.svg`
-- Create: `priv/static/images/ui/noir/paper-fiber.svg`
-- Create: `priv/static/images/ui/noir/portraits/detective-1.webp`
-- Create: `priv/static/images/ui/noir/portraits/detective-2.webp`
-- Create: `priv/static/images/ui/noir/portraits/detective-3.webp`
-- Create: `priv/static/images/ui/noir/portraits/detective-4.webp`
-- Create: `priv/static/images/ui/noir/portraits/chisel.webp`
-- Create: `priv/static/images/ui/noir/portraits/source.json`
+- Create: `assets/public/images/ui/noir/wood-grain.svg`
+- Create: `assets/public/images/ui/noir/paper-fiber.svg`
+- Create: `assets/public/images/ui/noir/portraits/detective-1.webp`
+- Create: `assets/public/images/ui/noir/portraits/detective-2.webp`
+- Create: `assets/public/images/ui/noir/portraits/detective-3.webp`
+- Create: `assets/public/images/ui/noir/portraits/detective-4.webp`
+- Create: `assets/public/images/ui/noir/portraits/chisel.webp`
+- Create: `assets/public/images/ui/noir/portraits/source.json`
 - Modify: `assets/css/app.css:1-30`
 
 **Interfaces:**
@@ -334,7 +334,7 @@ Expected: Vite client and SSR builds complete without warnings.
 - [ ] **Step 6: Commit**
 
 ```bash
-rtk git add assets/css/app.css assets/svelte/ui priv/static/images/ui/noir
+rtk git add assets/css/app.css assets/svelte/ui assets/public/images/ui/noir
 rtk git commit -m "feat(ui): add noir material system"
 ```
 
