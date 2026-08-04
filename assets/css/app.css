@@ -32,7 +32,199 @@
 
 #open-casebook {
   animation: casebook-open 520ms cubic-bezier(0.22, 0.72, 0.24, 1) both;
+  grid-template-columns: minmax(0, 1fr);
   transform-origin: 50% 0;
+}
+
+.casebook-page-tabs {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid #9f896d;
+  background: #c9b99b;
+  scrollbar-color: #765c43 #b9a78a;
+}
+
+.casebook-page-tab {
+  min-height: 2.75rem;
+  flex: 1 0 auto;
+  cursor: pointer;
+  border-right: 1px solid #9f896d;
+  padding-inline: 0.85rem;
+  color: #604d3a;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.casebook-page-tab:hover,
+.casebook-page-tab-active {
+  background: #8f372f;
+  color: #fff0d6;
+}
+
+.casebook-page-tab:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 3px solid #f1d7a5;
+  outline-offset: -4px;
+}
+
+.casebook-drawer {
+  position: relative;
+  z-index: 35;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  border-top: 1px solid #715b45;
+  background: #e4d8bd;
+  box-shadow: 0 -18px 42px rgb(48 32 20 / 0.28);
+}
+
+.casebook-drawer-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #9f896d;
+  background: #d0c09f;
+  padding: 0.75rem 1rem;
+}
+
+.casebook-drawer-kicker {
+  color: #8c3f33;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.5625rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.casebook-drawer-title {
+  margin-top: 0.15rem;
+  color: #2e241c;
+  font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.casebook-drawer-close {
+  display: grid;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  cursor: pointer;
+  place-items: center;
+  border: 1px solid #7a6249;
+  background: #e9dcbc;
+  color: #6f302a;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  font-size: 1.35rem;
+  line-height: 1;
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.casebook-drawer-close:hover {
+  background: #8f372f;
+  color: #fff0d6;
+  transform: rotate(-2deg);
+}
+
+.casebook-drawer-close:focus-visible {
+  outline: 3px solid #a54235;
+  outline-offset: 2px;
+}
+
+.casebook-drawer-content {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: #765c43 #c7b697;
+}
+
+.casebook-empty-page {
+  margin-top: 1rem;
+  border: 1px dashed #8e765b;
+  background: #d8c8aa;
+  padding: 1rem;
+  color: #65513d;
+  font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
+  font-size: 0.875rem;
+  font-style: italic;
+  line-height: 1.6;
+}
+
+.casebook-history-page {
+  padding: 1rem;
+}
+
+.casebook-history-entry {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-left: 3px solid #8f372f;
+  background: #d8c8aa;
+  padding: 0.55rem 0.7rem;
+  color: #4f3e30;
+  font-size: 0.75rem;
+}
+
+.casebook-history-entry span:first-child {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@media (min-width: 64rem) {
+  #open-casebook.casebook-drawer-open {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .casebook-drawer {
+    grid-column: 2;
+    grid-row: 1;
+    border-left: 1px solid #715b45;
+    border-top: 0;
+    box-shadow: -18px 0 42px rgb(48 32 20 / 0.18);
+  }
+
+  #casebook-map-page {
+    grid-column: 1;
+    grid-row: 1;
+  }
+}
+
+@media (max-width: 63.999rem) {
+  #casebook-map-page {
+    min-height: 55dvh;
+  }
+
+  .casebook-drawer {
+    position: sticky;
+    bottom: 0;
+    max-height: 45dvh;
+  }
+
+  .casebook-drawer-header::before {
+    position: absolute;
+    left: 50%;
+    top: 0.35rem;
+    width: 2.75rem;
+    height: 0.2rem;
+    translate: -50% 0;
+    border-radius: 999px;
+    background: #8e765b;
+    content: "";
+  }
 }
 
 .player-hud-scroll {

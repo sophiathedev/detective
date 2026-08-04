@@ -1,6 +1,7 @@
 <script>
   import { onDestroy, onMount } from "svelte"
   import ActionDock from "./game/ActionDock.svelte"
+  import CasebookDrawer from "./game/CasebookDrawer.svelte"
   import GameBoard from "./game/GameBoard.svelte"
   import PlayerHUD from "./game/PlayerHUD.svelte"
 
@@ -12,6 +13,8 @@
   let publicState = $state(initialPublic())
   let privateState = $state(initialPrivate())
   let connectionState = $state("connecting")
+  let drawerOpen = $state(true)
+  let drawerPage = $state(initialPrivate().role === "chisel" ? "chisel" : "search")
   let mapSelection = $state(null)
   let selectedSuspectId = $state(null)
   let selectedTopicId = $state(null)
@@ -40,6 +43,19 @@
   const seenPublicEventIds = new Set()
   const seenPrivateEventIds = new Set()
 
+  const detectiveDrawerPages = [
+    { id: "search", label: "Search" },
+    { id: "question", label: "Question" },
+    { id: "evidence", label: "Evidence" },
+    { id: "accusation", label: "Accusation" },
+    { id: "history", label: "History" },
+  ]
+  const chiselDrawerPages = [
+    { id: "question", label: "Response" },
+    { id: "chisel", label: "Private Case" },
+    { id: "history", label: "History" },
+  ]
+
   let detectives = $derived(publicState.players.filter((player) => player.role === "detective"))
   let chisel = $derived(publicState.players.find((player) => player.role === "chisel"))
   let ownPlayer = $derived(publicState.players.find((player) => player.id === privateState.player_id))
@@ -54,6 +70,12 @@
   let placementLocationIds = $derived(new Set(privateState.placement_location_ids ?? []))
   let legalLocationIds = $derived([...placementLocationIds, ...moveLocationIds])
   let availableActions = $derived(new Set(privateState.available_actions ?? []))
+  let drawerPages = $derived(
+    privateState.role === "chisel" ? chiselDrawerPages : detectiveDrawerPages,
+  )
+  let drawerTitle = $derived(
+    drawerPages.find((page) => page.id === drawerPage)?.label ?? "Casebook",
+  )
   let interrogationOptions = $derived(privateState.interrogation_options ?? [])
   let searchableSuspectIds = $derived(new Set(privateState.searchable_suspect_ids ?? []))
   let interrogatableSuspectIds = $derived(
@@ -235,15 +257,9 @@
     if (action === "search_suspect") {
       submitSuspectSearch()
     } else if (action === "interrogate") {
-      document.querySelector("#interrogation-workspace")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      })
+      openDrawer("question")
     } else if (action === "accuse" || action === "submit_final_guess") {
-      document.querySelector("#accusation-sheet")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      })
+      openDrawer("accusation")
     } else {
       sendCommand(action, {})
     }
@@ -347,6 +363,11 @@
     }
   })
 
+  $effect(() => {
+    if (drawerPages.some((page) => page.id === drawerPage)) return
+    drawerPage = drawerPages[0]?.id ?? "history"
+  })
+
   onDestroy(() => {
     if (typeof window !== "undefined" && pauseActive) restorePreviousFocus()
   })
@@ -362,6 +383,19 @@
     selectedTopicId =
       interrogationOptions.find((option) => option.suspect_id === suspectId)?.topics[0]?.id ?? null
     spendLeverage = false
+  }
+
+  function openDrawer(page) {
+    drawerPage = page
+    drawerOpen = true
+  }
+
+  function closeDrawer() {
+    drawerOpen = false
+  }
+
+  function legalMapLocation(locationId) {
+    return placementLocationIds.has(locationId) || moveLocationIds.has(locationId)
   }
 
   function submitInterrogation() {
@@ -618,15 +652,18 @@
 
     <main
       id="open-casebook"
-      class="relative grid min-h-0 flex-1 overflow-hidden border border-[#6f5b45] bg-[#d8c9aa] shadow-[0_24px_70px_rgba(0,0,0,0.55)] lg:grid-cols-2"
+      class:casebook-drawer-open={drawerOpen}
+      class="relative grid min-h-0 flex-1 overflow-hidden border border-[#6f5b45] bg-[#d8c9aa] shadow-[0_24px_70px_rgba(0,0,0,0.55)]"
     >
       <div
         id="game-casebook-workspace"
         class="contents"
         inert={publicState.status === "paused"}
       >
-      <div class="pointer-events-none absolute inset-y-0 left-1/2 z-30 hidden w-9 -translate-x-1/2 bg-[#5a4430] opacity-35 lg:block" aria-hidden="true"></div>
-      <div class="pointer-events-none absolute inset-y-0 left-1/2 z-30 hidden w-px bg-[#2f2118]/70 lg:block" aria-hidden="true"></div>
+      {#if drawerOpen}
+        <div class="pointer-events-none absolute inset-y-0 left-1/2 z-30 hidden w-9 -translate-x-1/2 bg-[#5a4430] opacity-35 lg:block" aria-hidden="true"></div>
+        <div class="pointer-events-none absolute inset-y-0 left-1/2 z-30 hidden w-px bg-[#2f2118]/70 lg:block" aria-hidden="true"></div>
+      {/if}
 
       <svg class="pointer-events-none absolute inset-0 z-20 size-full opacity-[0.07] mix-blend-multiply" aria-hidden="true">
         <filter id="paper-fibers">
@@ -646,6 +683,19 @@
             <p class="mt-1">Active: {activeDetective?.display_name ?? "-"}</p>
           </div>
         </div>
+
+        <nav id="casebook-page-tabs" class="casebook-page-tabs" aria-label="Casebook pages">
+          {#each drawerPages as page}
+            <button
+              id={`open-casebook-${page.id}`}
+              type="button"
+              aria-pressed={drawerOpen && drawerPage === page.id}
+              onclick={() => openDrawer(page.id)}
+              class:casebook-page-tab-active={drawerOpen && drawerPage === page.id}
+              class="casebook-page-tab"
+            >{page.label}</button>
+          {/each}
+        </nav>
 
         <div class="relative overflow-hidden bg-[#b7a78b] p-2 sm:p-3">
           <div
@@ -719,7 +769,8 @@
         </section>
       </section>
 
-      <section id="casebook-action-page" class="relative z-10 flex min-h-[42rem] flex-col bg-[#e4d8bd] lg:min-h-0">
+      <CasebookDrawer open={drawerOpen} title={drawerTitle} onClose={closeDrawer}>
+      <section id="casebook-action-page" class="relative flex min-h-0 flex-col bg-[#e4d8bd]">
         <PlayerHUD
           players={publicState.players}
           currentDetectiveId={publicState.current_detective_id}
@@ -729,8 +780,9 @@
           disconnectLabel={disconnectCountdown}
         />
 
-        <div class="grid min-h-0 flex-1 gap-0 xl:grid-cols-[minmax(0,1fr)_15rem]">
+        <div class="min-h-0 flex-1">
           <div class="min-h-0 p-4 sm:p-5">
+            {#if drawerPage === "search"}
             <div class="flex flex-wrap items-start justify-between gap-4 border-b border-[#a38b6e] pb-4">
               <div>
                 <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-[#8c3f33]">Action ledger</p>
@@ -774,7 +826,9 @@
               onCancelMove={cancelMapMovement}
               onAction={handleDockAction}
             />
+            {/if}
 
+            {#if drawerPage === "question"}
             <section
               id="interrogation-workspace"
               class="mt-5 border-y border-[#91785c] bg-[#dccdad] px-3 py-4 sm:px-4"
@@ -1033,7 +1087,9 @@
                 <p class="mt-4 text-sm leading-6 text-[#695642]">Move to a suspect, choose a known case card, and spend one action to question them.</p>
               {/if}
             </section>
+            {/if}
 
+            {#if drawerPage === "accusation"}
             {#if publicState.result}
               <section id="case-closed-result" class="mt-5 border-2 border-[#71372f] bg-[#eadbbc] p-4 sm:p-5" aria-labelledby="case-result-heading">
                 <div class="flex flex-wrap items-start justify-between gap-4 border-b border-[#9d8669] pb-4">
@@ -1119,8 +1175,14 @@
                   {#if publicState.phase !== "accusation"}<p class="mt-2 text-xs leading-5 text-[#695642]">A Solve accusation is legal only at the beginning of your turn, before any action is spent.</p>{/if}
                 {/if}
               </section>
+            {:else}
+              <p id="accusation-unavailable" class="casebook-empty-page">
+                No accusation sheet is authorized yet. The server opens this folio when a Solve attempt or final guess is legal.
+              </p>
+            {/if}
             {/if}
 
+            {#if drawerPage === "evidence"}
             {#if privateState.role === "detective"}
               <section id="private-evidence-dossier" class="mt-5 border-y border-[#91785c] bg-[#d4c3a3] px-3 py-4 sm:px-4" aria-labelledby="evidence-dossier-heading">
                 <div class="flex flex-wrap items-end justify-between gap-3">
@@ -1157,8 +1219,14 @@
                   </div>
                 </div>
               </section>
+            {:else}
+              <p id="evidence-private-seal" class="casebook-empty-page">
+                Detective evidence stays sealed on each private user channel.
+              </p>
+            {/if}
             {/if}
 
+            {#if drawerPage === "search"}
             <section id="keyboard-location-list" class="mt-5 border-t border-[#a38b6e] pt-4" aria-labelledby="location-list-heading">
               <h3 id="location-list-heading" class="font-mono text-[10px] uppercase tracking-[0.14em] text-[#80694f]">Location index</h3>
               <div class="mt-2 grid gap-1 sm:grid-cols-2">
@@ -1166,55 +1234,35 @@
                   <button
                     id={`location-index-${location.id}`}
                     type="button"
-                    onclick={() => locationAction(location)}
-                    class={`cursor-pointer px-2 py-1.5 text-left text-xs transition ${legalLocation(location.id) ? "bg-[#a54235] text-[#fff0d6] hover:bg-[#b94d3f]" : "hover:bg-[#d4c4a5]"}`}
+                    onclick={() => selectMapLocation(location)}
+                    class={`cursor-pointer px-2 py-1.5 text-left text-xs transition ${legalMapLocation(location.id) ? "bg-[#a54235] text-[#fff0d6] hover:bg-[#b94d3f]" : "hover:bg-[#d4c4a5]"}`}
                   >
                     {location.name}
-                    <span class="float-right font-mono text-[9px] uppercase">{legalLocation(location.id) ? "legal" : location.type.replaceAll("_", " ")}</span>
+                    <span class="float-right font-mono text-[9px] uppercase">{legalMapLocation(location.id) ? "legal" : location.type.replaceAll("_", " ")}</span>
                   </button>
                 {/each}
               </div>
             </section>
+            {/if}
           </div>
 
-          <aside id="chisel-hud" class="border-t border-[#a38b6e] bg-[#cab99a] p-4 xl:border-l xl:border-t-0" aria-labelledby="chisel-heading">
-            <div class="flex items-center gap-3">
-              <svg class="size-14 shrink-0 border border-[#533b2d] bg-[#231b17]" viewBox="0 0 64 64" role="img" aria-label="Original Chisel portrait token">
-                <rect width="64" height="64" fill="#352720" />
-                <path d="M12 25h40L44 12H21Z" fill="#111315" />
-                <path d="M20 23c0 15 3 24 12 24s13-9 13-24Z" fill="#b18a68" />
-                <path d="M18 64c2-14 7-20 14-20s14 6 16 20Z" fill="#7b3029" />
-                <path d="M25 29h5m5 0h5" stroke="#1e1815" stroke-width="2" />
-              </svg>
-              <div class="min-w-0">
-                <p class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7e3029]">Chisel · case handler</p>
-                <h2 id="chisel-heading" class="break-words font-serif text-base font-semibold leading-tight">{chisel?.display_name ?? "Unassigned"}</h2>
-                <p class="mt-1 font-mono text-[9px] uppercase text-[#715d47]">No turn · reacts to Detective actions</p>
-                <span
-                  id="chisel-connection-state"
-                  class={[
-                    "mt-1 block font-mono text-[9px] font-semibold uppercase tracking-[0.1em]",
-                    !connectionSnapshotReceived
-                      ? "text-[#715d47]"
-                      : chisel && onlinePlayerIds.includes(chisel.id)
-                        ? "text-[#315344]"
-                        : "text-[#973b32]",
-                  ]}
-                  role="timer"
-                  aria-label={`Chisel connection status: ${!connectionSnapshotReceived ? "syncing" : chisel && onlinePlayerIds.includes(chisel.id) ? "online" : `offline, pause countdown ${disconnectCountdown(chisel?.id)}`}`}
-                >
-                  {#if !connectionSnapshotReceived}
-                    SYNCING
-                  {:else if chisel && onlinePlayerIds.includes(chisel.id)}
-                    ONLINE
-                  {:else}
-                    OFFLINE · {disconnectCountdown(chisel?.id)}
-                  {/if}
-                </span>
+          {#if drawerPage === "chisel" && privateState.role === "chisel"}
+            <section id="chisel-casebook-page" class="bg-[#cab99a] p-4" aria-labelledby="chisel-heading">
+              <div class="flex items-center gap-3">
+                <svg class="size-14 shrink-0 border border-[#533b2d] bg-[#231b17]" viewBox="0 0 64 64" role="img" aria-label="Original Chisel portrait token">
+                  <rect width="64" height="64" fill="#352720" />
+                  <path d="M12 25h40L44 12H21Z" fill="#111315" />
+                  <path d="M20 23c0 15 3 24 12 24s13-9 13-24Z" fill="#b18a68" />
+                  <path d="M18 64c2-14 7-20 14-20s14 6 16 20Z" fill="#7b3029" />
+                  <path d="M25 29h5m5 0h5" stroke="#1e1815" stroke-width="2" />
+                </svg>
+                <div class="min-w-0">
+                  <p class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7e3029]">Chisel · private case handler</p>
+                  <h2 id="chisel-heading" class="break-words font-serif text-base font-semibold leading-tight">{chisel?.display_name ?? "Unassigned"}</h2>
+                  <p class="mt-1 font-mono text-[9px] uppercase text-[#715d47]">No turn · reacts to Detective actions</p>
+                </div>
               </div>
-            </div>
 
-            {#if privateState.role === "chisel"}
               <div class="mt-5 border-y border-[#9d8669] py-4">
                 <p class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7e3029]">Private casebook</p>
                 <p class="mt-2 font-serif text-sm italic leading-6 text-[#4e3d2f]">{privateState.casebook.briefing}</p>
@@ -1224,28 +1272,39 @@
                   <div class="flex justify-between gap-3"><dt class="text-[#715d47]">Pending response</dt><dd class="font-mono font-semibold">{privateState.pending_interrogation ? "OPEN" : "NONE"}</dd></div>
                 </dl>
               </div>
-            {:else}
-              <div class="mt-5 border-y border-[#9d8669] py-4 text-sm leading-6 text-[#5f4b39]">
-                Chisel secrets remain on the private user channel. Detective clients never receive the solution or response matrix.
-              </div>
-            {/if}
+            </section>
+          {/if}
 
-            <div class="mt-4" aria-live="polite">
-              <p class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#80694f]">Latest entry</p>
-              <p class="mt-2 text-sm leading-5 text-[#4f3e30]">{lastEvent}</p>
-            </div>
+          {#if drawerPage === "history"}
+            <section id="public-case-history" class="casebook-history-page" aria-labelledby="public-history-heading">
+              <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Public event ledger</p>
+              <h3 id="public-history-heading" class="mt-1 font-serif text-xl font-semibold">Investigation history</h3>
+              <p class="mt-2 border-l-2 border-[#8c3f33] pl-3 text-sm leading-6 text-[#4f3e30]" aria-live="polite">{lastEvent}</p>
 
-            {#if commandError && publicState.status !== "paused"}
-              <div id="game-command-error" class="mt-4 border-l-2 border-[#a54235] bg-[#e1cfad] p-3 text-xs leading-5" role="alert">
-                <p>{commandError}</p>
-                {#if retryCommand}
-                  <button type="button" onclick={retryLastCommand} class="mt-2 cursor-pointer font-semibold text-[#8e352d] underline underline-offset-2">Retry command</button>
-                {/if}
-              </div>
-            {/if}
-          </aside>
+              <ol id="public-history-list" class="mt-4 grid gap-2">
+                {#each publicState.public_history ?? [] as entry, index}
+                  <li id={`public-history-${index}`} class="casebook-history-entry">
+                    <span>{entry.type.replaceAll("_", " ")}</span>
+                    <span>{entry.player_id ? publicState.players.find((player) => player.id === entry.player_id)?.display_name ?? "Detective" : "Case file"}</span>
+                  </li>
+                {:else}
+                  <li class="casebook-empty-page">No public action has been filed yet.</li>
+                {/each}
+              </ol>
+
+              {#if commandError && publicState.status !== "paused"}
+                <div id="game-command-error" class="mt-4 border-l-2 border-[#a54235] bg-[#e1cfad] p-3 text-xs leading-5" role="alert">
+                  <p>{commandError}</p>
+                  {#if retryCommand}
+                    <button type="button" onclick={retryLastCommand} class="mt-2 cursor-pointer font-semibold text-[#8e352d] underline underline-offset-2">Retry command</button>
+                  {/if}
+                </div>
+              {/if}
+            </section>
+          {/if}
         </div>
       </section>
+      </CasebookDrawer>
       </div>
 
       {#if publicState.status === "paused"}
