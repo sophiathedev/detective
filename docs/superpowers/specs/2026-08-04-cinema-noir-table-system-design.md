@@ -103,9 +103,10 @@ scope using `:require_authenticated_user`. These pages expose membership,
 roles, private projections, or user-owned games and therefore require a logged
 in `current_scope`.
 
-Invite detail remains in the existing browser/current-user flow so an anonymous
-visitor can inspect a valid invitation and then return after authentication.
-Accepting the invitation still requires an authenticated scope.
+Invite detail remains in the existing authenticated LiveView session. A guest
+is redirected to login with `return_to` before invitation details are exposed,
+then returns to the invite after authentication. Accepting the invitation also
+requires the authenticated scope.
 
 Registration and login remain in the generated authentication scopes. The
 visual redesign does not duplicate `live_session` names or introduce a
