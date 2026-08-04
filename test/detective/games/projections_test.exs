@@ -186,24 +186,27 @@ defmodule Detective.Games.ProjectionsTest do
 
   test "active unplaced Detective receives only placement destination IDs" do
     state = engine_state_fixture()
+    placement_ids = state |> Rules.police_stations() |> Enum.map(& &1.id)
 
     assert {:ok, projection} = Projections.for_user(state, detective_user_id())
 
     assert "place" in projection.private.available_actions
     refute "move" in projection.private.available_actions
-    assert "51" in projection.private.placement_location_ids
+    assert projection.private.placement_location_ids == placement_ids
     assert projection.private.valid_move_location_ids == []
   end
 
   test "active placed Detective with move action receives only move destination IDs" do
     state = engine_state_fixture() |> place_detective()
+    detective = engine_detective(state)
+    move_ids = state |> Rules.valid_move_destinations(detective) |> Enum.map(& &1.id)
 
     assert {:ok, projection} = Projections.for_user(state, detective_user_id())
 
     assert "move" in projection.private.available_actions
     refute "place" in projection.private.available_actions
     assert projection.private.placement_location_ids == []
-    assert "48" in projection.private.valid_move_location_ids
+    assert projection.private.valid_move_location_ids == move_ids
   end
 
   test "paused Detective private projection suppresses map destination IDs" do
