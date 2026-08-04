@@ -1,5 +1,6 @@
 <script>
   import { onDestroy, onMount } from "svelte"
+  import ActionDock from "./game/ActionDock.svelte"
   import GameBoard from "./game/GameBoard.svelte"
   import PlayerHUD from "./game/PlayerHUD.svelte"
 
@@ -11,7 +12,7 @@
   let publicState = $state(initialPublic())
   let privateState = $state(initialPrivate())
   let connectionState = $state("connecting")
-  let selectedLocationId = $state(null)
+  let mapSelection = $state(null)
   let selectedSuspectId = $state(null)
   let selectedTopicId = $state(null)
   let selectedResponseId = $state(null)
@@ -45,8 +46,9 @@
   let activeDetective = $derived(
     publicState.players.find((player) => player.id === publicState.current_detective_id),
   )
-  let selectedLocation = $derived(
-    publicState.locations.find((location) => location.id === selectedLocationId),
+  let selectedLocationId = $derived(mapSelection?.location.id ?? null)
+  let ownLocation = $derived(
+    publicState.locations.find((location) => location.id === ownPlayer?.location_id) ?? null,
   )
   let moveLocationIds = $derived(new Set(privateState.valid_move_location_ids ?? []))
   let placementLocationIds = $derived(new Set(privateState.placement_location_ids ?? []))
@@ -85,6 +87,8 @@
       ? "Field map · only the active Detective can issue movement commands."
       : mapIntent
       ? `${mapIntent.type === "place" ? "Placing" : "Moving to"} ${locationName(mapIntent.locationId)}…`
+      : mapSelection
+        ? `${mapSelection.location.name} selected · confirm on the dispatch slip.`
       : ownPlayer?.location_id
         ? "Select a red-ringed location to review a one-action Move."
         : "Select any available Police Station to review free placement.",
@@ -99,6 +103,7 @@
 
     if (mapIntent && nextOwnPlayer?.location_id === mapIntent.locationId) {
       mapIntent = null
+      mapSelection = null
     }
 
     publicState = nextState
@@ -107,6 +112,11 @@
   function applyPrivate(nextState, version) {
     if (version < publicState.version) return
     privateState = nextState
+
+    if (mapSelection && !mapSelectionLegalIn(mapSelection, nextState)) {
+      mapSelection = null
+      mapIntent = null
+    }
   }
 
   function acceptEvent({ event_id, version }, seenEventIds) {
@@ -125,8 +135,54 @@
     return true
   }
 
-  function locationAction(location) {
-    selectedLocationId = location.id
+  function mapSelectionLegalIn(selection, state) {
+    const actions = new Set(state.available_actions ?? [])
+    const destinationIds = new Set(
+      selection.type === "place"
+        ? (state.placement_location_ids ?? [])
+        : (state.valid_move_location_ids ?? []),
+    )
+
+    return actions.has(selection.type) && destinationIds.has(selection.location.id)
+  }
+
+  function selectMapLocation(location) {
+    if (commandPending || connectionState !== "online") return
+
+    if (placementLocationIds.has(location.id) && availableActions.has("place")) {
+      mapSelection = { type: "place", location }
+    } else if (moveLocationIds.has(location.id) && availableActions.has("move")) {
+      mapSelection = { type: "move", location }
+    }
+  }
+
+  function confirmMapMovement() {
+    if (!mapSelection || commandPending || connectionState !== "online" || !gameChannel) return
+
+    mapIntent = {
+      type: mapSelection.type,
+      locationId: mapSelection.location.id,
+    }
+
+    sendCommand(mapSelection.type, { location_id: mapSelection.location.id })
+  }
+
+  function cancelMapMovement() {
+    if (commandPending) return
+    mapSelection = null
+  }
+
+  function mapErrorInvalidatesSelection(code) {
+    return new Set([
+      "destination_outside_district",
+      "invalid_location",
+      "placement_required",
+      "not_your_turn",
+      "wrong_phase",
+      "wrong_role",
+      "no_actions_remaining",
+      "game_paused",
+    ]).has(code)
   }
 
   function sendCommand(type, payload, existingCommand = null) {
@@ -159,6 +215,9 @@
         commandPending = false
         retryCommand = null
         if (mapIntent?.commandId === command.command_id) mapIntent = null
+        if ((type === "place" || type === "move") && mapErrorInvalidatesSelection(code)) {
+          mapSelection = null
+        }
         commandError = commandErrorMessage(code)
       })
       .receive("timeout", () => {
@@ -170,6 +229,24 @@
 
   function retryLastCommand() {
     if (retryCommand) sendCommand(retryCommand.type, retryCommand.payload, retryCommand)
+  }
+
+  function handleDockAction(action) {
+    if (action === "search_suspect") {
+      submitSuspectSearch()
+    } else if (action === "interrogate") {
+      document.querySelector("#interrogation-workspace")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+    } else if (action === "accuse" || action === "submit_final_guess") {
+      document.querySelector("#accusation-sheet")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+    } else {
+      sendCommand(action, {})
+    }
   }
 
   function commandErrorMessage(code) {
@@ -216,12 +293,6 @@
     }
 
     return messages[code] ?? "The server rejected this action."
-  }
-
-  function locationType(type) {
-    if (type === "police_station") return "Police Station"
-    if (type === "mob_joint") return "Mob Joint"
-    return "Location"
   }
 
   function locationName(locationId) {
@@ -339,6 +410,8 @@
 
   function invalidateConnectionSnapshot() {
     connectionState = "offline"
+    mapSelection = null
+    mapIntent = null
     connectionSnapshotReceived = false
     onlinePlayerIds = []
     offlineDeadlines = {}
@@ -591,7 +664,7 @@
             pendingLocationId={mapIntent?.locationId ?? null}
             {lastTravel}
             disabled={commandPending || connectionState !== "online" || publicState.status === "paused"}
-            onSelect={locationAction}
+            onSelect={selectMapLocation}
           />
 
           <p class="mt-2 font-mono text-[8px] leading-3 text-[#594936] sm:text-[9px]">
@@ -690,75 +763,17 @@
               {/if}
             </div>
 
-            <div class="mt-5 grid gap-5 sm:grid-cols-[minmax(12rem,1fr)_minmax(10rem,0.72fr)]">
-              <section aria-labelledby="selected-location-heading">
-                <p class="font-mono text-[10px] uppercase tracking-[0.14em] text-[#80694f]">Selected location</p>
-                {#if selectedLocation}
-                  <h3 id="selected-location-heading" class="mt-2 font-serif text-xl font-semibold">{selectedLocation.name}</h3>
-                  <p class="mt-2 text-sm leading-6 text-[#695642]">
-                    {locationType(selectedLocation.type)} · {selectedLocation.district_ids.join(" / ")}
-                  </p>
-                  {#if placementLocationIds.has(selectedLocation.id)}
-                    <p class="mt-3 border-l-2 border-[#a54235] pl-3 text-sm">First-turn placement costs no action.</p>
-                  {:else if moveLocationIds.has(selectedLocation.id)}
-                    <p class="mt-3 border-l-2 border-[#a54235] pl-3 text-sm">Legal Move · costs 1 action.</p>
-                  {:else}
-                    <p class="mt-3 text-sm text-[#806d56]">Inspect only; no legal movement command is available.</p>
-                  {/if}
-                {:else}
-                  <h3 id="selected-location-heading" class="mt-2 font-serif text-xl font-semibold">Open the map</h3>
-                  <p class="mt-2 max-w-md text-sm leading-6 text-[#695642]">Choose a marked location. The browser sends intent; the server validates district, role, turn, and action cost.</p>
-                {/if}
-              </section>
-
-              <section id="game-actions" aria-labelledby="game-actions-heading">
-                <h3 id="game-actions-heading" class="font-mono text-[10px] uppercase tracking-[0.14em] text-[#80694f]">Available actions</h3>
-                <div class="mt-2 grid gap-2">
-                  <button
-                    id="action-search-location"
-                    type="button"
-                    disabled={!availableActions.has("search_location") || commandPending}
-                    onclick={() => sendCommand("search_location", {})}
-                    class="flex min-h-10 cursor-pointer items-center justify-between gap-2 border border-[#796349] bg-[#efe2c5] px-3 text-left text-sm font-semibold transition hover:bg-[#f8ecd2] disabled:cursor-not-allowed disabled:opacity-35"
-                  >Search location <span class="shrink-0 font-mono text-[9px]">1 AP</span></button>
-                  <button
-                    id="action-search-suspect"
-                    type="button"
-                    disabled={!selectedSuspectId || !searchableSuspectIds.has(selectedSuspectId) || commandPending}
-                    onclick={submitSuspectSearch}
-                    class="flex min-h-10 cursor-pointer items-center justify-between gap-2 border border-[#796349] bg-[#efe2c5] px-3 text-left text-sm font-semibold transition hover:bg-[#f8ecd2] disabled:cursor-not-allowed disabled:opacity-35"
-                  >Search suspect <span class="shrink-0 font-mono text-[9px]">1 AP</span></button>
-                  <button
-                    id="action-analyze"
-                    type="button"
-                    disabled={!availableActions.has("analyze") || commandPending}
-                    onclick={() => sendCommand("analyze", {})}
-                    class="flex min-h-10 cursor-pointer items-center justify-between gap-2 border border-[#796349] bg-[#efe2c5] px-3 text-left text-sm font-semibold transition hover:bg-[#f8ecd2] disabled:cursor-not-allowed disabled:opacity-35"
-                  >Analyze <span class="shrink-0 font-mono text-[9px]">1 AP → $1</span></button>
-                  <button
-                    id="action-kickback"
-                    type="button"
-                    disabled={!availableActions.has("kickback") || commandPending}
-                    onclick={() => sendCommand("kickback", {})}
-                    class="flex min-h-10 cursor-pointer items-center justify-between gap-2 border border-[#796349] bg-[#efe2c5] px-3 text-left text-sm font-semibold transition hover:bg-[#f8ecd2] disabled:cursor-not-allowed disabled:opacity-35"
-                  >Kickback <span class="shrink-0 font-mono text-[9px]">1 AP</span></button>
-                  <button
-                    id="action-skip-free-question"
-                    type="button"
-                    disabled={!availableActions.has("skip_free_question") || commandPending}
-                    onclick={() => sendCommand("skip_free_question", {})}
-                    class="flex min-h-10 cursor-pointer items-center justify-between gap-2 border border-[#796349] bg-[#d7c7aa] px-3 text-left text-sm font-semibold transition hover:bg-[#e7d8bb] disabled:hidden"
-                  >Decline free question <span class="shrink-0 font-mono text-[9px]">0 AP</span></button>
-                  <button
-                    id="action-end-turn"
-                    type="button"
-                    disabled={!availableActions.has("end_turn") || commandPending}
-                    onclick={() => sendCommand("end_turn", {})}
-                    class="flex min-h-10 cursor-pointer items-center justify-between gap-2 bg-[#9c4035] px-3 text-left text-sm font-semibold text-[#fff0d6] transition hover:bg-[#ad4a3d] disabled:cursor-not-allowed disabled:bg-[#8d7b65]"
-                  >End turn <span class="shrink-0 font-mono text-[9px]">0 AP</span></button>
-                </div>
-              </section>
-            </div>
+            <ActionDock
+              {availableActions}
+              selection={mapSelection}
+              origin={ownLocation}
+              {commandPending}
+              {commandError}
+              connectionOnline={connectionState === "online" && publicState.status !== "paused"}
+              onConfirmMove={confirmMapMovement}
+              onCancelMove={cancelMapMovement}
+              onAction={handleDockAction}
+            />
 
             <section
               id="interrogation-workspace"
