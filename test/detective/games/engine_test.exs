@@ -46,6 +46,24 @@ defmodule Detective.Games.EngineTest do
     refute Map.has_key?(state.case_definition["search_results"]["locations"], "central-precinct")
   end
 
+  test "rejects invalid legacy references instead of initializing canonical state" do
+    invalid_cases = [
+      put_in(legacy_case_definition(), ["suspects", Access.at(0), "location_id"], "51"),
+      put_in(
+        legacy_case_definition(),
+        ["search_results", "locations"],
+        %{"51" => search_result("Raw canonical key", false)}
+      ),
+      update_in(legacy_case_definition(), ["search_results", "locations"], fn locations ->
+        Map.put(locations, "51", search_result("Raw canonical key", false))
+      end)
+    ]
+
+    Enum.each(invalid_cases, fn case_definition ->
+      assert {:error, :invalid_initial_state} = Engine.new(game(), players(), case_definition)
+    end)
+  end
+
   test "initializes exact turn-order Scratch and leverage without a Chisel turn" do
     state = new_state()
     first = player(state, "detective-1")

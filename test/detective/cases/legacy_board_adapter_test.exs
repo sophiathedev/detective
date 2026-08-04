@@ -47,6 +47,44 @@ defmodule Detective.Cases.LegacyBoardAdapterTest do
     assert {:error, :unknown_board} = LegacyBoardAdapter.adapt(custom)
   end
 
+  test "rejects unmapped and non-binary legacy suspect location references" do
+    Enum.each(["51", 51], fn invalid_location_id ->
+      legacy = %{
+        "locations" => legacy_seed_locations(),
+        "suspects" => [%{"id" => "suspect", "location_id" => invalid_location_id}]
+      }
+
+      assert {:error, :invalid_suspect_location} = LegacyBoardAdapter.adapt(legacy)
+    end)
+  end
+
+  test "rejects unmapped and non-binary legacy Search location references" do
+    Enum.each(["51", 51], fn invalid_location_id ->
+      legacy = %{
+        "locations" => legacy_seed_locations(),
+        "search_results" => %{
+          "locations" => %{invalid_location_id => %{"text" => "Invalid reference"}}
+        }
+      }
+
+      assert {:error, :invalid_search_results} = LegacyBoardAdapter.adapt(legacy)
+    end)
+  end
+
+  test "rejects mixed old and canonical Search keys instead of colliding during rewrite" do
+    legacy = %{
+      "locations" => legacy_seed_locations(),
+      "search_results" => %{
+        "locations" => %{
+          "central-precinct" => %{"text" => "Legacy key"},
+          "51" => %{"text" => "Raw canonical key"}
+        }
+      }
+    }
+
+    assert {:error, :invalid_search_results} = LegacyBoardAdapter.adapt(legacy)
+  end
+
   defp location(id, name, type, district_ids, x, y) do
     %{
       "id" => id,

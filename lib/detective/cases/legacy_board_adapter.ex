@@ -128,7 +128,7 @@ defmodule Detective.Cases.LegacyBoardAdapter do
     case Enum.find(@legacy_adapters, fn {known_locations, _id_map} ->
            locations == known_locations
          end) do
-      {_known_locations, id_map} -> {:ok, rewrite(case_definition, id_map)}
+      {_known_locations, id_map} -> rewrite(case_definition, id_map)
       nil -> {:error, :unknown_board}
     end
   end
@@ -136,36 +136,64 @@ defmodule Detective.Cases.LegacyBoardAdapter do
   def adapt(_case_definition), do: {:error, :unknown_board}
 
   defp rewrite(case_definition, id_map) do
-    case_definition
-    |> Map.delete("locations")
-    |> Map.put("board_id", "dcoa_classic")
-    |> Map.update("suspects", nil, &rewrite_suspects(&1, id_map))
-    |> Map.update("search_results", nil, &rewrite_search_results(&1, id_map))
+    with {:ok, suspects} <- rewrite_suspects(case_definition["suspects"], id_map),
+         {:ok, search_results} <-
+           rewrite_search_results(case_definition["search_results"], id_map) do
+      {:ok,
+       case_definition
+       |> Map.delete("locations")
+       |> Map.put("board_id", "dcoa_classic")
+       |> Map.put("suspects", suspects)
+       |> Map.put("search_results", search_results)}
+    end
   end
+
+  defp rewrite_suspects(nil, _id_map), do: {:ok, nil}
 
   defp rewrite_suspects(suspects, id_map) when is_list(suspects) do
-    Enum.map(suspects, fn
-      %{"location_id" => location_id} = suspect ->
-        Map.put(suspect, "location_id", Map.get(id_map, location_id, location_id))
+    Enum.reduce_while(suspects, {:ok, []}, fn
+      %{"location_id" => location_id} = suspect, {:ok, rewritten} ->
+        case Map.fetch(id_map, location_id) do
+          {:ok, canonical_id} ->
+            {:cont, {:ok, [Map.put(suspect, "location_id", canonical_id) | rewritten]}}
 
-      suspect ->
-        suspect
+          :error ->
+            {:halt, {:error, :invalid_suspect_location}}
+        end
+
+      _suspect, _rewritten ->
+        {:halt, {:error, :invalid_suspect_location}}
     end)
+    |> case do
+      {:ok, rewritten} -> {:ok, Enum.reverse(rewritten)}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
-  defp rewrite_suspects(suspects, _id_map), do: suspects
+  defp rewrite_suspects(suspects, _id_map), do: {:ok, suspects}
+
+  defp rewrite_search_results(nil, _id_map), do: {:ok, nil}
 
   defp rewrite_search_results(search_results, id_map) when is_map(search_results) do
-    Map.update(search_results, "locations", nil, fn
-      locations when is_map(locations) ->
-        Map.new(locations, fn {location_id, result} ->
-          {Map.get(id_map, location_id, location_id), result}
-        end)
+    with {:ok, locations} <- rewrite_search_locations(search_results["locations"], id_map) do
+      {:ok, Map.put(search_results, "locations", locations)}
+    end
+  end
 
-      locations ->
-        locations
+  defp rewrite_search_results(search_results, _id_map), do: {:ok, search_results}
+
+  defp rewrite_search_locations(nil, _id_map), do: {:ok, nil}
+
+  defp rewrite_search_locations(locations, id_map) when is_map(locations) do
+    Enum.reduce_while(locations, {:ok, %{}}, fn {location_id, result}, {:ok, rewritten} ->
+      with {:ok, canonical_id} <- Map.fetch(id_map, location_id),
+           false <- Map.has_key?(rewritten, canonical_id) do
+        {:cont, {:ok, Map.put(rewritten, canonical_id, result)}}
+      else
+        _invalid -> {:halt, {:error, :invalid_search_results}}
+      end
     end)
   end
 
-  defp rewrite_search_results(search_results, _id_map), do: search_results
+  defp rewrite_search_locations(locations, _id_map), do: {:ok, locations}
 end

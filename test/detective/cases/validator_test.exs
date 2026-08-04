@@ -12,6 +12,36 @@ defmodule Detective.Cases.ValidatorTest do
     assert :ok = Validator.validate(legacy)
   end
 
+  test "rejects a raw canonical suspect reference on an exact legacy topology" do
+    legacy = %{
+      "locations" => legacy_fixture_locations(),
+      "suspects" => [%{"id" => "suspect", "location_id" => "51"}]
+    }
+
+    assert {:error, :invalid_suspect_location} = Validator.validate(legacy)
+  end
+
+  test "rejects raw canonical and mixed Search references on an exact legacy topology" do
+    Enum.each(
+      [
+        %{"51" => search_result([], [])},
+        %{
+          "central-precinct" => search_result([], []),
+          "51" => search_result([], [])
+        }
+      ],
+      fn search_locations ->
+        legacy = %{
+          "locations" => legacy_fixture_locations(),
+          "suspects" => [%{"id" => "suspect", "location_id" => "central-precinct"}],
+          "search_results" => %{"locations" => search_locations}
+        }
+
+        assert {:error, :invalid_search_results} = Validator.validate(legacy)
+      end
+    )
+  end
+
   test "requires a known board and validates suspect/search location references" do
     content =
       valid_case()
