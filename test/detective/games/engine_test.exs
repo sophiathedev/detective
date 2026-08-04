@@ -60,6 +60,22 @@ defmodule Detective.Games.EngineTest do
     assert state.days_remaining == 9
   end
 
+  for invalid_max_days <- [-1, "9", 1.5, true, nil] do
+    test "invalid max_days #{inspect(invalid_max_days)} keeps the Classic default" do
+      invalid = unquote(Macro.escape(invalid_max_days))
+
+      assert {:ok, state} =
+               Engine.new(
+                 game(),
+                 classic_players(2),
+                 Map.put(case_definition(), "max_days", invalid)
+               )
+
+      assert state.days_remaining == 9
+      assert state.day == 1
+    end
+  end
+
   test "initializes runtime locations from the canonical board catalog" do
     assert {:ok, state} = Engine.new(game(), players(), case_definition())
 
