@@ -5,6 +5,19 @@ defmodule Detective.Cases.BoardCatalogTest do
 
   @district_ids ~w(westside hollywood central_la san_gabriel_valley south_bay)
   @location_fields ~w(id number slug name type district_ids x y)
+  @catalog_sha256 "a6ec0d6b9aabff9bc8fd4a84bcf153e7b9b19a70ccdadd7378da7b91dfb62b5e"
+
+  test "canonical catalog bytes match the independently audited board data" do
+    digest =
+      :detective
+      |> :code.priv_dir()
+      |> Path.join("board/dcoa_classic.json")
+      |> File.read!()
+      |> then(&:crypto.hash(:sha256, &1))
+      |> Base.encode16(case: :lower)
+
+    assert digest == @catalog_sha256
+  end
 
   test "Classic catalog contains every numbered board location once" do
     assert {:ok, board} = BoardCatalog.fetch("dcoa_classic")
@@ -60,6 +73,8 @@ defmodule Detective.Cases.BoardCatalogTest do
     assert_location("39", "Vermont & Pico", ~w(central_la))
     assert_location("45", "L.A. Times", ~w(hollywood central_la))
     assert_location("53", "Mission & Valley", ~w(central_la san_gabriel_valley))
+    assert_location("56", "Garvey & Brooklyn", ~w(central_la san_gabriel_valley))
+    assert_location("57", "Telegraph & 9th", ~w(central_la san_gabriel_valley))
     assert_location("58", "Occidental College", ~w(hollywood san_gabriel_valley))
     assert_location("59", "Sycamore Park", ~w(hollywood san_gabriel_valley))
     assert_location("82", "Vermont & Manchester", ~w(central_la south_bay))
