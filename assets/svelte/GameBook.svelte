@@ -1,6 +1,7 @@
 <script>
   import { onDestroy, onMount } from "svelte"
   import GameBoard from "./game/GameBoard.svelte"
+  import PlayerHUD from "./game/PlayerHUD.svelte"
 
   let { game_id, user_id, initial_public, initial_private } = $props()
 
@@ -646,55 +647,14 @@
       </section>
 
       <section id="casebook-action-page" class="relative z-10 flex min-h-[42rem] flex-col bg-[#e4d8bd] lg:min-h-0">
-        <div id="detective-bookmarks" class="grid grid-cols-2 border-b border-[#9f896d] sm:grid-cols-4">
-          {#each [1, 2, 3, 4] as seat}
-            {@const detective = detectives.find((player) => player.seat === seat)}
-            <article
-              id={`detective-hud-${seat}`}
-              class={`relative min-h-24 border-[#a38b6e] p-2.5 sm:border-r ${detective?.id === publicState.current_detective_id ? "bg-[#f0e3c8]" : "bg-[#cbbb9d]"}`}
-              aria-current={detective?.id === publicState.current_detective_id ? "true" : undefined}
-            >
-              {#if detective}
-                <div class="flex items-center gap-2">
-                  <svg class="size-11 shrink-0 border border-[#6f5942] bg-[#2a211a]" viewBox="0 0 64 64" role="img" aria-label={`Original portrait token for ${detective.display_name}`}>
-                    <rect width="64" height="64" fill={["#29475a", "#704239", "#3e5c43", "#685234"][seat - 1]} />
-                    <circle cx="32" cy="28" r="13" fill="#d8b38c" />
-                    {#if seat === 1}
-                      <path d="M15 21h34l-8-9H24Z" fill="#17191a" />
-                    {:else if seat === 2}
-                      <path d="M18 27c3-15 25-18 30-2-8-4-21-3-30 2Z" fill="#2b1814" />
-                    {:else if seat === 3}
-                      <path d="M17 23c8-15 26-15 32 2l-8-3-8-10-6 10Z" fill="#1b201a" />
-                    {:else}
-                      <path d="M18 19h28l5 8H13Z" fill="#2c251c" />
-                    {/if}
-                    <path d="M12 64c2-17 12-24 20-24s19 7 21 24Z" fill="#1e2425" />
-                    <circle cx="27" cy="28" r="1.5" fill="#211812" />
-                    <circle cx="38" cy="28" r="1.5" fill="#211812" />
-                  </svg>
-                  <div class="min-w-0">
-                    <p class="truncate text-xs font-semibold text-[#30251c]">{detective.display_name}</p>
-                    <p class="mt-1 font-mono text-[10px] text-[#705b45]">AP {detective.actions_remaining}/4</p>
-                    <p class="truncate font-mono text-[9px] uppercase tracking-[0.08em] text-[#826a50]">{detective.location_id ?? "Not placed"}</p>
-                    {#if connectionSnapshotReceived && !onlinePlayerIds.includes(detective.id)}
-                      <span
-                        id={`detective-connection-${seat}`}
-                        class="detective-offline-mark"
-                        role="timer"
-                        aria-label={`${detective.display_name} offline, pause countdown ${disconnectCountdown(detective.id)}`}
-                      >OFFLINE · {disconnectCountdown(detective.id)}</span>
-                    {/if}
-                  </div>
-                </div>
-                {#if detective.id === publicState.current_detective_id}
-                  <span class="absolute inset-x-0 bottom-0 h-1 bg-[#a54235]" aria-hidden="true"></span>
-                {/if}
-              {:else}
-                <div class="flex h-full items-center justify-center font-mono text-[10px] uppercase tracking-[0.12em] text-[#8a755b]">Empty bookmark {seat}</div>
-              {/if}
-            </article>
-          {/each}
-        </div>
+        <PlayerHUD
+          players={publicState.players}
+          currentDetectiveId={publicState.current_detective_id}
+          {privateState}
+          {onlinePlayerIds}
+          {connectionSnapshotReceived}
+          disconnectLabel={disconnectCountdown}
+        />
 
         <div class="grid min-h-0 flex-1 gap-0 xl:grid-cols-[minmax(0,1fr)_15rem]">
           <div class="min-h-0 p-4 sm:p-5">
