@@ -1,0 +1,1229 @@
+{
+  "id": "dcoa_classic",
+  "district_ids": [
+    "westside",
+    "hollywood",
+    "central_la",
+    "san_gabriel_valley",
+    "south_bay"
+  ],
+  "locations": [
+    {
+      "id": "1",
+      "number": 1,
+      "slug": "university-of-california",
+      "name": "University of California",
+      "type": "standard",
+      "district_ids": [
+        "westside"
+      ],
+      "x": 0.127,
+      "y": 0.4151
+    },
+    {
+      "id": "2",
+      "number": 2,
+      "slug": "botanical-gardens",
+      "name": "Botanical Gardens",
+      "type": "standard",
+      "district_ids": [
+        "westside"
+      ],
+      "x": 0.107,
+      "y": 0.467
+    },
+    {
+      "id": "3",
+      "number": 3,
+      "slug": "westwood-village",
+      "name": "Westwood Village",
+      "type": "standard",
+      "district_ids": [
+        "westside"
+      ],
+      "x": 0.159,
+      "y": 0.478
+    },
+    {
+      "id": "4",
+      "number": 4,
+      "slug": "west-la-station",
+      "name": "West L.A. Station",
+      "type": "police_station",
+      "district_ids": [
+        "westside"
+      ],
+      "x": 0.143,
+      "y": 0.5173
+    },
+    {
+      "id": "5",
+      "number": 5,
+      "slug": "wilshire-blvd",
+      "name": "Wilshire Blvd.",
+      "type": "standard",
+      "district_ids": [
+        "westside"
+      ],
+      "x": 0.093,
+      "y": 0.5818
+    },
+    {
+      "id": "6",
+      "number": 6,
+      "slug": "ocean-park-amusement-pier",
+      "name": "Ocean Park Amusement Pier",
+      "type": "standard",
+      "district_ids": [
+        "westside"
+      ],
+      "x": 0.11,
+      "y": 0.6399
+    },
+    {
+      "id": "7",
+      "number": 7,
+      "slug": "pier-blvd",
+      "name": "Pier Blvd.",
+      "type": "standard",
+      "district_ids": [
+        "westside"
+      ],
+      "x": 0.143,
+      "y": 0.6038
+    },
+    {
+      "id": "8",
+      "number": 8,
+      "slug": "beverly-hills-hotel",
+      "name": "Beverly Hills Hotel",
+      "type": "standard",
+      "district_ids": [
+        "westside",
+        "hollywood"
+      ],
+      "x": 0.207,
+      "y": 0.4088
+    },
+    {
+      "id": "9",
+      "number": 9,
+      "slug": "slapsy-maxies",
+      "name": "Slapsy Maxie's",
+      "type": "mob_joint",
+      "district_ids": [
+        "westside"
+      ],
+      "x": 0.229,
+      "y": 0.467
+    },
+    {
+      "id": "10",
+      "number": 10,
+      "slug": "la-brea-tar-pits",
+      "name": "La Brea Tar Pits",
+      "type": "standard",
+      "district_ids": [
+        "westside"
+      ],
+      "x": 0.265,
+      "y": 0.4607
+    },
+    {
+      "id": "11",
+      "number": 11,
+      "slug": "fox-studios",
+      "name": "Fox Studios",
+      "type": "standard",
+      "district_ids": [
+        "westside"
+      ],
+      "x": 0.236,
+      "y": 0.5299
+    },
+    {
+      "id": "12",
+      "number": 12,
+      "slug": "wilshire-station",
+      "name": "Wilshire Station",
+      "type": "police_station",
+      "district_ids": [
+        "westside"
+      ],
+      "x": 0.289,
+      "y": 0.5189
+    },
+    {
+      "id": "13",
+      "number": 13,
+      "slug": "clover-field-airport",
+      "name": "Clover Field Airport",
+      "type": "standard",
+      "district_ids": [
+        "westside"
+      ],
+      "x": 0.209,
+      "y": 0.6022
+    },
+    {
+      "id": "14",
+      "number": 14,
+      "slug": "washington-blvd",
+      "name": "Washington Blvd.",
+      "type": "standard",
+      "district_ids": [
+        "westside"
+      ],
+      "x": 0.269,
+      "y": 0.5959
+    },
+    {
+      "id": "15",
+      "number": 15,
+      "slug": "sunset-pier",
+      "name": "Sunset Pier",
+      "type": "standard",
+      "district_ids": [
+        "westside"
+      ],
+      "x": 0.181,
+      "y": 0.6808
+    },
+    {
+      "id": "16",
+      "number": 16,
+      "slug": "manchester-blvd",
+      "name": "Manchester Blvd.",
+      "type": "standard",
+      "district_ids": [
+        "westside"
+      ],
+      "x": 0.227,
+      "y": 0.7028
+    },
+    {
+      "id": "17",
+      "number": 17,
+      "slug": "country-club-manor",
+      "name": "Country Club Manor",
+      "type": "standard",
+      "district_ids": [
+        "westside",
+        "hollywood"
+      ],
+      "x": 0.33,
+      "y": 0.4135
+    },
+    {
+      "id": "18",
+      "number": 18,
+      "slug": "western-and-wilshire",
+      "name": "Western & Wilshire",
+      "type": "standard",
+      "district_ids": [
+        "westside"
+      ],
+      "x": 0.344,
+      "y": 0.4717
+    },
+    {
+      "id": "19",
+      "number": 19,
+      "slug": "loyola-high",
+      "name": "Loyola High",
+      "type": "standard",
+      "district_ids": [
+        "westside",
+        "central_la"
+      ],
+      "x": 0.369,
+      "y": 0.5204
+    },
+    {
+      "id": "20",
+      "number": 20,
+      "slug": "mccarty-memorial-christian",
+      "name": "McCarty Memorial Christian",
+      "type": "standard",
+      "district_ids": [
+        "westside"
+      ],
+      "x": 0.32,
+      "y": 0.555
+    },
+    {
+      "id": "21",
+      "number": 21,
+      "slug": "crenshaw-and-santa-barbara",
+      "name": "Crenshaw & Santa Barbara",
+      "type": "standard",
+      "district_ids": [
+        "westside"
+      ],
+      "x": 0.309,
+      "y": 0.6368
+    },
+    {
+      "id": "22",
+      "number": 22,
+      "slug": "the-stag-and-bull",
+      "name": "The Stag & Bull",
+      "type": "mob_joint",
+      "district_ids": [
+        "westside",
+        "central_la"
+      ],
+      "x": 0.371,
+      "y": 0.6148
+    },
+    {
+      "id": "23",
+      "number": 23,
+      "slug": "inglewood-cemetery",
+      "name": "Inglewood Cemetery",
+      "type": "standard",
+      "district_ids": [
+        "westside",
+        "south_bay"
+      ],
+      "x": 0.306,
+      "y": 0.6855
+    },
+    {
+      "id": "24",
+      "number": 24,
+      "slug": "hollywood-bowl",
+      "name": "Hollywood Bowl",
+      "type": "standard",
+      "district_ids": [
+        "hollywood"
+      ],
+      "x": 0.288,
+      "y": 0.283
+    },
+    {
+      "id": "25",
+      "number": 25,
+      "slug": "graumans-chinese-theatre",
+      "name": "Grauman's Chinese Theatre",
+      "type": "standard",
+      "district_ids": [
+        "hollywood"
+      ],
+      "x": 0.261,
+      "y": 0.3223
+    },
+    {
+      "id": "26",
+      "number": 26,
+      "slug": "chateau-marmont",
+      "name": "Chateau Marmont",
+      "type": "standard",
+      "district_ids": [
+        "hollywood"
+      ],
+      "x": 0.264,
+      "y": 0.3742
+    },
+    {
+      "id": "27",
+      "number": 27,
+      "slug": "hollywood-station",
+      "name": "Hollywood Station",
+      "type": "police_station",
+      "district_ids": [
+        "hollywood"
+      ],
+      "x": 0.315,
+      "y": 0.3648
+    },
+    {
+      "id": "28",
+      "number": 28,
+      "slug": "western-and-los-feliz",
+      "name": "Western & Los Feliz",
+      "type": "standard",
+      "district_ids": [
+        "hollywood"
+      ],
+      "x": 0.34,
+      "y": 0.3082
+    },
+    {
+      "id": "29",
+      "number": 29,
+      "slug": "hollywoodland-sign",
+      "name": "Hollywoodland Sign",
+      "type": "standard",
+      "district_ids": [
+        "hollywood"
+      ],
+      "x": 0.377,
+      "y": 0.2704
+    },
+    {
+      "id": "30",
+      "number": 30,
+      "slug": "griffith-park",
+      "name": "Griffith Park",
+      "type": "standard",
+      "district_ids": [
+        "hollywood"
+      ],
+      "x": 0.413,
+      "y": 0.2594
+    },
+    {
+      "id": "31",
+      "number": 31,
+      "slug": "normandie-and-beverly",
+      "name": "Normandie & Beverly",
+      "type": "standard",
+      "district_ids": [
+        "hollywood"
+      ],
+      "x": 0.37,
+      "y": 0.3915
+    },
+    {
+      "id": "32",
+      "number": 32,
+      "slug": "frostonya-apt-hotel",
+      "name": "Frostonya Apt. Hotel",
+      "type": "standard",
+      "district_ids": [
+        "hollywood"
+      ],
+      "x": 0.397,
+      "y": 0.3742
+    },
+    {
+      "id": "33",
+      "number": 33,
+      "slug": "sunset-revue",
+      "name": "Sunset Revue",
+      "type": "standard",
+      "district_ids": [
+        "hollywood"
+      ],
+      "x": 0.438,
+      "y": 0.3522
+    },
+    {
+      "id": "34",
+      "number": 34,
+      "slug": "black-diamond-casino",
+      "name": "Black Diamond Casino",
+      "type": "mob_joint",
+      "district_ids": [
+        "hollywood"
+      ],
+      "x": 0.486,
+      "y": 0.2469
+    },
+    {
+      "id": "35",
+      "number": 35,
+      "slug": "glendale-and-riverside",
+      "name": "Glendale & Riverside",
+      "type": "standard",
+      "district_ids": [
+        "hollywood"
+      ],
+      "x": 0.552,
+      "y": 0.283
+    },
+    {
+      "id": "36",
+      "number": 36,
+      "slug": "glendale-station",
+      "name": "Glendale Station",
+      "type": "police_station",
+      "district_ids": [
+        "hollywood"
+      ],
+      "x": 0.488,
+      "y": 0.327
+    },
+    {
+      "id": "37",
+      "number": 37,
+      "slug": "angelus-temple",
+      "name": "Angelus Temple",
+      "type": "standard",
+      "district_ids": [
+        "hollywood"
+      ],
+      "x": 0.53,
+      "y": 0.3396
+    },
+    {
+      "id": "38",
+      "number": 38,
+      "slug": "hoover-and-temple",
+      "name": "Hoover & Temple",
+      "type": "standard",
+      "district_ids": [
+        "hollywood",
+        "central_la"
+      ],
+      "x": 0.437,
+      "y": 0.4182
+    },
+    {
+      "id": "39",
+      "number": 39,
+      "slug": "vermont-and-pico",
+      "name": "Vermont & Pico",
+      "type": "standard",
+      "district_ids": [
+        "central_la"
+      ],
+      "x": 0.399,
+      "y": 0.5299
+    },
+    {
+      "id": "40",
+      "number": 40,
+      "slug": "alvarado-street",
+      "name": "Alvarado Street",
+      "type": "standard",
+      "district_ids": [
+        "central_la"
+      ],
+      "x": 0.444,
+      "y": 0.4827
+    },
+    {
+      "id": "41",
+      "number": 41,
+      "slug": "la-library",
+      "name": "L.A. Library",
+      "type": "standard",
+      "district_ids": [
+        "central_la"
+      ],
+      "x": 0.51,
+      "y": 0.4733
+    },
+    {
+      "id": "42",
+      "number": 42,
+      "slug": "olympic-stadium",
+      "name": "Olympic Stadium",
+      "type": "standard",
+      "district_ids": [
+        "central_la"
+      ],
+      "x": 0.441,
+      "y": 0.6053
+    },
+    {
+      "id": "43",
+      "number": 43,
+      "slug": "hill-and-washington",
+      "name": "Hill & Washington",
+      "type": "standard",
+      "district_ids": [
+        "central_la"
+      ],
+      "x": 0.48,
+      "y": 0.5802
+    },
+    {
+      "id": "44",
+      "number": 44,
+      "slug": "wrigley-field",
+      "name": "Wrigley Field",
+      "type": "standard",
+      "district_ids": [
+        "central_la"
+      ],
+      "x": 0.513,
+      "y": 0.6132
+    },
+    {
+      "id": "45",
+      "number": 45,
+      "slug": "la-times",
+      "name": "L.A. Times",
+      "type": "standard",
+      "district_ids": [
+        "hollywood",
+        "central_la"
+      ],
+      "x": 0.541,
+      "y": 0.4167
+    },
+    {
+      "id": "46",
+      "number": 46,
+      "slug": "city-hall",
+      "name": "City Hall",
+      "type": "standard",
+      "district_ids": [
+        "central_la"
+      ],
+      "x": 0.594,
+      "y": 0.3821
+    },
+    {
+      "id": "47",
+      "number": 47,
+      "slug": "union-station",
+      "name": "Union Station",
+      "type": "standard",
+      "district_ids": [
+        "central_la"
+      ],
+      "x": 0.594,
+      "y": 0.423
+    },
+    {
+      "id": "48",
+      "number": 48,
+      "slug": "bradbury-building",
+      "name": "Bradbury Building",
+      "type": "standard",
+      "district_ids": [
+        "central_la"
+      ],
+      "x": 0.576,
+      "y": 0.4827
+    },
+    {
+      "id": "49",
+      "number": 49,
+      "slug": "san-pedro-and-9th",
+      "name": "San Pedro & 9th",
+      "type": "standard",
+      "district_ids": [
+        "central_la"
+      ],
+      "x": 0.56,
+      "y": 0.5645
+    },
+    {
+      "id": "50",
+      "number": 50,
+      "slug": "alameda-and-vernon",
+      "name": "Alameda & Vernon",
+      "type": "standard",
+      "district_ids": [
+        "central_la"
+      ],
+      "x": 0.605,
+      "y": 0.6368
+    },
+    {
+      "id": "51",
+      "number": 51,
+      "slug": "la-police-department-headquarters",
+      "name": "L.A. Police Department Headquarters",
+      "type": "police_station",
+      "district_ids": [
+        "central_la"
+      ],
+      "x": 0.623,
+      "y": 0.5527
+    },
+    {
+      "id": "52",
+      "number": 52,
+      "slug": "chinatown",
+      "name": "Chinatown",
+      "type": "mob_joint",
+      "district_ids": [
+        "central_la"
+      ],
+      "x": 0.652,
+      "y": 0.4151
+    },
+    {
+      "id": "53",
+      "number": 53,
+      "slug": "mission-and-valley",
+      "name": "Mission & Valley",
+      "type": "standard",
+      "district_ids": [
+        "central_la",
+        "san_gabriel_valley"
+      ],
+      "x": 0.695,
+      "y": 0.3947
+    },
+    {
+      "id": "54",
+      "number": 54,
+      "slug": "la-general",
+      "name": "L.A. General",
+      "type": "standard",
+      "district_ids": [
+        "central_la"
+      ],
+      "x": 0.701,
+      "y": 0.4355
+    },
+    {
+      "id": "55",
+      "number": 55,
+      "slug": "cathedral-of-saint-vibiana",
+      "name": "Cathedral of Saint Vibiana",
+      "type": "standard",
+      "district_ids": [
+        "central_la"
+      ],
+      "x": 0.677,
+      "y": 0.4827
+    },
+    {
+      "id": "56",
+      "number": 56,
+      "slug": "garvey-and-brooklyn",
+      "name": "Garvey & Brooklyn",
+      "type": "standard",
+      "district_ids": [
+        "central_la",
+        "san_gabriel_valley"
+      ],
+      "x": 0.748,
+      "y": 0.5236
+    },
+    {
+      "id": "57",
+      "number": 57,
+      "slug": "telegraph-and-9th",
+      "name": "Telegraph & 9th",
+      "type": "standard",
+      "district_ids": [
+        "central_la",
+        "san_gabriel_valley"
+      ],
+      "x": 0.687,
+      "y": 0.6164
+    },
+    {
+      "id": "58",
+      "number": 58,
+      "slug": "occidental-college",
+      "name": "Occidental College",
+      "type": "standard",
+      "district_ids": [
+        "hollywood",
+        "san_gabriel_valley"
+      ],
+      "x": 0.625,
+      "y": 0.272
+    },
+    {
+      "id": "59",
+      "number": 59,
+      "slug": "sycamore-park",
+      "name": "Sycamore Park",
+      "type": "standard",
+      "district_ids": [
+        "hollywood",
+        "san_gabriel_valley"
+      ],
+      "x": 0.648,
+      "y": 0.3443
+    },
+    {
+      "id": "60",
+      "number": 60,
+      "slug": "colorado-blvd",
+      "name": "Colorado Blvd.",
+      "type": "standard",
+      "district_ids": [
+        "san_gabriel_valley"
+      ],
+      "x": 0.673,
+      "y": 0.2704
+    },
+    {
+      "id": "61",
+      "number": 61,
+      "slug": "southwest-museum",
+      "name": "Southwest Museum",
+      "type": "standard",
+      "district_ids": [
+        "san_gabriel_valley"
+      ],
+      "x": 0.685,
+      "y": 0.3223
+    },
+    {
+      "id": "62",
+      "number": 62,
+      "slug": "hotel-vista-del-arroyo",
+      "name": "Hotel Vista del Arroyo",
+      "type": "standard",
+      "district_ids": [
+        "san_gabriel_valley"
+      ],
+      "x": 0.747,
+      "y": 0.2736
+    },
+    {
+      "id": "63",
+      "number": 63,
+      "slug": "pasadena-station",
+      "name": "Pasadena Station",
+      "type": "police_station",
+      "district_ids": [
+        "san_gabriel_valley"
+      ],
+      "x": 0.775,
+      "y": 0.3412
+    },
+    {
+      "id": "64",
+      "number": 64,
+      "slug": "ascot-speedway",
+      "name": "Ascot Speedway",
+      "type": "standard",
+      "district_ids": [
+        "san_gabriel_valley"
+      ],
+      "x": 0.761,
+      "y": 0.3821
+    },
+    {
+      "id": "65",
+      "number": 65,
+      "slug": "atlantic-and-mission",
+      "name": "Atlantic & Mission",
+      "type": "standard",
+      "district_ids": [
+        "san_gabriel_valley"
+      ],
+      "x": 0.821,
+      "y": 0.3538
+    },
+    {
+      "id": "66",
+      "number": 66,
+      "slug": "atlantic-and-colorado",
+      "name": "Atlantic & Colorado",
+      "type": "standard",
+      "district_ids": [
+        "san_gabriel_valley"
+      ],
+      "x": 0.829,
+      "y": 0.3066
+    },
+    {
+      "id": "67",
+      "number": 67,
+      "slug": "mt-wilson-observatory",
+      "name": "Mt. Wilson Observatory",
+      "type": "standard",
+      "district_ids": [
+        "san_gabriel_valley"
+      ],
+      "x": 0.884,
+      "y": 0.2516
+    },
+    {
+      "id": "68",
+      "number": 68,
+      "slug": "mission-dr",
+      "name": "Mission Dr.",
+      "type": "standard",
+      "district_ids": [
+        "san_gabriel_valley"
+      ],
+      "x": 0.864,
+      "y": 0.3836
+    },
+    {
+      "id": "69",
+      "number": 69,
+      "slug": "gays-lion-farm",
+      "name": "Gay's Lion Farm",
+      "type": "standard",
+      "district_ids": [
+        "san_gabriel_valley"
+      ],
+      "x": 0.867,
+      "y": 0.4418
+    },
+    {
+      "id": "70",
+      "number": 70,
+      "slug": "midwick-country-club",
+      "name": "Midwick Country Club",
+      "type": "standard",
+      "district_ids": [
+        "san_gabriel_valley"
+      ],
+      "x": 0.805,
+      "y": 0.4324
+    },
+    {
+      "id": "71",
+      "number": 71,
+      "slug": "montebello-golf-club",
+      "name": "Montebello Golf Club",
+      "type": "mob_joint",
+      "district_ids": [
+        "san_gabriel_valley"
+      ],
+      "x": 0.829,
+      "y": 0.522
+    },
+    {
+      "id": "72",
+      "number": 72,
+      "slug": "montebello-station",
+      "name": "Montebello Station",
+      "type": "police_station",
+      "district_ids": [
+        "san_gabriel_valley"
+      ],
+      "x": 0.793,
+      "y": 0.5849
+    },
+    {
+      "id": "73",
+      "number": 73,
+      "slug": "garvey-and-whittier",
+      "name": "Garvey & Whittier",
+      "type": "standard",
+      "district_ids": [
+        "san_gabriel_valley"
+      ],
+      "x": 0.751,
+      "y": 0.5786
+    },
+    {
+      "id": "74",
+      "number": 74,
+      "slug": "whittier-blvd",
+      "name": "Whittier Blvd.",
+      "type": "standard",
+      "district_ids": [
+        "san_gabriel_valley"
+      ],
+      "x": 0.86,
+      "y": 0.6038
+    },
+    {
+      "id": "75",
+      "number": 75,
+      "slug": "state-highway",
+      "name": "State Highway",
+      "type": "standard",
+      "district_ids": [
+        "san_gabriel_valley"
+      ],
+      "x": 0.83,
+      "y": 0.6855
+    },
+    {
+      "id": "76",
+      "number": 76,
+      "slug": "riviera-club",
+      "name": "Riviera Club",
+      "type": "mob_joint",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.238,
+      "y": 0.7406
+    },
+    {
+      "id": "77",
+      "number": 77,
+      "slug": "torrance-oil-fields",
+      "name": "Torrance Oil Fields",
+      "type": "standard",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.261,
+      "y": 0.7799
+    },
+    {
+      "id": "78",
+      "number": 78,
+      "slug": "palos-verdes-hills",
+      "name": "Palos Verdes Hills",
+      "type": "standard",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.221,
+      "y": 0.8286
+    },
+    {
+      "id": "79",
+      "number": 79,
+      "slug": "palos-verdes-beach",
+      "name": "Palos Verdes Beach",
+      "type": "standard",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.287,
+      "y": 0.9292
+    },
+    {
+      "id": "80",
+      "number": 80,
+      "slug": "narbonne-and-anaheim",
+      "name": "Narbonne & Anaheim",
+      "type": "standard",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.307,
+      "y": 0.8208
+    },
+    {
+      "id": "81",
+      "number": 81,
+      "slug": "western-and-anaheim",
+      "name": "Western & Anaheim",
+      "type": "standard",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.362,
+      "y": 0.8192
+    },
+    {
+      "id": "82",
+      "number": 82,
+      "slug": "vermont-and-manchester",
+      "name": "Vermont & Manchester",
+      "type": "standard",
+      "district_ids": [
+        "central_la",
+        "south_bay"
+      ],
+      "x": 0.401,
+      "y": 0.6808
+    },
+    {
+      "id": "83",
+      "number": 83,
+      "slug": "vermont-and-carson",
+      "name": "Vermont & Carson",
+      "type": "standard",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.398,
+      "y": 0.7673
+    },
+    {
+      "id": "84",
+      "number": 84,
+      "slug": "san-pedro-station",
+      "name": "San Pedro Station",
+      "type": "police_station",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.383,
+      "y": 0.9167
+    },
+    {
+      "id": "85",
+      "number": 85,
+      "slug": "point-fermin",
+      "name": "Point Fermin",
+      "type": "standard",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.371,
+      "y": 0.9607
+    },
+    {
+      "id": "86",
+      "number": 86,
+      "slug": "san-pedro",
+      "name": "San Pedro",
+      "type": "standard",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.426,
+      "y": 0.8947
+    },
+    {
+      "id": "87",
+      "number": 87,
+      "slug": "san-pedro-and-anaheim",
+      "name": "San Pedro & Anaheim",
+      "type": "standard",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.468,
+      "y": 0.8538
+    },
+    {
+      "id": "88",
+      "number": 88,
+      "slug": "terminal-island-federal-prison",
+      "name": "Terminal Island Federal Prison",
+      "type": "standard",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.519,
+      "y": 0.8915
+    },
+    {
+      "id": "89",
+      "number": 89,
+      "slug": "la-harbor-lighthouse",
+      "name": "L.A. Harbor Lighthouse",
+      "type": "standard",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.481,
+      "y": 0.9544
+    },
+    {
+      "id": "90",
+      "number": 90,
+      "slug": "broadway-and-redondo",
+      "name": "Broadway & Redondo",
+      "type": "standard",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.461,
+      "y": 0.7264
+    },
+    {
+      "id": "91",
+      "number": 91,
+      "slug": "san-pedro-and-manchester",
+      "name": "San Pedro & Manchester",
+      "type": "standard",
+      "district_ids": [
+        "central_la",
+        "south_bay"
+      ],
+      "x": 0.521,
+      "y": 0.684
+    },
+    {
+      "id": "92",
+      "number": 92,
+      "slug": "redondo-blvd",
+      "name": "Redondo Blvd.",
+      "type": "standard",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.552,
+      "y": 0.7186
+    },
+    {
+      "id": "93",
+      "number": 93,
+      "slug": "union-oil-refinery",
+      "name": "Union Oil Refinery",
+      "type": "standard",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.514,
+      "y": 0.7799
+    },
+    {
+      "id": "94",
+      "number": 94,
+      "slug": "long-beach-city-hall",
+      "name": "Long Beach City Hall",
+      "type": "standard",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.541,
+      "y": 0.8223
+    },
+    {
+      "id": "95",
+      "number": 95,
+      "slug": "long-beach-station",
+      "name": "Long Beach Station",
+      "type": "police_station",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.58,
+      "y": 0.7846
+    },
+    {
+      "id": "96",
+      "number": 96,
+      "slug": "topsys-nightclub",
+      "name": "Topsy's Nightclub",
+      "type": "mob_joint",
+      "district_ids": [
+        "central_la",
+        "south_bay"
+      ],
+      "x": 0.608,
+      "y": 0.6918
+    },
+    {
+      "id": "97",
+      "number": 97,
+      "slug": "atlantic-blvd",
+      "name": "Atlantic Blvd.",
+      "type": "standard",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.629,
+      "y": 0.7421
+    },
+    {
+      "id": "98",
+      "number": 98,
+      "slug": "atlantic-and-firestone",
+      "name": "Atlantic & Firestone",
+      "type": "standard",
+      "district_ids": [
+        "central_la",
+        "san_gabriel_valley",
+        "south_bay"
+      ],
+      "x": 0.693,
+      "y": 0.7138
+    },
+    {
+      "id": "99",
+      "number": 99,
+      "slug": "horseshoe-pier",
+      "name": "Horseshoe Pier",
+      "type": "standard",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.589,
+      "y": 0.9214
+    },
+    {
+      "id": "100",
+      "number": 100,
+      "slug": "anaheim-st",
+      "name": "Anaheim St.",
+      "type": "standard",
+      "district_ids": [
+        "south_bay"
+      ],
+      "x": 0.65,
+      "y": 0.8978
+    }
+  ]
+}
