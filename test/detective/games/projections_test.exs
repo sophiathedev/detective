@@ -1,7 +1,7 @@
 defmodule Detective.Games.ProjectionsTest do
   use ExUnit.Case, async: true
 
-  alias Detective.Games.Projections
+  alias Detective.Games.{Command, Engine, Projections, Rules}
   alias Detective.Games.Projections.Public
   alias Detective.Games.State
 
@@ -185,83 +185,72 @@ defmodule Detective.Games.ProjectionsTest do
   end
 
   test "active unplaced Detective receives only placement destination IDs" do
-    state = movable_state_fixture()
+    state = engine_state_fixture()
 
     assert {:ok, projection} = Projections.for_user(state, detective_user_id())
 
     assert "place" in projection.private.available_actions
     refute "move" in projection.private.available_actions
-    assert projection.private.placement_location_ids == ["51"]
+    assert "51" in projection.private.placement_location_ids
     assert projection.private.valid_move_location_ids == []
   end
 
   test "active placed Detective with move action receives only move destination IDs" do
-    state =
-      movable_state_fixture()
-      |> put_in(
-        [Access.key!(:players), "10000000-0000-0000-0000-000000000001", :location_id],
-        "51"
-      )
+    state = engine_state_fixture() |> place_detective()
 
     assert {:ok, projection} = Projections.for_user(state, detective_user_id())
 
     assert "move" in projection.private.available_actions
     refute "place" in projection.private.available_actions
     assert projection.private.placement_location_ids == []
-    assert projection.private.valid_move_location_ids == ["48"]
+    assert "48" in projection.private.valid_move_location_ids
   end
 
-  test "Detective private projection suppresses map IDs when their actions are unavailable" do
-    placed_state =
-      movable_state_fixture()
-      |> put_in(
-        [Access.key!(:players), "10000000-0000-0000-0000-000000000001", :location_id],
-        "51"
-      )
+  test "paused Detective private projection suppresses map destination IDs" do
+    state = pause_game(engine_state_fixture())
 
-    inactive = %{movable_state_fixture() | current_detective_id: nil}
+    assert_no_map_destinations(state)
+  end
+
+  test "inactive Detective private projection suppresses map destination IDs" do
+    placed_state = engine_state_fixture() |> place_detective()
+
+    assert {:ok, inactive, _events} = apply_engine_command(placed_state, :end_turn)
+    assert inactive.current_detective_id == second_detective_id()
+
+    assert_no_map_destinations(inactive)
+  end
+
+  test "zero-action Detective private projection suppresses map destination IDs" do
+    placed_state = engine_state_fixture() |> place_detective()
 
     zero_actions =
-      put_in(
-        placed_state,
-        [Access.key!(:players), "10000000-0000-0000-0000-000000000001", :actions_remaining],
-        0
-      )
+      Enum.reduce(["48", "51", "48", "51"], placed_state, fn location_id, state ->
+        assert {:ok, moved, _events} =
+                 apply_engine_command(state, :move, %{"location_id" => location_id})
 
+        moved
+      end)
+
+    assert engine_detective(zero_actions).actions_remaining == 0
+
+    assert_no_map_destinations(zero_actions)
+  end
+
+  test "free-question Detective private projection suppresses map destination IDs" do
     free_question =
-      put_in(
-        placed_state,
-        [
-          Access.key!(:players),
-          "10000000-0000-0000-0000-000000000001",
-          :free_question_suspect_id
-        ],
-        "suspect"
-      )
+      engine_state_fixture(hidden_suspect_case_definition())
+      |> place_detective()
+      |> search_location()
 
-    cases = [
-      paused: %{movable_state_fixture() | status: :paused, phase: :paused},
-      inactive: inactive,
-      zero_actions: zero_actions,
-      free_question: free_question
-    ]
+    assert engine_detective(free_question).free_question_suspect_id == "hidden-suspect"
+    assert engine_detective(free_question).actions_remaining == 3
 
-    for {state_name, state} <- cases do
-      assert {:ok, projection} = Projections.for_user(state, detective_user_id())
-
-      refute "place" in projection.private.available_actions,
-             "#{state_name} unexpectedly allows place"
-
-      refute "move" in projection.private.available_actions,
-             "#{state_name} unexpectedly allows move"
-
-      assert projection.private.placement_location_ids == [], "#{state_name} leaked placement IDs"
-      assert projection.private.valid_move_location_ids == [], "#{state_name} leaked move IDs"
-    end
+    assert_no_map_destinations(free_question)
   end
 
   test "Chisel and nonmembers never receive Detective map destination fields" do
-    state = movable_state_fixture()
+    state = engine_state_fixture()
 
     assert {:ok, chisel} = Projections.for_user(state, chisel_user_id())
     refute Map.has_key?(chisel.private, :placement_location_ids)
@@ -348,18 +337,151 @@ defmodule Detective.Games.ProjectionsTest do
     }
   end
 
-  defp movable_state_fixture do
-    state_fixture()
-    |> Map.update!(:locations, fn locations ->
-      Map.put(locations, "48", %{
-        id: "48",
-        name: "Los Angeles Public Library",
-        type: "library",
-        district_ids: ["central_la"],
-        x: 0.612,
-        y: 0.557
-      })
+  defp engine_state_fixture(case_definition \\ engine_case_definition()) do
+    assert {:ok, state} =
+             Engine.new(
+               %{id: Ecto.UUID.generate(), case_version_id: Ecto.UUID.generate()},
+               engine_players(),
+               case_definition
+             )
+
+    state
+  end
+
+  defp place_detective(state) do
+    assert {:ok, placed, _events} = apply_engine_command(state, :place, %{"location_id" => "51"})
+    placed
+  end
+
+  defp search_location(state) do
+    assert {:ok, searched, _events} = apply_engine_command(state, :search_location)
+    searched
+  end
+
+  defp assert_no_map_destinations(state) do
+    actions = Rules.available_actions(state, detective_user_id())
+    assert {:ok, projection} = Projections.for_user(state, detective_user_id())
+
+    refute "place" in actions
+    refute "move" in actions
+    assert projection.private.available_actions == actions
+    assert projection.private.placement_location_ids == []
+    assert projection.private.valid_move_location_ids == []
+  end
+
+  defp pause_game(state) do
+    assert {:ok, paused, _events} =
+             Engine.apply_system(state, {:pause_for_disconnect, [detective_id()]})
+
+    paused
+  end
+
+  defp apply_engine_command(state, type, payload \\ %{}) do
+    Engine.apply(
+      state,
+      detective_user_id(),
+      %Command{
+        command_id: Ecto.UUID.generate(),
+        type: type,
+        expected_version: state.version,
+        payload: payload
+      }
+    )
+  end
+
+  defp engine_detective(state), do: Map.fetch!(state.players, detective_id())
+
+  defp engine_players do
+    [
+      %{
+        id: chisel_id(),
+        user_id: chisel_user_id(),
+        display_name: "Chisel",
+        role: "chisel",
+        seat: nil
+      },
+      %{
+        id: detective_id(),
+        user_id: detective_user_id(),
+        display_name: "Detective One",
+        role: "detective",
+        seat: 1
+      },
+      %{
+        id: second_detective_id(),
+        user_id: "20000000-0000-0000-0000-000000000003",
+        display_name: "Detective Two",
+        role: "detective",
+        seat: 2
+      }
+    ]
+  end
+
+  defp engine_case_definition do
+    %{
+      "board_id" => "dcoa_classic",
+      "case_cards" => [
+        %{
+          "id" => "topic",
+          "code" => "A",
+          "title" => "Known Topic",
+          "type" => "information",
+          "description" => "A public topic.",
+          "initially_known" => true
+        }
+      ],
+      "suspects" => [
+        %{
+          "id" => "suspect",
+          "name" => "Suspect",
+          "occupation" => "witness",
+          "location_id" => "51"
+        }
+      ],
+      "response_matrix" => %{
+        "suspect" => %{"topic" => %{"most_useful" => "A truthful answer."}}
+      },
+      "search_results" => %{
+        "locations" => %{"51" => search_result("A routine search.", true)},
+        "suspects" => %{"suspect" => search_result("A routine interview.", true)},
+        "all_other_locations" => search_result("Nothing relevant.", false)
+      }
+    }
+  end
+
+  defp hidden_suspect_case_definition do
+    engine_case_definition()
+    |> update_in(["suspects"], fn suspects ->
+      [
+        %{
+          "id" => "hidden-suspect",
+          "name" => "Hidden Suspect",
+          "occupation" => "courier",
+          "location_id" => "51",
+          "initially_known" => false
+        }
+        | suspects
+      ]
     end)
+    |> put_in(
+      ["response_matrix", "hidden-suspect"],
+      %{"topic" => %{"most_useful" => "The hidden truth."}}
+    )
+    |> put_in(["search_results", "locations", "51", "reveal_suspect_ids"], ["hidden-suspect"])
+    |> put_in(
+      ["search_results", "suspects", "hidden-suspect"],
+      search_result("A courier emerges from the shadows.", true)
+    )
+  end
+
+  defp search_result(text, archive) do
+    %{
+      "text" => text,
+      "archive" => archive,
+      "reveal_case_card_ids" => [],
+      "take_case_card_ids" => [],
+      "reveal_suspect_ids" => []
+    }
   end
 
   defp pending_interrogation do
@@ -380,4 +502,7 @@ defmodule Detective.Games.ProjectionsTest do
 
   defp detective_user_id, do: "20000000-0000-0000-0000-000000000001"
   defp chisel_user_id, do: "20000000-0000-0000-0000-000000000002"
+  defp chisel_id, do: "10000000-0000-0000-0000-000000000010"
+  defp detective_id, do: "10000000-0000-0000-0000-000000000011"
+  defp second_detective_id, do: "10000000-0000-0000-0000-000000000012"
 end
