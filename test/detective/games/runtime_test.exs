@@ -2,6 +2,7 @@ defmodule Detective.Games.RuntimeTest do
   use Detective.DataCase, async: false
 
   import Detective.AccountsFixtures
+  import Detective.CasesFixtures
   import Detective.GamesFixtures
 
   alias Detective.Accounts.Scope
@@ -20,7 +21,65 @@ defmodule Detective.Games.RuntimeTest do
     State
   }
 
-  alias Detective.{Games, Invitations}
+  alias Detective.{Cases, Games, Invitations}
+
+  test "starts a waiting game from an exact legacy published case version" do
+    canonical_version = case_version_fixture()
+    legacy_content = legacy_case_definition_fixture(canonical_version.content)
+
+    {:ok, legacy_version} =
+      Cases.create_version(canonical_version.case_file, %{
+        version: 2,
+        published_at: DateTime.utc_now(:second),
+        content: legacy_content
+      })
+
+    selected = Cases.get_published_version(legacy_version.id)
+    assert selected.content["locations"] == legacy_content["locations"]
+    refute Map.has_key?(selected.content, "board_id")
+
+    host = user_fixture()
+    first = user_fixture()
+    second = user_fixture()
+    %{game: game, invite_token: token} = game_fixture(host, %{case_version: selected})
+    assert %Game{status: "waiting"} = Repo.get!(Game, game.id)
+
+    on_exit(fn ->
+      case Registry.lookup(Detective.GameRegistry, game.id) do
+        [{pid, _value}] -> DynamicSupervisor.terminate_child(SessionSupervisor, pid)
+        [] -> :ok
+      end
+    end)
+
+    assert {:ok, _result} = Invitations.accept(Scope.for_user(first), token)
+    assert {:ok, _result} = Invitations.accept(Scope.for_user(second), token)
+
+    assert {:ok, %{lobby: first_ready}} =
+             Games.set_ready(Scope.for_user(first), game.id, 0, true)
+
+    assert {:ok, %{lobby: ready}} =
+             Games.set_ready(
+               Scope.for_user(second),
+               game.id,
+               first_ready.current_version,
+               true
+             )
+
+    assert {:ok, %{lobby: active}} =
+             Games.start_game(
+               Scope.for_user(host),
+               game.id,
+               Ecto.UUID.generate(),
+               ready.current_version
+             )
+
+    assert active.status == "active"
+    assert {:ok, state} = Session.get_state(game.id)
+    assert state.case_definition["board_id"] == "dcoa_classic"
+    refute Map.has_key?(state.case_definition, "locations")
+    assert State.player_by_user_id(state, first.id).location_id == nil
+    assert state.suspects["night-clerk"].location_id == "51"
+  end
 
   test "start validates readiness and persists one recoverable initial state" do
     %{host: host, detective: detective, game: game, version: version} = ready_game()

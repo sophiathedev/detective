@@ -5,10 +5,11 @@ defmodule Detective.Cases.SearchDeck do
   Search text and reveal instructions never come from a client command.
   """
 
-  alias Detective.Cases.{BoardCatalog, ResponseMatrix}
+  alias Detective.Cases.{BoardCatalog, LegacyBoardAdapter, ResponseMatrix}
 
   def validate(case_definition) when is_map(case_definition) do
-    with {:ok, locations} <- BoardCatalog.locations(case_definition["board_id"]) do
+    with {:ok, case_definition} <- LegacyBoardAdapter.adapt(case_definition),
+         {:ok, locations} <- BoardCatalog.locations(case_definition["board_id"]) do
       validate(case_definition, locations)
     end
   end
@@ -16,6 +17,14 @@ defmodule Detective.Cases.SearchDeck do
   def validate(_case_definition), do: {:error, :invalid_search_results}
 
   def validate(case_definition, locations) when is_map(case_definition) and is_list(locations) do
+    with {:ok, case_definition} <- LegacyBoardAdapter.adapt(case_definition) do
+      validate_adapted(case_definition, locations)
+    end
+  end
+
+  def validate(_case_definition, _locations), do: {:error, :invalid_search_results}
+
+  defp validate_adapted(case_definition, locations) do
     case case_definition["search_results"] do
       nil ->
         :ok
@@ -27,8 +36,6 @@ defmodule Detective.Cases.SearchDeck do
         {:error, :invalid_search_results}
     end
   end
-
-  def validate(_case_definition, _locations), do: {:error, :invalid_search_results}
 
   def configured?(case_definition) do
     case_definition
@@ -83,12 +90,11 @@ defmodule Detective.Cases.SearchDeck do
     suspects = search_results["suspects"] || %{}
     fallback = search_results["all_other_locations"]
 
-    location_ids = ids(board_locations)
-    suspect_ids = case_definition |> Map.get("suspects", []) |> ids()
-    card_ids = case_definition |> Map.get("case_cards", []) |> ids()
-
     with true <- is_map(locations),
          true <- is_map(suspects),
+         {:ok, location_ids} <- ids(board_locations),
+         {:ok, suspect_ids} <- case_definition |> Map.get("suspects", []) |> ids(),
+         {:ok, card_ids} <- case_definition |> Map.get("case_cards", []) |> ids(),
          true <- map_keys_within?(locations, location_ids),
          true <- map_keys_within?(suspects, suspect_ids),
          true <- Enum.all?(suspect_ids, &Map.has_key?(suspects, &1)),
@@ -159,11 +165,17 @@ defmodule Detective.Cases.SearchDeck do
   defp normalize_result(_result, _target_type, _target_id),
     do: {:error, :search_not_available}
 
-  defp ids(entries) do
-    entries
-    |> Enum.map(& &1["id"])
-    |> MapSet.new()
+  defp ids(entries) when is_list(entries) do
+    Enum.reduce_while(entries, {:ok, MapSet.new()}, fn
+      %{"id" => id}, {:ok, ids} when is_binary(id) and id != "" ->
+        {:cont, {:ok, MapSet.put(ids, id)}}
+
+      _entry, _ids ->
+        {:halt, {:error, :invalid_search_results}}
+    end)
   end
+
+  defp ids(_entries), do: {:error, :invalid_search_results}
 
   defp map_keys_within?(map, allowed_ids) do
     map

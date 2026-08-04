@@ -7,7 +7,15 @@ defmodule Detective.Games.Engine do
   belong to more than one district and therefore bridges later Move actions.
   """
 
-  alias Detective.Cases.{AccusationSheet, BoardCatalog, ResponseMatrix, SearchDeck, Validator}
+  alias Detective.Cases.{
+    AccusationSheet,
+    BoardCatalog,
+    LegacyBoardAdapter,
+    ResponseMatrix,
+    SearchDeck,
+    Validator
+  }
+
   alias Detective.Games.{Command, Event, Rules, State}
 
   @actions_per_turn 4
@@ -23,6 +31,7 @@ defmodule Detective.Games.Engine do
 
     with [chisel] <- chisels,
          true <- length(detectives) in 2..4,
+         {:ok, case_definition} <- LegacyBoardAdapter.adapt(case_definition),
          :ok <- Validator.validate(case_definition),
          {:ok, board_locations} <- BoardCatalog.locations(case_definition["board_id"]),
          {:ok, locations} <- normalize_locations(board_locations),

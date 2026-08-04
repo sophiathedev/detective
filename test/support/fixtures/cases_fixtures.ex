@@ -1,6 +1,33 @@
 defmodule Detective.CasesFixtures do
   alias Detective.Cases
 
+  @legacy_fixture_locations [
+    %{
+      "id" => "central-precinct",
+      "name" => "Central Precinct",
+      "type" => "police_station",
+      "district_ids" => ["central"],
+      "x" => 0.25,
+      "y" => 0.35
+    },
+    %{
+      "id" => "canal-gate",
+      "name" => "Canal Gate",
+      "type" => "standard",
+      "district_ids" => ["central", "harbor"],
+      "x" => 0.5,
+      "y" => 0.5
+    },
+    %{
+      "id" => "pier-club",
+      "name" => "Pier Club",
+      "type" => "mob_joint",
+      "district_ids" => ["harbor"],
+      "x" => 0.75,
+      "y" => 0.7
+    }
+  ]
+
   def case_file_fixture(attrs \\ %{}) do
     unique = System.unique_integer([:positive])
 
@@ -133,5 +160,26 @@ defmodule Detective.CasesFixtures do
 
     {:ok, version} = Cases.create_version(case_file, attrs)
     Detective.Repo.preload(version, :case_file)
+  end
+
+  def legacy_case_definition_fixture(case_definition) when is_map(case_definition) do
+    case_definition
+    |> Map.delete("board_id")
+    |> Map.put("locations", @legacy_fixture_locations)
+    |> update_in(["suspects"], fn suspects ->
+      Enum.map(suspects, fn suspect ->
+        if suspect["location_id"] == "51" do
+          Map.put(suspect, "location_id", "central-precinct")
+        else
+          suspect
+        end
+      end)
+    end)
+    |> update_in(["search_results", "locations"], fn locations ->
+      Map.new(locations, fn
+        {"51", result} -> {"central-precinct", result}
+        entry -> entry
+      end)
+    end)
   end
 end

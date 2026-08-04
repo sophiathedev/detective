@@ -3,6 +3,15 @@ defmodule Detective.Cases.ValidatorTest do
 
   alias Detective.Cases.Validator
 
+  test "validates an exact pre-catalog published fixture through the legacy adapter" do
+    legacy = %{
+      "locations" => legacy_fixture_locations(),
+      "suspects" => [%{"id" => "suspect", "location_id" => "central-precinct"}]
+    }
+
+    assert :ok = Validator.validate(legacy)
+  end
+
   test "requires a known board and validates suspect/search location references" do
     content =
       valid_case()
@@ -161,6 +170,25 @@ defmodule Detective.Cases.ValidatorTest do
       "reveal_case_card_ids" => reveal_ids,
       "take_case_card_ids" => take_ids,
       "reveal_suspect_ids" => []
+    }
+  end
+
+  defp legacy_fixture_locations do
+    [
+      location("central-precinct", "Central Precinct", "police_station", ["central"], 0.25, 0.35),
+      location("canal-gate", "Canal Gate", "standard", ["central", "harbor"], 0.5, 0.5),
+      location("pier-club", "Pier Club", "mob_joint", ["harbor"], 0.75, 0.7)
+    ]
+  end
+
+  defp location(id, name, type, district_ids, x, y) do
+    %{
+      "id" => id,
+      "name" => name,
+      "type" => type,
+      "district_ids" => district_ids,
+      "x" => x,
+      "y" => y
     }
   end
 end

@@ -3,11 +3,30 @@ defmodule Detective.Games.EngineTest do
 
   alias Detective.Games.{Command, Engine, Rules, State}
 
-  test "requires two to four Detectives" do
-    one_detective = Enum.reject(players(), &(&1.id == player_id("detective-2")))
+  test "accepts exactly one Chisel and two to four Detectives" do
+    cases = [
+      {0, 1, {:error, :invalid_initial_state}},
+      {1, 1, {:error, :invalid_initial_state}},
+      {2, 1, :ok},
+      {4, 1, :ok},
+      {5, 1, {:error, :invalid_initial_state}},
+      {2, 0, {:error, :invalid_initial_state}},
+      {2, 2, {:error, :invalid_initial_state}}
+    ]
 
-    assert {:error, :invalid_initial_state} =
-             Engine.new(game(), one_detective, case_definition())
+    Enum.each(cases, fn {detective_count, chisel_count, expected} ->
+      actual =
+        case Engine.new(
+               game(),
+               players_for_counts(detective_count, chisel_count),
+               case_definition()
+             ) do
+          {:ok, %State{}} -> :ok
+          {:error, reason} -> {:error, reason}
+        end
+
+      assert actual == expected
+    end)
   end
 
   test "initializes runtime locations from the canonical board catalog" do
@@ -15,6 +34,16 @@ defmodule Detective.Games.EngineTest do
 
     assert map_size(state.locations) == 100
     assert state.locations["51"].name == "L.A. Police Department Headquarters"
+  end
+
+  test "adapts an exact legacy fixture before initializing runtime state" do
+    assert {:ok, state} = Engine.new(game(), players(), legacy_case_definition())
+
+    assert state.case_definition["board_id"] == "dcoa_classic"
+    refute Map.has_key?(state.case_definition, "locations")
+    assert state.suspects["night-clerk"].location_id == "51"
+    assert Map.has_key?(state.case_definition["search_results"]["locations"], "51")
+    refute Map.has_key?(state.case_definition["search_results"]["locations"], "central-precinct")
   end
 
   test "initializes exact turn-order Scratch and leverage without a Chisel turn" do
@@ -933,6 +962,30 @@ defmodule Detective.Games.EngineTest do
     ]
   end
 
+  defp players_for_counts(detective_count, chisel_count) do
+    detectives =
+      for seat <- 1..detective_count//1 do
+        counted_participant("detective", seat, seat)
+      end
+
+    chisels =
+      for index <- 1..chisel_count//1 do
+        counted_participant("chisel", index, nil)
+      end
+
+    chisels ++ detectives
+  end
+
+  defp counted_participant(role, index, seat) do
+    %{
+      id: Ecto.UUID.generate(),
+      user_id: Ecto.UUID.generate(),
+      display_name: "#{role}-#{index}",
+      role: role,
+      seat: seat
+    }
+  end
+
   defp participant(key, role, seat) do
     %{
       id: player_id(key),
@@ -1033,6 +1086,45 @@ defmodule Detective.Games.EngineTest do
         "all_other_locations" =>
           search_result("A careful search uncovers nothing connected to the case.", false)
       }
+    }
+  end
+
+  defp legacy_case_definition do
+    case_definition()
+    |> Map.delete("board_id")
+    |> Map.put("locations", [
+      legacy_location(
+        "central-precinct",
+        "Central Precinct",
+        "police_station",
+        ["central"],
+        0.25,
+        0.35
+      ),
+      legacy_location(
+        "canal-gate",
+        "Canal Gate",
+        "standard",
+        ["central", "harbor"],
+        0.5,
+        0.5
+      ),
+      legacy_location("pier-club", "Pier Club", "mob_joint", ["harbor"], 0.75, 0.7)
+    ])
+    |> put_in(["suspects", Access.at(0), "location_id"], "central-precinct")
+    |> update_in(["search_results", "locations"], fn %{"51" => result} ->
+      %{"central-precinct" => result}
+    end)
+  end
+
+  defp legacy_location(id, name, type, district_ids, x, y) do
+    %{
+      "id" => id,
+      "name" => name,
+      "type" => type,
+      "district_ids" => district_ids,
+      "x" => x,
+      "y" => y
     }
   end
 
