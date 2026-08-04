@@ -120,7 +120,9 @@ defmodule Detective.Games.ConnectionMonitorTest do
 
   test "two simultaneous offline players yield one authoritative pause" do
     %{game: game, player_ids: player_ids} = active_game()
-    [first_player_id, second_player_id] = player_ids
+    [first_player_id, second_player_id | online_player_ids] = player_ids
+    monitored_player_ids = [first_player_id, second_player_id]
+    online_tabs = Enum.map(online_player_ids, &{&1, start_presence_holder(game.id, &1)})
 
     Endpoint.subscribe("game:#{game.id}")
     {:ok, monitor_pid} = start_monitor(game.id, player_ids, :active)
@@ -135,11 +137,15 @@ defmodule Detective.Games.ConnectionMonitorTest do
     refute_receive %Phoenix.Socket.Broadcast{event: "game_paused"}
     assert {:ok, paused} = Session.get_state(game.id)
     assert paused.status == :paused
-    assert Enum.sort(paused.paused_player_ids) == Enum.sort(player_ids)
+    assert Enum.sort(paused.paused_player_ids) == Enum.sort(monitored_player_ids)
 
     _ = :sys.get_state(monitor_pid)
     assert :sys.get_state(monitor_pid).game_status == :paused
     assert :sys.get_state(monitor_pid).timers == %{}
+
+    Enum.each(online_tabs, fn {player_id, pid} ->
+      stop_presence_holder(game.id, player_id, pid)
+    end)
   end
 
   test "paused monitors track Presence without timers and finished monitors stop normally" do
@@ -286,12 +292,20 @@ defmodule Detective.Games.ConnectionMonitorTest do
   end
 
   test "a delayed active after_join seed cannot revive a finished monitor" do
-    %{game: game, detective: detective, player_ids: player_ids} = active_game()
+    %{
+      game: game,
+      detective: detective,
+      second_detective: second_detective,
+      player_ids: player_ids
+    } = active_game()
+
     assert {:ok, active} = Session.get_state(game.id)
     {:ok, monitor_pid} = start_monitor(game.id, player_ids, :active)
     monitor = Process.monitor(monitor_pid)
 
-    assert {:ok, %{state: finished}} = finish_game(game.id, detective.id, active.version)
+    assert {:ok, %{state: finished}} =
+             finish_game(game.id, detective.id, second_detective.id, active.version)
+
     assert finished.status == :finished
     assert_receive {:DOWN, ^monitor, :process, ^monitor_pid, :normal}
 
@@ -396,11 +410,21 @@ defmodule Detective.Games.ConnectionMonitorTest do
   defp active_game do
     host = user_fixture()
     detective = user_fixture()
+    second_detective = user_fixture()
     %{game: game, invite_token: token} = game_fixture(host)
     assert {:ok, _result} = Invitations.accept(Scope.for_user(detective), token)
+    assert {:ok, _result} = Invitations.accept(Scope.for_user(second_detective), token)
+
+    assert {:ok, %{lobby: first_ready}} =
+             Games.set_ready(Scope.for_user(detective), game.id, 0, true)
 
     assert {:ok, %{lobby: lobby}} =
-             Games.set_ready(Scope.for_user(detective), game.id, 0, true)
+             Games.set_ready(
+               Scope.for_user(second_detective),
+               game.id,
+               first_ready.current_version,
+               true
+             )
 
     assert {:ok, _result} =
              Games.start_game(
@@ -413,18 +437,24 @@ defmodule Detective.Games.ConnectionMonitorTest do
     assert {:ok, state} = Session.get_state(game.id)
     cleanup_game_processes(game.id)
 
-    %{game: game, host: host, detective: detective, player_ids: Map.keys(state.players)}
+    %{
+      game: game,
+      host: host,
+      detective: detective,
+      second_detective: second_detective,
+      player_ids: Map.keys(state.players)
+    }
   end
 
   defp player_ids, do: [Ecto.UUID.generate(), Ecto.UUID.generate()]
 
-  defp finish_game(game_id, detective_id, version) do
+  defp finish_game(game_id, detective_id, second_detective_id, version) do
     assert {:ok, %{version: placed_version}} =
              Session.execute(game_id, detective_id, %Command{
                command_id: Ecto.UUID.generate(),
                type: :place,
                expected_version: version,
-               payload: %{"location_id" => "central-precinct"}
+               payload: %{"location_id" => "51"}
              })
 
     assert {:ok, %{version: searched_version}} =
@@ -435,11 +465,27 @@ defmodule Detective.Games.ConnectionMonitorTest do
                payload: %{}
              })
 
-    assert {:ok, %{version: next_day_version}} =
+    assert {:ok, %{version: second_turn_version}} =
              Session.execute(game_id, detective_id, %Command{
                command_id: Ecto.UUID.generate(),
                type: :end_turn,
                expected_version: searched_version,
+               payload: %{}
+             })
+
+    assert {:ok, %{version: second_placed_version}} =
+             Session.execute(game_id, second_detective_id, %Command{
+               command_id: Ecto.UUID.generate(),
+               type: :place,
+               expected_version: second_turn_version,
+               payload: %{"location_id" => "84"}
+             })
+
+    assert {:ok, %{version: next_day_version}} =
+             Session.execute(game_id, second_detective_id, %Command{
+               command_id: Ecto.UUID.generate(),
+               type: :end_turn,
+               expected_version: second_placed_version,
                payload: %{}
              })
 

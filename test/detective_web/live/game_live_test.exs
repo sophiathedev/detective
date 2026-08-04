@@ -54,9 +54,21 @@ defmodule DetectiveWeb.GameLiveTest do
   defp active_game do
     host = user_fixture()
     detective = user_fixture()
+    second_detective = user_fixture()
     %{game: game, invite_token: token} = game_fixture(host)
     assert {:ok, _result} = Invitations.accept(Scope.for_user(detective), token)
-    assert {:ok, %{lobby: lobby}} = Games.set_ready(Scope.for_user(detective), game.id, 0, true)
+    assert {:ok, _result} = Invitations.accept(Scope.for_user(second_detective), token)
+
+    assert {:ok, %{lobby: first_ready}} =
+             Games.set_ready(Scope.for_user(detective), game.id, 0, true)
+
+    assert {:ok, %{lobby: lobby}} =
+             Games.set_ready(
+               Scope.for_user(second_detective),
+               game.id,
+               first_ready.current_version,
+               true
+             )
 
     assert {:ok, _result} =
              Games.start_game(

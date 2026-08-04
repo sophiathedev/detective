@@ -14,7 +14,8 @@ defmodule DetectiveWeb.GameChannelTest do
     ConnectionMonitor,
     ConnectionMonitorSupervisor,
     Session,
-    SessionSupervisor
+    SessionSupervisor,
+    State
   }
 
   alias Detective.{Games, Invitations}
@@ -23,12 +24,22 @@ defmodule DetectiveWeb.GameChannelTest do
   setup do
     host = user_fixture()
     detective = user_fixture()
+    second_detective = user_fixture()
     outsider = user_fixture()
     %{game: game, invite_token: token} = game_fixture(host)
     assert {:ok, _result} = Invitations.accept(Scope.for_user(detective), token)
+    assert {:ok, _result} = Invitations.accept(Scope.for_user(second_detective), token)
+
+    assert {:ok, %{lobby: first_ready}} =
+             Games.set_ready(Scope.for_user(detective), game.id, 0, true)
 
     assert {:ok, %{lobby: ready_lobby}} =
-             Games.set_ready(Scope.for_user(detective), game.id, 0, true)
+             Games.set_ready(
+               Scope.for_user(second_detective),
+               game.id,
+               first_ready.current_version,
+               true
+             )
 
     assert {:ok, %{lobby: active_lobby}} =
              Games.start_game(
@@ -50,7 +61,14 @@ defmodule DetectiveWeb.GameChannelTest do
       end
     end)
 
-    %{host: host, detective: detective, outsider: outsider, game: game, lobby: active_lobby}
+    %{
+      host: host,
+      detective: detective,
+      second_detective: second_detective,
+      outsider: outsider,
+      game: game,
+      lobby: active_lobby
+    }
   end
 
   test "member receives public game state and only their private projection", context do
@@ -148,6 +166,7 @@ defmodule DetectiveWeb.GameChannelTest do
 
   test "paused members rejoin and only the online Chisel can resume", context do
     detective_id = player_id_for_role(context.lobby.players, "detective")
+    second_detective_id = player_id_for_user(context.game.id, context.second_detective.id)
     host_id = player_id_for_role(context.lobby.players, "chisel")
 
     assert {:ok, _reply, detective_game_socket} =
@@ -164,7 +183,15 @@ defmodule DetectiveWeb.GameChannelTest do
                %{}
              )
 
+    assert {:ok, _reply, _second_detective_socket} =
+             subscribe_and_join(
+               authenticated_socket(context.second_detective),
+               "game:#{context.game.id}",
+               %{}
+             )
+
     await_presence_count(context.game.id, detective_id, &(&1 == 1))
+    await_presence_count(context.game.id, second_detective_id, &(&1 == 1))
     await_presence_count(context.game.id, host_id, &(&1 == 1))
 
     assert {:ok, %{state: paused}} =
@@ -220,6 +247,7 @@ defmodule DetectiveWeb.GameChannelTest do
 
   test "an abnormal monitor crash self-heals while joined channels remain", context do
     detective_id = player_id_for_role(context.lobby.players, "detective")
+    second_detective_id = player_id_for_user(context.game.id, context.second_detective.id)
     host_id = player_id_for_role(context.lobby.players, "chisel")
 
     assert {:ok, %{state: paused}} =
@@ -239,7 +267,15 @@ defmodule DetectiveWeb.GameChannelTest do
                %{}
              )
 
+    assert {:ok, _reply, _second_detective_socket} =
+             subscribe_and_join(
+               authenticated_socket(context.second_detective),
+               "game:#{context.game.id}",
+               %{}
+             )
+
     await_presence_count(context.game.id, detective_id, &(&1 == 1))
+    await_presence_count(context.game.id, second_detective_id, &(&1 == 1))
     await_presence_count(context.game.id, host_id, &(&1 == 1))
 
     first_monitor_pid = monitor_pid!(context.game.id)
@@ -259,7 +295,7 @@ defmodule DetectiveWeb.GameChannelTest do
 
     assert recovered.game_status == :active
     assert recovered.game_version == resumed_version
-    assert recovered.player_ids == MapSet.new([detective_id, host_id])
+    assert recovered.player_ids == MapSet.new([detective_id, second_detective_id, host_id])
 
     flush_connection_states()
     Process.unlink(detective_game_socket.channel_pid)
@@ -295,7 +331,7 @@ defmodule DetectiveWeb.GameChannelTest do
         "command_id" => command_id,
         "type" => "place",
         "expected_version" => public_state.version,
-        "payload" => %{"location_id" => "central-precinct"}
+        "payload" => %{"location_id" => "51"}
       })
 
     assert_reply ref, :ok, %{version: accepted_version, duplicate: false}
@@ -304,7 +340,7 @@ defmodule DetectiveWeb.GameChannelTest do
     assert_broadcast "detective_placed", %{
       event_id: event_id,
       version: ^accepted_version,
-      payload: %{location_id: "central-precinct"}
+      payload: %{location_id: "51"}
     }
 
     assert is_binary(event_id)
@@ -312,7 +348,7 @@ defmodule DetectiveWeb.GameChannelTest do
     assert_broadcast "game_state", %{version: ^accepted_version, state: next_public}
     detective_id = detective_player_id(context.lobby.players)
     placed_player = Enum.find(next_public.players, &(&1.id == detective_id))
-    assert placed_player.location_id == "central-precinct"
+    assert placed_player.location_id == "51"
 
     assert_broadcast "private_state", %{
       game_id: game_id,
@@ -328,7 +364,7 @@ defmodule DetectiveWeb.GameChannelTest do
         "command_id" => Ecto.UUID.generate(),
         "type" => "move",
         "expected_version" => accepted_version,
-        "payload" => %{"location_id" => "canal-gate"}
+        "payload" => %{"location_id" => "82"}
       })
 
     assert_reply move_ref, :ok, %{version: moved_version, duplicate: false}
@@ -336,12 +372,12 @@ defmodule DetectiveWeb.GameChannelTest do
 
     assert_broadcast "player_moved", %{
       version: ^moved_version,
-      payload: %{location_id: "canal-gate", actions_remaining: 3}
+      payload: %{location_id: "82", actions_remaining: 3}
     }
 
     assert_broadcast "game_state", %{version: ^moved_version, state: moved_public}
     moved_player = Enum.find(moved_public.players, &(&1.id == detective_id))
-    assert moved_player.location_id == "canal-gate"
+    assert moved_player.location_id == "82"
     assert moved_player.actions_remaining == 3
 
     duplicate_ref =
@@ -349,7 +385,7 @@ defmodule DetectiveWeb.GameChannelTest do
         "command_id" => command_id,
         "type" => "place",
         "expected_version" => public_state.version,
-        "payload" => %{"location_id" => "central-precinct"}
+        "payload" => %{"location_id" => "51"}
       })
 
     assert_reply duplicate_ref, :ok, %{version: ^accepted_version, duplicate: true}
@@ -357,7 +393,7 @@ defmodule DetectiveWeb.GameChannelTest do
     assert_broadcast "detective_placed", %{
       event_id: ^event_id,
       version: ^accepted_version,
-      payload: %{"location_id" => "central-precinct"}
+      payload: %{"location_id" => "51"}
     }
 
     assert_broadcast "game_state", %{version: ^moved_version}
@@ -394,7 +430,7 @@ defmodule DetectiveWeb.GameChannelTest do
         "command_id" => Ecto.UUID.generate(),
         "type" => "place",
         "expected_version" => public_state.version,
-        "payload" => %{"location_id" => "central-precinct"}
+        "payload" => %{"location_id" => "51"}
       })
 
     assert_reply place_ref, :ok, %{version: placed_version}
@@ -429,8 +465,8 @@ defmodule DetectiveWeb.GameChannelTest do
     }
 
     assert_broadcast "game_state", %{version: ^searched_version, state: searched_public}
-    assert "location:central-precinct" in searched_public.archived_searches
-    assert Enum.any?(searched_public.case_cards, &(&1.id == "sealed-ledger"))
+    assert "location:51" in searched_public.archived_searches
+    refute Enum.any?(searched_public.case_cards, &(&1.id == "sealed-ledger"))
 
     repeated_ref =
       push(game_socket, "command", %{
@@ -446,6 +482,7 @@ defmodule DetectiveWeb.GameChannelTest do
   test "interrogation delivers ARC options privately and resolves a server-owned challenge",
        context do
     detective_socket = authenticated_socket(context.detective)
+    second_detective_socket = authenticated_socket(context.second_detective)
     host_socket = authenticated_socket(context.host)
 
     assert {:ok, %{state: public_state}, detective_game_socket} =
@@ -459,6 +496,13 @@ defmodule DetectiveWeb.GameChannelTest do
     assert {:ok, _host_public, host_game_socket} =
              subscribe_and_join(host_socket, "game:#{context.game.id}", %{})
 
+    assert {:ok, _second_public, second_detective_game_socket} =
+             subscribe_and_join(
+               second_detective_socket,
+               "game:#{context.game.id}",
+               %{}
+             )
+
     assert {:ok, _host_private, _host_user_socket} =
              subscribe_and_join(host_socket, "user:#{context.host.id}", %{
                "game_id" => context.game.id
@@ -469,7 +513,7 @@ defmodule DetectiveWeb.GameChannelTest do
         "command_id" => Ecto.UUID.generate(),
         "type" => "place",
         "expected_version" => public_state.version,
-        "payload" => %{"location_id" => "central-precinct"}
+        "payload" => %{"location_id" => "51"}
       })
 
     assert_reply place_ref, :ok, %{version: placed_version}
@@ -509,11 +553,21 @@ defmodule DetectiveWeb.GameChannelTest do
     assert_reply allow_ref, :ok, %{version: response_version}
     assert_broadcast "question_allowed", %{version: ^response_version}
 
+    decline_ref =
+      push(second_detective_game_socket, "command", %{
+        "command_id" => Ecto.UUID.generate(),
+        "type" => "decline_snitch",
+        "expected_version" => response_version,
+        "payload" => %{}
+      })
+
+    assert_reply decline_ref, :ok, %{version: response_stage_version}
+
     select_ref =
       push(host_game_socket, "command", %{
         "command_id" => Ecto.UUID.generate(),
         "type" => "select_response",
-        "expected_version" => response_version,
+        "expected_version" => response_stage_version,
         "payload" => %{"response_id" => "clerk-a-misdirection-1"}
       })
 
@@ -574,6 +628,11 @@ defmodule DetectiveWeb.GameChannelTest do
     players
     |> Enum.find(&(&1.role == role))
     |> Map.fetch!(:id)
+  end
+
+  defp player_id_for_user(game_id, user_id) do
+    assert {:ok, state} = Session.get_state(game_id)
+    state |> State.player_by_user_id(user_id) |> Map.fetch!(:id)
   end
 
   defp resume_payload(version) do

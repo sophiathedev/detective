@@ -3,6 +3,20 @@ defmodule Detective.Games.EngineTest do
 
   alias Detective.Games.{Command, Engine, Rules, State}
 
+  test "requires two to four Detectives" do
+    one_detective = Enum.reject(players(), &(&1.id == player_id("detective-2")))
+
+    assert {:error, :invalid_initial_state} =
+             Engine.new(game(), one_detective, case_definition())
+  end
+
+  test "initializes runtime locations from the canonical board catalog" do
+    assert {:ok, state} = Engine.new(game(), players(), case_definition())
+
+    assert map_size(state.locations) == 100
+    assert state.locations["51"].name == "L.A. Police Department Headquarters"
+  end
+
   test "initializes exact turn-order Scratch and leverage without a Chisel turn" do
     state = new_state()
     first = player(state, "detective-1")
@@ -24,22 +38,22 @@ defmodule Detective.Games.EngineTest do
     state = new_state()
 
     assert {:error, :police_station_required} =
-             apply_command(state, "detective-1", :place, %{"location_id" => "archive"})
+             apply_command(state, "detective-1", :place, %{"location_id" => "48"})
 
     assert {:ok, placed, [event]} =
              apply_command(state, "detective-1", :place, %{
-               "location_id" => "central-precinct"
+               "location_id" => "51"
              })
 
     detective = player(placed, "detective-1")
-    assert detective.location_id == "central-precinct"
+    assert detective.location_id == "51"
     assert detective.actions_remaining == 4
     assert placed.version == 1
     assert event.type == :detective_placed
 
     assert {:error, :already_placed} =
              apply_command(placed, "detective-1", :place, %{
-               "location_id" => "central-precinct"
+               "location_id" => "51"
              })
   end
 
@@ -47,23 +61,23 @@ defmodule Detective.Games.EngineTest do
     state = placed_state()
 
     assert {:ok, at_archive, _events} =
-             apply_command(state, "detective-1", :move, %{"location_id" => "archive"})
+             apply_command(state, "detective-1", :move, %{"location_id" => "48"})
 
     assert player(at_archive, "detective-1").actions_remaining == 3
 
     assert {:error, :destination_outside_district} =
-             apply_command(at_archive, "detective-1", :move, %{"location_id" => "pier-club"})
+             apply_command(at_archive, "detective-1", :move, %{"location_id" => "84"})
 
     assert {:ok, at_border, _events} =
-             apply_command(at_archive, "detective-1", :move, %{"location_id" => "canal-gate"})
+             apply_command(at_archive, "detective-1", :move, %{"location_id" => "82"})
 
     assert {:ok, at_pier, [event]} =
-             apply_command(at_border, "detective-1", :move, %{"location_id" => "pier-club"})
+             apply_command(at_border, "detective-1", :move, %{"location_id" => "96"})
 
     detective = player(at_pier, "detective-1")
-    assert detective.location_id == "pier-club"
+    assert detective.location_id == "96"
     assert detective.actions_remaining == 1
-    assert event.public_payload.from_location_id == "canal-gate"
+    assert event.public_payload.from_location_id == "82"
   end
 
   test "Analyze exchanges one action for one Scratch" do
@@ -85,10 +99,10 @@ defmodule Detective.Games.EngineTest do
     assert {:error, :mob_joint_required} = apply_command(state, "detective-1", :kickback)
 
     {:ok, at_border, _events} =
-      apply_command(state, "detective-1", :move, %{"location_id" => "canal-gate"})
+      apply_command(state, "detective-1", :move, %{"location_id" => "82"})
 
     {:ok, at_pier, _events} =
-      apply_command(at_border, "detective-1", :move, %{"location_id" => "pier-club"})
+      apply_command(at_border, "detective-1", :move, %{"location_id" => "96"})
 
     before = player(at_pier, "detective-1")
     assert {:ok, paid, [event]} = apply_command(at_pier, "detective-1", :kickback)
@@ -119,7 +133,7 @@ defmodule Detective.Games.EngineTest do
 
     {:ok, second_placed, _events} =
       apply_command(second_turn, "detective-2", :place, %{
-        "location_id" => "harbor-precinct"
+        "location_id" => "84"
       })
 
     assert {:ok, day_two, events} = apply_command(second_placed, "detective-2", :end_turn)
@@ -210,7 +224,7 @@ defmodule Detective.Games.EngineTest do
     assert detective.knowledge == ["victim-file", "sealed-ledger"]
     assert detective.evidence == ["sealed-ledger"]
     assert hd(detective.search_notes)["text"] == "The ledger was hidden behind the duty roster."
-    assert searched.archived_searches == ["location:central-precinct"]
+    assert searched.archived_searches == ["location:51"]
 
     assert searched.taken_evidence["sealed-ledger"] == %{
              "player_id" => detective.id,
@@ -316,7 +330,7 @@ defmodule Detective.Games.EngineTest do
             "id" => "dock-runner",
             "name" => "Dock Runner",
             "occupation" => "courier",
-            "location_id" => "central-precinct",
+            "location_id" => "51",
             "initially_known" => false
           }
           | suspects
@@ -332,7 +346,7 @@ defmodule Detective.Games.EngineTest do
         }
       )
       |> put_in(
-        ["search_results", "locations", "central-precinct", "reveal_suspect_ids"],
+        ["search_results", "locations", "51", "reveal_suspect_ids"],
         ["dock-runner"]
       )
       |> put_in(
@@ -343,7 +357,7 @@ defmodule Detective.Games.EngineTest do
     assert {:ok, initial} = Engine.new(game(), players(), hidden_case)
 
     {:ok, placed, _events} =
-      apply_command(initial, "detective-1", :place, %{"location_id" => "central-precinct"})
+      apply_command(initial, "detective-1", :place, %{"location_id" => "51"})
 
     refute Map.fetch!(placed.suspects, "dock-runner").revealed
 
@@ -361,7 +375,7 @@ defmodule Detective.Games.EngineTest do
            ]
 
     assert {:error, :free_question_pending} =
-             apply_command(discovered, "detective-1", :move, %{"location_id" => "archive"})
+             apply_command(discovered, "detective-1", :move, %{"location_id" => "48"})
 
     actions_before = detective.actions_remaining
 
@@ -379,7 +393,7 @@ defmodule Detective.Games.EngineTest do
 
     {:ok, placed_again, _events} =
       apply_command(initial_again, "detective-1", :place, %{
-        "location_id" => "central-precinct"
+        "location_id" => "51"
       })
 
     {:ok, discovered_again, _events} =
@@ -768,11 +782,8 @@ defmodule Detective.Games.EngineTest do
     assert hd(detective.statements)["response_text"] == "The desk sergeant forged the register."
   end
 
-  test "rejects a case definition without a valid Police Station" do
-    content =
-      put_in(case_definition()["locations"], [
-        location("archive", "Archive", "standard", ["central"], 0.2, 0.3)
-      ])
+  test "rejects a case definition with an unknown board" do
+    content = Map.put(case_definition(), "board_id", "missing")
 
     assert {:error, :invalid_initial_state} =
              Engine.new(game(), players(), content)
@@ -788,7 +799,7 @@ defmodule Detective.Games.EngineTest do
 
     assert {:ok, placed, _events} =
              apply_command(state, "detective-1", :place, %{
-               "location_id" => "central-precinct"
+               "location_id" => "51"
              })
 
     placed
@@ -820,7 +831,7 @@ defmodule Detective.Games.EngineTest do
   defp place_second_detective(state) do
     assert {:ok, placed, _events} =
              apply_command(state, "detective-2", :place, %{
-               "location_id" => "harbor-precinct"
+               "location_id" => "84"
              })
 
     placed
@@ -943,6 +954,7 @@ defmodule Detective.Games.EngineTest do
   defp case_definition do
     %{
       "max_days" => 2,
+      "board_id" => "dcoa_classic",
       "case_cards" => [
         %{
           "id" => "victim-file",
@@ -962,26 +974,12 @@ defmodule Detective.Games.EngineTest do
           "initially_known" => false
         }
       ],
-      "locations" => [
-        location(
-          "central-precinct",
-          "Central Precinct",
-          "police_station",
-          ["central"],
-          0.15,
-          0.24
-        ),
-        location("archive", "City Archive", "standard", ["central"], 0.38, 0.31),
-        location("canal-gate", "Canal Gate", "standard", ["central", "harbor"], 0.58, 0.5),
-        location("harbor-precinct", "Harbor Precinct", "police_station", ["harbor"], 0.78, 0.65),
-        location("pier-club", "Pier Club", "mob_joint", ["harbor"], 0.86, 0.73)
-      ],
       "suspects" => [
         %{
           "id" => "night-clerk",
           "name" => "Night Clerk",
           "occupation" => "records clerk",
-          "location_id" => "central-precinct"
+          "location_id" => "51"
         }
       ],
       "response_matrix" => %{
@@ -1021,7 +1019,7 @@ defmodule Detective.Games.EngineTest do
       "epilogue" => "The clerk used the ledger to conceal the forged register.",
       "search_results" => %{
         "locations" => %{
-          "central-precinct" =>
+          "51" =>
             search_result(
               "The ledger was hidden behind the duty roster.",
               true,
@@ -1045,17 +1043,6 @@ defmodule Detective.Games.EngineTest do
       "reveal_case_card_ids" => reveal_card_ids,
       "take_case_card_ids" => take_card_ids,
       "reveal_suspect_ids" => []
-    }
-  end
-
-  defp location(id, name, type, district_ids, x, y) do
-    %{
-      "id" => id,
-      "name" => name,
-      "type" => type,
-      "district_ids" => district_ids,
-      "x" => x,
-      "y" => y
     }
   end
 end

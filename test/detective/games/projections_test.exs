@@ -31,7 +31,7 @@ defmodule Detective.Games.ProjectionsTest do
 
     assert detective.private.scratch == 4
     assert detective.private.available_actions == ["place"]
-    assert detective.private.placement_location_ids == ["precinct"]
+    assert detective.private.placement_location_ids == ["51"]
   end
 
   test "only the Chisel projection contains the allow-listed secret casebook" do
@@ -90,7 +90,7 @@ defmodule Detective.Games.ProjectionsTest do
 
     state = %{
       base
-      | archived_searches: ["location:precinct"],
+      | archived_searches: ["location:51"],
         taken_evidence: %{
           "hidden-card" => %{
             "player_id" => detective_id,
@@ -106,7 +106,7 @@ defmodule Detective.Games.ProjectionsTest do
             |> Map.put(:search_notes, [
               %{
                 "target_type" => "location",
-                "target_id" => "precinct",
+                "target_id" => "51",
                 "text" => "A fingerprint hides under the blotter.",
                 "case_card_ids" => ["hidden-card"],
                 "taken_case_card_ids" => ["hidden-card"],
@@ -226,13 +226,13 @@ defmodule Detective.Games.ProjectionsTest do
         }
       },
       locations: %{
-        "precinct" => %{
-          id: "precinct",
-          name: "Precinct",
+        "51" => %{
+          id: "51",
+          name: "L.A. Police Department Headquarters",
           type: "police_station",
-          district_ids: ["central"],
-          x: 0.2,
-          y: 0.3
+          district_ids: ["central_la"],
+          x: 0.623,
+          y: 0.5527
         }
       },
       suspects: %{
@@ -240,7 +240,7 @@ defmodule Detective.Games.ProjectionsTest do
           id: "suspect",
           name: "Suspect",
           occupation: "witness",
-          location_id: "precinct"
+          location_id: "51"
         }
       },
       case_definition: %{

@@ -23,7 +23,7 @@ defmodule Detective.Games.SnapshotCodecTest do
           display_name: "Ada",
           role: "detective",
           seat: 1,
-          location_id: "precinct",
+          location_id: "51",
           actions_remaining: 3,
           scratch: 5,
           leverage_supply: 7,
@@ -33,7 +33,7 @@ defmodule Detective.Games.SnapshotCodecTest do
           search_notes: [
             %{
               "target_type" => "location",
-              "target_id" => "precinct",
+              "target_id" => "51",
               "text" => "A private search result.",
               "case_card_ids" => ["signal-log"],
               "taken_case_card_ids" => ["signal-log"],
@@ -49,13 +49,13 @@ defmodule Detective.Games.SnapshotCodecTest do
         }
       },
       locations: %{
-        "precinct" => %{
-          id: "precinct",
-          name: "Precinct",
+        "51" => %{
+          id: "51",
+          name: "L.A. Police Department Headquarters",
           type: "police_station",
-          district_ids: ["central"],
-          x: 0.2,
-          y: 0.3
+          district_ids: ["central_la"],
+          x: 0.623,
+          y: 0.5527
         }
       },
       case_definition: %{
@@ -63,7 +63,7 @@ defmodule Detective.Games.SnapshotCodecTest do
         "published" => true
       },
       public_case_card_ids: ["public-log"],
-      archived_searches: ["location:precinct"],
+      archived_searches: ["location:51"],
       taken_evidence: %{
         "signal-log" => %{
           "player_id" => player_id,
@@ -86,10 +86,10 @@ defmodule Detective.Games.SnapshotCodecTest do
     assert restored.players[player_id].evidence == ["signal-log"]
     assert restored.players[player_id].free_question_suspect_id == "witness"
     refute restored.players[player_id].solve_token_available
-    assert restored.locations["precinct"].district_ids == ["central"]
+    assert restored.locations["51"].district_ids == ["central_la"]
     assert restored.case_definition["solution"]["suspect_id"] == "secret"
     assert restored.public_case_card_ids == ["public-log"]
-    assert restored.archived_searches == ["location:precinct"]
+    assert restored.archived_searches == ["location:51"]
     assert restored.taken_evidence["signal-log"]["release_day"] == 5
   end
 

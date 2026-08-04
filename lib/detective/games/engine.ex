@@ -7,7 +7,7 @@ defmodule Detective.Games.Engine do
   belong to more than one district and therefore bridges later Move actions.
   """
 
-  alias Detective.Cases.{AccusationSheet, ResponseMatrix, SearchDeck, Validator}
+  alias Detective.Cases.{AccusationSheet, BoardCatalog, ResponseMatrix, SearchDeck, Validator}
   alias Detective.Games.{Command, Event, Rules, State}
 
   @actions_per_turn 4
@@ -22,9 +22,10 @@ defmodule Detective.Games.Engine do
     chisels = Enum.filter(players, &(&1.role == "chisel"))
 
     with [chisel] <- chisels,
-         true <- detectives != [] and length(detectives) <= 4,
+         true <- length(detectives) in 2..4,
          :ok <- Validator.validate(case_definition),
-         {:ok, locations} <- normalize_locations(case_definition["locations"]),
+         {:ok, board_locations} <- BoardCatalog.locations(case_definition["board_id"]),
+         {:ok, locations} <- normalize_locations(board_locations),
          true <- Enum.any?(locations, fn {_id, location} -> location.type == "police_station" end) do
       initial_knowledge = ResponseMatrix.initial_topic_ids(case_definition)
 

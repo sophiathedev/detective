@@ -66,73 +66,6 @@ author_response_decks = fn matrix ->
   end)
 end
 
-map_locations = [
-  %{
-    "id" => "central-precinct",
-    "name" => "Central Precinct",
-    "type" => "police_station",
-    "district_ids" => ["civic"],
-    "x" => 0.3,
-    "y" => 0.42
-  },
-  %{
-    "id" => "meridian-array",
-    "name" => "Meridian Array",
-    "type" => "standard",
-    "district_ids" => ["observatory"],
-    "x" => 0.42,
-    "y" => 0.23
-  },
-  %{
-    "id" => "northlight-boarding-house",
-    "name" => "Northlight Boarding House",
-    "type" => "standard",
-    "district_ids" => ["observatory", "civic"],
-    "x" => 0.39,
-    "y" => 0.34
-  },
-  %{
-    "id" => "city-archive",
-    "name" => "City Archive",
-    "type" => "standard",
-    "district_ids" => ["civic"],
-    "x" => 0.35,
-    "y" => 0.5
-  },
-  %{
-    "id" => "telegraph-exchange",
-    "name" => "Telegraph Exchange",
-    "type" => "standard",
-    "district_ids" => ["civic", "harbor"],
-    "x" => 0.55,
-    "y" => 0.55
-  },
-  %{
-    "id" => "harbor-precinct",
-    "name" => "Harbor Precinct",
-    "type" => "police_station",
-    "district_ids" => ["harbor"],
-    "x" => 0.68,
-    "y" => 0.61
-  },
-  %{
-    "id" => "breakwater-relay",
-    "name" => "Breakwater Relay",
-    "type" => "standard",
-    "district_ids" => ["harbor"],
-    "x" => 0.79,
-    "y" => 0.71
-  },
-  %{
-    "id" => "mariner-social-club",
-    "name" => "Mariner Social Club",
-    "type" => "mob_joint",
-    "district_ids" => ["harbor"],
-    "x" => 0.65,
-    "y" => 0.72
-  }
-]
-
 additional_case_cards = [
   %{
     "id" => "receiver-cable",
@@ -169,7 +102,7 @@ end
 
 search_results = %{
   "locations" => %{
-    "meridian-array" => %{
+    "29" => %{
       "text" =>
         "A torn calibration sleeve leads to the copper tuning key beneath the receiver dais.",
       "archive" => true,
@@ -177,7 +110,7 @@ search_results = %{
       "take_case_card_ids" => ["copper-tuning-key"],
       "reveal_suspect_ids" => []
     },
-    "telegraph-exchange" => %{
+    "82" => %{
       "text" =>
         "A routing clerk identifies a cut receiver cable hidden among condemned switchboard parts.",
       "archive" => true,
@@ -185,7 +118,7 @@ search_results = %{
       "take_case_card_ids" => [],
       "reveal_suspect_ids" => []
     },
-    "mariner-social-club" => %{
+    "96" => %{
       "text" =>
         "The coatroom ledger links an abandoned harbor flare to a private table used after midnight.",
       "archive" => true,
@@ -274,6 +207,7 @@ solution = %{
         content = %{
           "locale" => "en",
           "max_days" => 6,
+          "board_id" => "dcoa_classic",
           "briefing" =>
             "At 00:17, Dr. Mara Venn sent a broken distress call from Meridian Array. By sunrise she was dead, the station log had been altered, and an unknown ship had vanished beyond the breakwater. Determine who killed her, what was used, and why the midnight signal had to be silenced.",
           "case_cards" => [
@@ -309,25 +243,24 @@ solution = %{
               "id" => "iona-pike",
               "name" => "Iona Pike",
               "occupation" => "array engineer",
-              "location_id" => "meridian-array",
+              "location_id" => "29",
               "initially_known" => true
             },
             %{
               "id" => "tomas-vale",
               "name" => "Tomas Vale",
               "occupation" => "harbor pilot",
-              "location_id" => "breakwater-relay",
+              "location_id" => "99",
               "initially_known" => true
             },
             %{
               "id" => "celeste-rook",
               "name" => "Celeste Rook",
               "occupation" => "investigative journalist",
-              "location_id" => "northlight-boarding-house",
+              "location_id" => "38",
               "initially_known" => true
             }
           ],
-          "locations" => map_locations,
           "response_matrix" => %{
             "iona-pike" => %{
               "mara-venn" => %{
@@ -432,7 +365,8 @@ solution = %{
             upgraded_content =
               legacy_version.content
               |> Map.put("max_days", 6)
-              |> Map.put("locations", map_locations)
+              |> Map.delete("locations")
+              |> Map.put("board_id", "dcoa_classic")
               |> Map.update!("case_cards", upgrade_case_cards)
               |> Map.update!("response_matrix", author_response_decks)
               |> Map.put("search_results", search_results)

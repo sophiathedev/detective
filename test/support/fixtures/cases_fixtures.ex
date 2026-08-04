@@ -27,6 +27,7 @@ defmodule Detective.CasesFixtures do
         content: %{
           "briefing" => "An original test mystery.",
           "max_days" => 3,
+          "board_id" => "dcoa_classic",
           "case_cards" => [
             %{
               "id" => "victim-file",
@@ -46,38 +47,12 @@ defmodule Detective.CasesFixtures do
               "initially_known" => false
             }
           ],
-          "locations" => [
-            %{
-              "id" => "central-precinct",
-              "name" => "Central Precinct",
-              "type" => "police_station",
-              "district_ids" => ["central"],
-              "x" => 0.25,
-              "y" => 0.35
-            },
-            %{
-              "id" => "canal-gate",
-              "name" => "Canal Gate",
-              "type" => "standard",
-              "district_ids" => ["central", "harbor"],
-              "x" => 0.5,
-              "y" => 0.5
-            },
-            %{
-              "id" => "pier-club",
-              "name" => "Pier Club",
-              "type" => "mob_joint",
-              "district_ids" => ["harbor"],
-              "x" => 0.75,
-              "y" => 0.7
-            }
-          ],
           "suspects" => [
             %{
               "id" => "night-clerk",
               "name" => "Night Clerk",
               "occupation" => "records clerk",
-              "location_id" => "central-precinct",
+              "location_id" => "51",
               "initially_known" => true
             }
           ],
@@ -103,7 +78,7 @@ defmodule Detective.CasesFixtures do
           },
           "search_results" => %{
             "locations" => %{
-              "central-precinct" => %{
+              "51" => %{
                 "text" =>
                   "Behind the intake desk, a loose floorboard conceals the sealed ledger.",
                 "archive" => true,

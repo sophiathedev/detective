@@ -92,7 +92,7 @@ defmodule Detective.Games.RuntimeTest do
       command_id: command_id,
       type: :place,
       expected_version: lobby.current_version,
-      payload: %{"location_id" => "central-precinct"}
+      payload: %{"location_id" => "51"}
     }
 
     assert {:ok,
@@ -119,7 +119,7 @@ defmodule Detective.Games.RuntimeTest do
     assert Repo.aggregate(GameSnapshot, :count) == 2
     assert Repo.aggregate(GameEvent, :count) == 2
 
-    conflicting = %{place | payload: %{"location_id" => "canal-gate"}}
+    conflicting = %{place | payload: %{"location_id" => "82"}}
     assert {:error, :command_id_conflict} = Session.execute(game.id, detective.id, conflicting)
 
     {:ok, pid} = SessionSupervisor.ensure_session(game.id)
@@ -129,7 +129,7 @@ defmodule Detective.Games.RuntimeTest do
 
     assert {:ok, restored} = Session.get_state(game.id)
     assert restored.version == placed_version
-    assert restored.players[restored.current_detective_id].location_id == "central-precinct"
+    assert restored.players[restored.current_detective_id].location_id == "51"
 
     assert {:ok, loaded} = Persistence.load_state(game.id)
     assert loaded.version == placed_version
@@ -151,7 +151,7 @@ defmodule Detective.Games.RuntimeTest do
         command_id: Ecto.UUID.generate(),
         type: :place,
         expected_version: lobby.current_version,
-        payload: %{"location_id" => "central-precinct"}
+        payload: %{"location_id" => "51"}
       })
 
     assert {:ok, %{version: analyzed_version}} =
@@ -174,7 +174,13 @@ defmodule Detective.Games.RuntimeTest do
   end
 
   test "pending interrogation restores across Chisel and Detective decisions" do
-    %{host: host, detective: detective, game: game, version: version} = ready_game()
+    %{
+      host: host,
+      detective: detective,
+      second_detective: second_detective,
+      game: game,
+      version: version
+    } = ready_game()
 
     {:ok, %{lobby: lobby}} =
       Games.start_game(
@@ -189,7 +195,7 @@ defmodule Detective.Games.RuntimeTest do
         command_id: Ecto.UUID.generate(),
         type: :place,
         expected_version: lobby.current_version,
-        payload: %{"location_id" => "central-precinct"}
+        payload: %{"location_id" => "51"}
       })
 
     {:ok, %{version: interrogation_version}} =
@@ -212,11 +218,19 @@ defmodule Detective.Games.RuntimeTest do
     assert restored_question.pending_action["suspect_id"] == "night-clerk"
     assert restored_question.pending_action["stage"] == "block_decision"
 
-    {:ok, %{version: response_version}} =
+    {:ok, %{version: snitch_window_version}} =
       Session.execute(game.id, host.id, %Command{
         command_id: Ecto.UUID.generate(),
         type: :allow_question,
         expected_version: interrogation_version,
+        payload: %{}
+      })
+
+    {:ok, %{version: response_version}} =
+      Session.execute(game.id, second_detective.id, %Command{
+        command_id: Ecto.UUID.generate(),
+        type: :decline_snitch,
+        expected_version: snitch_window_version,
         payload: %{}
       })
 
@@ -266,7 +280,7 @@ defmodule Detective.Games.RuntimeTest do
         command_id: Ecto.UUID.generate(),
         type: :place,
         expected_version: lobby.current_version,
-        payload: %{"location_id" => "central-precinct"}
+        payload: %{"location_id" => "51"}
       })
 
     {:ok, %{version: _interrogation_version}} =
@@ -326,7 +340,13 @@ defmodule Detective.Games.RuntimeTest do
   end
 
   test "a correct persisted accusation closes the game and restores its public result" do
-    %{host: host, detective: detective, game: game, version: version} = ready_game()
+    %{
+      host: host,
+      detective: detective,
+      second_detective: second_detective,
+      game: game,
+      version: version
+    } = ready_game()
 
     {:ok, %{lobby: lobby}} =
       Games.start_game(
@@ -341,7 +361,7 @@ defmodule Detective.Games.RuntimeTest do
         command_id: Ecto.UUID.generate(),
         type: :place,
         expected_version: lobby.current_version,
-        payload: %{"location_id" => "central-precinct"}
+        payload: %{"location_id" => "51"}
       })
 
     {:ok, %{version: searched_version}} =
@@ -352,11 +372,27 @@ defmodule Detective.Games.RuntimeTest do
         payload: %{}
       })
 
-    {:ok, %{version: next_day_version}} =
+    {:ok, %{version: second_turn_version}} =
       Session.execute(game.id, detective.id, %Command{
         command_id: Ecto.UUID.generate(),
         type: :end_turn,
         expected_version: searched_version,
+        payload: %{}
+      })
+
+    {:ok, %{version: second_placed_version}} =
+      Session.execute(game.id, second_detective.id, %Command{
+        command_id: Ecto.UUID.generate(),
+        type: :place,
+        expected_version: second_turn_version,
+        payload: %{"location_id" => "84"}
+      })
+
+    {:ok, %{version: next_day_version}} =
+      Session.execute(game.id, second_detective.id, %Command{
+        command_id: Ecto.UUID.generate(),
+        type: :end_turn,
+        expected_version: second_placed_version,
         payload: %{}
       })
 
@@ -445,7 +481,7 @@ defmodule Detective.Games.RuntimeTest do
         command_id: Ecto.UUID.generate(),
         type: :place,
         expected_version: lobby.current_version,
-        payload: %{"location_id" => "central-precinct"}
+        payload: %{"location_id" => "51"}
       })
 
     {:ok, %{version: question_version}} =
@@ -517,11 +553,21 @@ defmodule Detective.Games.RuntimeTest do
   defp ready_game do
     host = user_fixture()
     detective = user_fixture()
+    second_detective = user_fixture()
     %{game: game, invite_token: token} = game_fixture(host)
     assert {:ok, _result} = Invitations.accept(Scope.for_user(detective), token)
+    assert {:ok, _result} = Invitations.accept(Scope.for_user(second_detective), token)
+
+    assert {:ok, %{lobby: first_ready}} =
+             Games.set_ready(Scope.for_user(detective), game.id, 0, true)
 
     assert {:ok, %{lobby: lobby}} =
-             Games.set_ready(Scope.for_user(detective), game.id, 0, true)
+             Games.set_ready(
+               Scope.for_user(second_detective),
+               game.id,
+               first_ready.current_version,
+               true
+             )
 
     on_exit(fn ->
       case Registry.lookup(Detective.GameRegistry, game.id) do
@@ -530,7 +576,13 @@ defmodule Detective.Games.RuntimeTest do
       end
     end)
 
-    %{host: host, detective: detective, game: game, version: lobby.current_version}
+    %{
+      host: host,
+      detective: detective,
+      second_detective: second_detective,
+      game: game,
+      version: lobby.current_version
+    }
   end
 
   defp restart_session(game_id) do

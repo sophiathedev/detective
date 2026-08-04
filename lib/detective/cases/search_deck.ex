@@ -5,22 +5,30 @@ defmodule Detective.Cases.SearchDeck do
   Search text and reveal instructions never come from a client command.
   """
 
-  alias Detective.Cases.ResponseMatrix
+  alias Detective.Cases.{BoardCatalog, ResponseMatrix}
 
   def validate(case_definition) when is_map(case_definition) do
+    with {:ok, locations} <- BoardCatalog.locations(case_definition["board_id"]) do
+      validate(case_definition, locations)
+    end
+  end
+
+  def validate(_case_definition), do: {:error, :invalid_search_results}
+
+  def validate(case_definition, locations) when is_map(case_definition) and is_list(locations) do
     case case_definition["search_results"] do
       nil ->
         :ok
 
       search_results when is_map(search_results) ->
-        validate_search_results(case_definition, search_results)
+        validate_search_results(case_definition, search_results, locations)
 
       _invalid ->
         {:error, :invalid_search_results}
     end
   end
 
-  def validate(_case_definition), do: {:error, :invalid_search_results}
+  def validate(_case_definition, _locations), do: {:error, :invalid_search_results}
 
   def configured?(case_definition) do
     case_definition
@@ -70,12 +78,12 @@ defmodule Detective.Cases.SearchDeck do
   def target_key(%{target_type: target_type, target_id: target_id}),
     do: "#{target_type}:#{target_id}"
 
-  defp validate_search_results(case_definition, search_results) do
+  defp validate_search_results(case_definition, search_results, board_locations) do
     locations = search_results["locations"] || %{}
     suspects = search_results["suspects"] || %{}
     fallback = search_results["all_other_locations"]
 
-    location_ids = case_definition |> Map.get("locations", []) |> ids()
+    location_ids = ids(board_locations)
     suspect_ids = case_definition |> Map.get("suspects", []) |> ids()
     card_ids = case_definition |> Map.get("case_cards", []) |> ids()
 

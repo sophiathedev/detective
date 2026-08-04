@@ -3,24 +3,23 @@ defmodule Detective.Cases.ValidatorTest do
 
   alias Detective.Cases.Validator
 
-  test "accepts border locations that keep every location within three Move actions" do
-    assert :ok = Validator.validate(valid_case())
+  test "requires a known board and validates suspect/search location references" do
+    content =
+      valid_case()
+      |> Map.delete("locations")
+      |> put_in(["suspects", Access.at(0), "location_id"], "51")
+
+    assert {:error, :unknown_board} = Validator.validate(Map.put(content, "board_id", "missing"))
+    assert :ok = Validator.validate(Map.put(content, "board_id", "dcoa_classic"))
+
+    invalid_suspect = put_in(content, ["suspects", Access.at(0), "location_id"], "101")
+
+    assert {:error, :invalid_suspect_location} =
+             Validator.validate(Map.put(invalid_suspect, "board_id", "dcoa_classic"))
   end
 
-  test "rejects disconnected locations and missing Police Stations" do
-    disconnected =
-      update_in(valid_case()["locations"], fn locations ->
-        [location("remote", "Remote", "standard", ["hills"]) | locations]
-      end)
-
-    assert {:error, :location_beyond_three_moves} = Validator.validate(disconnected)
-
-    without_station =
-      update_in(valid_case()["locations"], fn locations ->
-        Enum.map(locations, &Map.put(&1, "type", "standard"))
-      end)
-
-    assert {:error, :police_station_required} = Validator.validate(without_station)
+  test "accepts canonical board locations that keep every location within three Move actions" do
+    assert :ok = Validator.validate(valid_case())
   end
 
   test "validates response references and requires one most useful response" do
@@ -73,7 +72,7 @@ defmodule Detective.Cases.ValidatorTest do
       ])
       |> Map.put("search_results", %{
         "locations" => %{
-          "precinct" => search_result(["receipt"], ["receipt"])
+          "51" => search_result(["receipt"], ["receipt"])
         },
         "suspects" => %{
           "suspect" => search_result([], [])
@@ -90,14 +89,14 @@ defmodule Detective.Cases.ValidatorTest do
 
     invalid_card =
       put_in(
-        valid["search_results"]["locations"]["precinct"]["reveal_case_card_ids"],
+        valid["search_results"]["locations"]["51"]["reveal_case_card_ids"],
         ["missing"]
       )
 
     assert {:error, :invalid_search_results} = Validator.validate(invalid_card)
 
     taken_without_reveal =
-      put_in(valid["search_results"]["locations"]["precinct"]["reveal_case_card_ids"], [])
+      put_in(valid["search_results"]["locations"]["51"]["reveal_case_card_ids"], [])
 
     assert {:error, :invalid_search_results} = Validator.validate(taken_without_reveal)
 
@@ -150,23 +149,8 @@ defmodule Detective.Cases.ValidatorTest do
 
   defp valid_case do
     %{
-      "locations" => [
-        location("precinct", "Precinct", "police_station", ["central"]),
-        location("border", "Border", "standard", ["central", "harbor"]),
-        location("pier", "Pier", "mob_joint", ["harbor"])
-      ],
-      "suspects" => [%{"id" => "suspect", "location_id" => "pier"}]
-    }
-  end
-
-  defp location(id, name, type, districts) do
-    %{
-      "id" => id,
-      "name" => name,
-      "type" => type,
-      "district_ids" => districts,
-      "x" => 0.5,
-      "y" => 0.5
+      "board_id" => "dcoa_classic",
+      "suspects" => [%{"id" => "suspect", "location_id" => "96"}]
     }
   end
 

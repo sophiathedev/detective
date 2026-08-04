@@ -86,11 +86,21 @@ defmodule DetectiveWeb.LobbyChannelTest do
   test "ready lobby starts once and broadcasts the game route" do
     host = user_fixture()
     detective = user_fixture()
+    second_detective = user_fixture()
     %{game: game, invite_token: token} = game_fixture(host)
     assert {:ok, _result} = Invitations.accept(Scope.for_user(detective), token)
+    assert {:ok, _result} = Invitations.accept(Scope.for_user(second_detective), token)
+
+    assert {:ok, %{lobby: first_ready}} =
+             Games.set_ready(Scope.for_user(detective), game.id, 0, true)
 
     assert {:ok, %{lobby: ready_lobby}} =
-             Games.set_ready(Scope.for_user(detective), game.id, 0, true)
+             Games.set_ready(
+               Scope.for_user(second_detective),
+               game.id,
+               first_ready.current_version,
+               true
+             )
 
     on_exit(fn ->
       case Registry.lookup(Detective.GameRegistry, game.id) do
@@ -115,9 +125,16 @@ defmodule DetectiveWeb.LobbyChannelTest do
         "expected_version" => lobby.current_version
       })
 
-    assert_reply ref, :ok, %{path: path, version: 2}
+    started_version = ready_lobby.current_version + 1
+    assert_reply ref, :ok, %{path: path, version: ^started_version}
     assert path == "/games/#{game.id}"
-    assert_broadcast "game_started", %{game_id: game_id, path: ^path, version: 2}
+
+    assert_broadcast "game_started", %{
+      game_id: game_id,
+      path: ^path,
+      version: ^started_version
+    }
+
     assert game_id == game.id
   end
 
