@@ -54,6 +54,22 @@ defmodule DetectiveWeb.GameChannel do
   end
 
   @impl true
+  def handle_in("sync_state", _payload, socket) do
+    case Games.game_projection(socket.assigns.current_scope, socket.assigns.game_id) do
+      {:ok, projection} ->
+        {:reply,
+         {:ok,
+          %{
+            version: projection.public.version,
+            state: projection.public
+          }}, socket}
+
+      {:error, reason} ->
+        {:reply, {:error, %{code: error_code(reason)}}, socket}
+    end
+  end
+
+  @impl true
   def handle_in(
         "command",
         %{

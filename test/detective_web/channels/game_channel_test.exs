@@ -5,6 +5,7 @@ defmodule DetectiveWeb.GameChannelTest do
 
   import Detective.AccountsFixtures
   import Detective.GamesFixtures
+  import Ecto.Query
   import Phoenix.ChannelTest
 
   alias Detective.Accounts
@@ -13,12 +14,13 @@ defmodule DetectiveWeb.GameChannelTest do
   alias Detective.Games.{
     ConnectionMonitor,
     ConnectionMonitorSupervisor,
+    GameEvent,
     Session,
     SessionSupervisor,
     State
   }
 
-  alias Detective.{Games, Invitations}
+  alias Detective.{Games, Invitations, Repo}
   alias DetectiveWeb.{Endpoint, Presence, UserSocket}
 
   setup do
@@ -319,10 +321,32 @@ defmodule DetectiveWeb.GameChannelTest do
     assert {:ok, %{state: public_state}, game_socket} =
              subscribe_and_join(socket, "game:#{context.game.id}", %{})
 
-    assert {:ok, _private_reply, _user_socket} =
+    assert {:ok, _private_reply, user_socket} =
              subscribe_and_join(socket, "user:#{context.detective.id}", %{
                "game_id" => context.game.id
              })
+
+    assert {:ok, _host_reply, _host_game_socket} =
+             subscribe_and_join(
+               authenticated_socket(context.host),
+               "game:#{context.game.id}",
+               %{}
+             )
+
+    assert {:ok, _second_reply, _second_game_socket} =
+             subscribe_and_join(
+               authenticated_socket(context.second_detective),
+               "game:#{context.game.id}",
+               %{}
+             )
+
+    detective_id = detective_player_id(context.lobby.players)
+    host_id = player_id_for_role(context.lobby.players, "chisel")
+    second_detective_id = player_id_for_user(context.game.id, context.second_detective.id)
+
+    await_presence_count(context.game.id, detective_id, &(&1 == 1))
+    await_presence_count(context.game.id, host_id, &(&1 == 1))
+    await_presence_count(context.game.id, second_detective_id, &(&1 == 1))
 
     command_id = Ecto.UUID.generate()
 
@@ -346,7 +370,6 @@ defmodule DetectiveWeb.GameChannelTest do
     assert is_binary(event_id)
 
     assert_broadcast "game_state", %{version: ^accepted_version, state: next_public}
-    detective_id = detective_player_id(context.lobby.players)
     placed_player = Enum.find(next_public.players, &(&1.id == detective_id))
     assert placed_player.location_id == "51"
 
@@ -359,9 +382,11 @@ defmodule DetectiveWeb.GameChannelTest do
     assert game_id == context.game.id
     assert next_private.available_actions |> Enum.member?("move")
 
+    move_command_id = Ecto.UUID.generate()
+
     move_ref =
       push(game_socket, "command", %{
-        "command_id" => Ecto.UUID.generate(),
+        "command_id" => move_command_id,
         "type" => "move",
         "expected_version" => accepted_version,
         "payload" => %{"location_id" => "82"}
@@ -371,9 +396,23 @@ defmodule DetectiveWeb.GameChannelTest do
     assert moved_version == accepted_version + 1
 
     assert_broadcast "player_moved", %{
+      event_id: move_event_id,
       version: ^moved_version,
-      payload: %{location_id: "82", actions_remaining: 3}
+      payload: move_payload
     }
+
+    assert move_payload.location_id == "82"
+    assert move_payload.actions_remaining == 3
+
+    forbidden_public_keys = [
+      :solution,
+      :response_type,
+      :hidden_evidence,
+      :alternative_responses,
+      :chisel_notes
+    ]
+
+    refute Enum.any?(forbidden_public_keys, &Map.has_key?(move_payload, &1))
 
     assert_broadcast "game_state", %{version: ^moved_version, state: moved_public}
     moved_player = Enum.find(moved_public.players, &(&1.id == detective_id))
@@ -382,21 +421,64 @@ defmodule DetectiveWeb.GameChannelTest do
 
     duplicate_ref =
       push(game_socket, "command", %{
-        "command_id" => command_id,
-        "type" => "place",
-        "expected_version" => public_state.version,
-        "payload" => %{"location_id" => "51"}
+        "command_id" => move_command_id,
+        "type" => "move",
+        "expected_version" => accepted_version,
+        "payload" => %{"location_id" => "82"}
       })
 
-    assert_reply duplicate_ref, :ok, %{version: ^accepted_version, duplicate: true}
+    assert_reply duplicate_ref, :ok, %{version: ^moved_version, duplicate: true}
 
-    assert_broadcast "detective_placed", %{
-      event_id: ^event_id,
-      version: ^accepted_version,
-      payload: %{"location_id" => "51"}
+    assert_broadcast "player_moved", %{
+      event_id: ^move_event_id,
+      version: ^moved_version,
+      payload: duplicate_move_payload
     }
 
     assert_broadcast "game_state", %{version: ^moved_version}
+
+    assert (duplicate_move_payload[:location_id] || duplicate_move_payload["location_id"]) == "82"
+
+    assert (duplicate_move_payload[:actions_remaining] ||
+              duplicate_move_payload["actions_remaining"]) == 3
+
+    assert Repo.one(
+             from event in GameEvent,
+               where:
+                 event.game_id == ^context.game.id and
+                   event.command_id == ^move_command_id,
+               select: count(event.id)
+           ) == 1
+
+    assert {:ok, state} = Session.get_state(context.game.id)
+    moved_player = Map.fetch!(state.players, detective_id)
+    assert moved_player.location_id == "82"
+    assert moved_player.actions_remaining == 3
+
+    public_sync_ref = push(game_socket, "sync_state", %{})
+
+    assert_reply public_sync_ref, :ok, %{
+      version: ^moved_version,
+      state: synced_public
+    }
+
+    synced_player = Enum.find(synced_public.players, &(&1.id == detective_id))
+    assert synced_player.location_id == "82"
+    assert synced_player.actions_remaining == 3
+    refute Jason.encode!(synced_public) =~ "solution"
+    refute Jason.encode!(synced_public) =~ "response_matrix"
+
+    private_sync_ref = push(user_socket, "sync_state", %{})
+
+    assert_reply private_sync_ref, :ok, %{
+      game_id: game_id,
+      version: ^moved_version,
+      state: synced_private
+    }
+
+    assert game_id == context.game.id
+    assert synced_private.role == "detective"
+    refute Jason.encode!(synced_private) =~ "solution"
   end
 
   test "Chisel private topic receives the casebook but no fake action economy", context do

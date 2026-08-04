@@ -41,8 +41,10 @@ describe("GameBoard", () => {
 
     expect(legal).toHaveAttribute("role", "button")
     expect(legal).toHaveAttribute("tabindex", "0")
+    expect(legal).toHaveAttribute("focusable", "true")
     expect(illegal).not.toHaveAttribute("role")
     expect(illegal).not.toHaveAttribute("tabindex")
+    expect(illegal).toHaveAttribute("focusable", "false")
 
     await fireEvent.click(illegal)
     await fireEvent.keyDown(illegal, { key: "Enter" })
@@ -52,6 +54,7 @@ describe("GameBoard", () => {
     expect(onSelect).not.toHaveBeenCalled()
 
     await fireEvent.keyDown(legal, { key: "Enter" })
+    await fireEvent.keyDown(legal, { key: " " })
     await fireEvent.click(
       screen.getByRole("button", {
         name: /^Choose L\.A\. Police Department Headquarters$/i,
@@ -60,6 +63,7 @@ describe("GameBoard", () => {
 
     expect(onSelect).toHaveBeenNthCalledWith(1, locations[1])
     expect(onSelect).toHaveBeenNthCalledWith(2, locations[1])
+    expect(onSelect).toHaveBeenNthCalledWith(3, locations[1])
   })
 
   it("removes interaction semantics while disabled", async () => {
@@ -74,9 +78,30 @@ describe("GameBoard", () => {
         name: /^Choose L\.A\. Police Department Headquarters$/i,
       }),
     ).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /Bradbury Building/i })).not.toBeInTheDocument()
 
     await fireEvent.click(hotspot)
     expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it("keeps fallback destination buttons in parity with legal SVG hotspots", () => {
+    render(GameBoard, {
+      ...baseProps,
+      legalLocationIds: ["48", "51"],
+      onSelect: vi.fn(),
+    })
+
+    const legalHotspots = locations.filter((location) =>
+      screen.getByTestId(`map-hotspot-${location.id}`).hasAttribute("role"),
+    )
+    const fallbackButtons = screen.getAllByRole("button", { name: /^Choose /i })
+
+    expect(fallbackButtons).toHaveLength(legalHotspots.length)
+    expect(fallbackButtons.map((button) => button.textContent.trim())).toEqual([
+      "Choose Bradbury Building",
+      "Choose L.A. Police Department Headquarters",
+    ])
+    expect(fallbackButtons.map((button) => button.dataset.locationId)).toEqual(["48", "51"])
   })
 
   it("uses the official board plane and marks selected and pending locations", () => {

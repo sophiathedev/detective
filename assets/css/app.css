@@ -460,6 +460,19 @@
   line-height: 1.45;
 }
 
+.game-sync-status {
+  margin: -0.25rem 0 0.75rem;
+  border-left: 3px solid #d96b58;
+  background: #2b2119;
+  padding: 0.6rem 0.75rem;
+  color: #f1d7a5;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  line-height: 1.45;
+  text-transform: uppercase;
+}
+
 @media (min-width: 40rem) {
   .action-dock-actions {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -788,5 +801,24 @@
 
   #game-map animate {
     display: none;
+  }
+
+  #open-casebook,
+  .map-legal-ring,
+  .map-location-pending .map-legal-ring,
+  .map-command-pending,
+  .map-travel-line,
+  .map-arrival-pulse,
+  .player-hud-slot-active,
+  .game-pause-document {
+    animation: none !important;
+  }
+
+  .map-detective-token,
+  .casebook-drawer,
+  .casebook-drawer-close,
+  .casebook-page-tab,
+  .action-dock-button {
+    transition: none !important;
   }
 }

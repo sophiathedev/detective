@@ -110,6 +110,7 @@
           class={`map-location-marker ${legal ? "map-location-legal cursor-pointer" : "cursor-default"} ${pendingLocationId === location.id ? "map-location-pending" : ""}`}
           role={legal ? "button" : undefined}
           tabindex={legal ? "0" : undefined}
+          focusable={legal ? "true" : "false"}
           aria-label={legal ? `Select ${location.name} on the map` : undefined}
           aria-busy={pendingLocationId === location.id ? "true" : undefined}
           onclick={(event) => select(event, location)}
@@ -191,7 +192,10 @@
       <div class="flex gap-2 overflow-x-auto pb-1">
         {#each legalLocations as location}
           <button
+            id={`map-destination-${location.id}`}
             type="button"
+            data-location-id={location.id}
+            aria-controls="game-map"
             class="min-h-11 shrink-0 cursor-pointer border border-[#7b6249] bg-[#eadcbd] px-3 font-mono text-[10px] font-semibold uppercase tracking-[0.06em] text-[#3e2c20] transition hover:border-[#973b32] hover:bg-[#f4e8ce] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8e342d]"
             aria-pressed={selectedLocationId === location.id}
             onclick={(event) => select(event, location)}

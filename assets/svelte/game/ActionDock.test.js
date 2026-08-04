@@ -103,8 +103,22 @@ describe("ActionDock", () => {
       onCancelMove,
     })
 
-    expect(screen.getByText("Dispatching car")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Dispatching car" })).toBeDisabled()
+    expect(screen.getByRole("status")).toHaveTextContent("Dispatching car")
+  })
+
+  it("announces a completed stale-version resynchronization as status copy", () => {
+    render(ActionDock, {
+      ...baseProps,
+      selection: null,
+      commandError: "Game state changed; map resynchronized",
+      commandStatus: true,
+    })
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Game state changed; map resynchronized",
+    )
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
   })
 
   it("labels free placement without inventing an action cost", () => {

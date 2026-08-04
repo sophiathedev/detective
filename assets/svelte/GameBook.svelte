@@ -27,6 +27,11 @@
   let commandPending = $state(false)
   let retryCommand = $state(null)
   let commandError = $state(null)
+  let publicProjectionReady = $state(false)
+  let privateProjectionReady = $state(false)
+  let publicProjectionVersion = $state(null)
+  let privateProjectionVersion = $state(null)
+  let resynchronizingAfterStale = $state(false)
   let lastEvent = $state("Casebook synchronized.")
   let mapIntent = $state(null)
   let lastTravel = $state(null)
@@ -75,6 +80,19 @@
   )
   let drawerTitle = $derived(
     drawerPages.find((page) => page.id === drawerPage)?.label ?? "Casebook",
+  )
+  let projectionsSynchronized = $derived(
+    publicProjectionReady &&
+      privateProjectionReady &&
+      publicProjectionVersion === privateProjectionVersion,
+  )
+  let controlsReady = $derived(
+    connectionState === "online" &&
+      projectionsSynchronized &&
+      publicState.status !== "paused",
+  )
+  let commandStatus = $derived(
+    commandError?.startsWith("Game state changed;") ?? false,
   )
   let interrogationOptions = $derived(privateState.interrogation_options ?? [])
   let searchableSuspectIds = $derived(new Set(privateState.searchable_suspect_ids ?? []))
@@ -129,11 +147,15 @@
     }
 
     publicState = nextState
+    publicProjectionVersion = nextState.version
+    publicProjectionReady = true
   }
 
   function applyPrivate(nextState, version) {
     if (version < publicState.version) return
     privateState = nextState
+    privateProjectionVersion = version
+    privateProjectionReady = true
 
     if (mapSelection && !mapSelectionLegalIn(mapSelection, nextState)) {
       mapSelection = null
@@ -169,7 +191,7 @@
   }
 
   function selectMapLocation(location) {
-    if (commandPending || connectionState !== "online") return
+    if (commandPending || !controlsReady) return
 
     if (placementLocationIds.has(location.id) && availableActions.has("place")) {
       mapSelection = { type: "place", location }
@@ -179,7 +201,7 @@
   }
 
   function confirmMapMovement() {
-    if (!mapSelection || commandPending || connectionState !== "online" || !gameChannel) return
+    if (!mapSelection || commandPending || !controlsReady || !gameChannel) return
 
     mapIntent = {
       type: mapSelection.type,
@@ -241,6 +263,7 @@
           mapSelection = null
         }
         commandError = commandErrorMessage(code)
+        if (code === "stale_version") requestProjectionResync()
       })
       .receive("timeout", () => {
         commandPending = false
@@ -267,10 +290,12 @@
 
   function commandErrorMessage(code) {
     const messages = {
-      stale_version: "The case advanced before this action. Reload the current state.",
+      stale_version: "Game state changed; resynchronizing map",
       not_your_turn: "Only the active Detective can act.",
       wrong_role: "This action belongs to a Detective.",
+      wrong_phase: "This action is sealed during the current case phase.",
       placement_required: "Place your token at a Police Station first.",
+      invalid_location: "That location is not part of the active board catalog.",
       destination_outside_district: "That location is outside the current district.",
       no_actions_remaining: "No actions remain this turn.",
       mob_joint_required: "Kickback is available only at a Mob Joint.",
@@ -368,6 +393,13 @@
     drawerPage = drawerPages[0]?.id ?? "history"
   })
 
+  $effect(() => {
+    if (!resynchronizingAfterStale || !controlsReady) return
+
+    resynchronizingAfterStale = false
+    commandError = "Game state changed; map resynchronized"
+  })
+
   onDestroy(() => {
     if (typeof window !== "undefined" && pauseActive) restorePreviousFocus()
   })
@@ -442,14 +474,70 @@
     })
   }
 
-  function invalidateConnectionSnapshot() {
-    connectionState = "offline"
-    mapSelection = null
-    mapIntent = null
+  function invalidateConnectionSnapshot(nextConnectionState = "offline") {
+    connectionState = nextConnectionState
+    commandError =
+      nextConnectionState === "unauthorized"
+        ? "This account is no longer authorized for the case channel."
+        : "Connection lost. Waiting for fresh public and private case files."
     connectionSnapshotReceived = false
     onlinePlayerIds = []
     offlineDeadlines = {}
     allPlayersOnline = false
+    mapSelection = null
+    mapIntent = null
+    commandPending = false
+    retryCommand = null
+    publicProjectionReady = false
+    privateProjectionReady = false
+    publicProjectionVersion = null
+    privateProjectionVersion = null
+    resynchronizingAfterStale = false
+  }
+
+  function requestProjectionResync() {
+    mapSelection = null
+    mapIntent = null
+    commandPending = false
+    retryCommand = null
+    publicProjectionReady = false
+    privateProjectionReady = false
+    publicProjectionVersion = null
+    privateProjectionVersion = null
+    resynchronizingAfterStale = true
+
+    if (!gameChannel?.isJoined() || !userChannel?.isJoined()) {
+      invalidateConnectionSnapshot()
+      return
+    }
+
+    requestPublicProjectionSync()
+    requestPrivateProjectionSync()
+  }
+
+  function requestPublicProjectionSync() {
+    if (!gameChannel?.isJoined()) return
+
+    gameChannel
+      .push("sync_state", {})
+      .receive("ok", ({ state }) => applyPublic(state))
+      .receive("error", () => invalidateConnectionSnapshot())
+      .receive("timeout", () => invalidateConnectionSnapshot())
+  }
+
+  function requestPrivateProjectionSync() {
+    if (!userChannel?.isJoined()) return
+
+    userChannel
+      .push("sync_state", {})
+      .receive("ok", ({ state, version }) => applyPrivate(state, version))
+      .receive("error", () => invalidateConnectionSnapshot())
+      .receive("timeout", () => invalidateConnectionSnapshot())
+  }
+
+  function requestMissingProjectionSync() {
+    if (!publicProjectionReady) requestPublicProjectionSync()
+    if (!privateProjectionReady) requestPrivateProjectionSync()
   }
 
   onMount(() => {
@@ -458,15 +546,17 @@
     }, 1000)
     const socket = window.getGameSocket?.()
     if (!socket) {
-      connectionState = "offline"
+      invalidateConnectionSnapshot()
       return () => window.clearInterval(connectionClockInterval)
     }
 
     gameChannel = socket.channel(`game:${game_id}`, {})
     userChannel = socket.channel(`user:${user_id}`, { game_id })
 
-    gameChannel.onError(invalidateConnectionSnapshot)
-    gameChannel.onClose(invalidateConnectionSnapshot)
+    gameChannel.onError(() => invalidateConnectionSnapshot())
+    gameChannel.onClose(() => invalidateConnectionSnapshot())
+    userChannel.onError(() => invalidateConnectionSnapshot())
+    userChannel.onClose(() => invalidateConnectionSnapshot())
 
     gameChannel.on("game_state", ({ state }) => applyPublic(state))
     gameChannel.on("connection_state", (state) => {
@@ -475,6 +565,7 @@
       allPlayersOnline = state.all_players_online
       connectionSnapshotReceived = true
       connectionState = "online"
+      requestMissingProjectionSync()
     })
     gameChannel.on("game_paused", (message) =>
       recordPublicEvent(message, "A missing investigator sealed the case."),
@@ -617,14 +708,18 @@
       .join()
       .receive("ok", ({ state }) => {
         applyPublic(state)
+        requestMissingProjectionSync()
       })
-      .receive("error", () => (connectionState = "unauthorized"))
-      .receive("timeout", () => (connectionState = "offline"))
+      .receive("error", () => invalidateConnectionSnapshot("unauthorized"))
+      .receive("timeout", () => invalidateConnectionSnapshot())
 
     userChannel
       .join()
-      .receive("ok", ({ state, version }) => applyPrivate(state, version))
-      .receive("error", () => (connectionState = "unauthorized"))
+      .receive("ok", ({ state, version }) => {
+        applyPrivate(state, version)
+        requestMissingProjectionSync()
+      })
+      .receive("error", () => invalidateConnectionSnapshot("unauthorized"))
 
     return () => {
       window.clearInterval(connectionClockInterval)
@@ -650,6 +745,12 @@
       </div>
     </header>
 
+    {#if commandStatus}
+      <p id="game-sync-status" class="game-sync-status" role="status" aria-live="polite">
+        {commandError}
+      </p>
+    {/if}
+
     <main
       id="open-casebook"
       class:casebook-drawer-open={drawerOpen}
@@ -658,7 +759,7 @@
       <div
         id="game-casebook-workspace"
         class="contents"
-        inert={publicState.status === "paused"}
+        inert={!controlsReady}
       >
       {#if drawerOpen}
         <div class="pointer-events-none absolute inset-y-0 left-1/2 z-30 hidden w-9 -translate-x-1/2 bg-[#5a4430] opacity-35 lg:block" aria-hidden="true"></div>
@@ -713,7 +814,7 @@
             {selectedLocationId}
             pendingLocationId={mapIntent?.locationId ?? null}
             {lastTravel}
-            disabled={commandPending || connectionState !== "online" || publicState.status === "paused"}
+            disabled={commandPending || !controlsReady}
             onSelect={selectMapLocation}
           />
 
@@ -820,8 +921,9 @@
               selection={mapSelection}
               origin={ownLocation}
               {commandPending}
-              {commandError}
-              connectionOnline={connectionState === "online" && publicState.status !== "paused"}
+              commandError={commandStatus ? null : commandError}
+              commandStatus={false}
+              connectionOnline={controlsReady}
               onConfirmMove={confirmMapMovement}
               onCancelMove={cancelMapMovement}
               onAction={handleDockAction}
@@ -1231,15 +1333,25 @@
               <h3 id="location-list-heading" class="font-mono text-[10px] uppercase tracking-[0.14em] text-[#80694f]">Location index</h3>
               <div class="mt-2 grid gap-1 sm:grid-cols-2">
                 {#each publicState.locations as location}
-                  <button
-                    id={`location-index-${location.id}`}
-                    type="button"
-                    onclick={() => selectMapLocation(location)}
-                    class={`cursor-pointer px-2 py-1.5 text-left text-xs transition ${legalMapLocation(location.id) ? "bg-[#a54235] text-[#fff0d6] hover:bg-[#b94d3f]" : "hover:bg-[#d4c4a5]"}`}
-                  >
-                    {location.name}
-                    <span class="float-right font-mono text-[9px] uppercase">{legalMapLocation(location.id) ? "legal" : location.type.replaceAll("_", " ")}</span>
-                  </button>
+                  {#if legalMapLocation(location.id)}
+                    <button
+                      id={`location-index-${location.id}`}
+                      type="button"
+                      onclick={() => selectMapLocation(location)}
+                      class="min-h-11 cursor-pointer bg-[#a54235] px-2 py-1.5 text-left text-xs text-[#fff0d6] transition hover:bg-[#b94d3f]"
+                    >
+                      {location.name}
+                      <span class="float-right font-mono text-[9px] uppercase">legal</span>
+                    </button>
+                  {:else}
+                    <div
+                      id={`location-index-${location.id}`}
+                      class="px-2 py-1.5 text-left text-xs text-[#6f5c47]"
+                    >
+                      {location.name}
+                      <span class="float-right font-mono text-[9px] uppercase">{location.type.replaceAll("_", " ")}</span>
+                    </div>
+                  {/if}
                 {/each}
               </div>
             </section>
@@ -1292,7 +1404,7 @@
                 {/each}
               </ol>
 
-              {#if commandError && publicState.status !== "paused"}
+              {#if commandError && !commandStatus && publicState.status !== "paused"}
                 <div id="game-command-error" class="mt-4 border-l-2 border-[#a54235] bg-[#e1cfad] p-3 text-xs leading-5" role="alert">
                   <p>{commandError}</p>
                   {#if retryCommand}

@@ -5,6 +5,7 @@
     origin = null,
     commandPending = false,
     commandError = null,
+    commandStatus = false,
     connectionOnline = false,
     onConfirmMove = () => {},
     onCancelMove = () => {},
@@ -39,6 +40,12 @@
 </script>
 
 <section id="action-dock" class="action-dock" aria-labelledby="action-dock-heading">
+  {#if commandPending && selection}
+    <p id="action-dock-pending-status" class="sr-only" role="status" aria-live="polite">
+      Dispatching car
+    </p>
+  {/if}
+
   <div class="action-dock-heading-row">
     <div>
       <p class="action-dock-kicker">Dispatch desk · server authority</p>
@@ -112,6 +119,11 @@
   {/if}
 
   {#if commandError}
-    <p id="action-dock-error" class="action-dock-error" role="alert">{commandError}</p>
+    <p
+      id="action-dock-error"
+      class="action-dock-error"
+      role={commandStatus ? "status" : "alert"}
+      aria-live={commandStatus ? "polite" : "assertive"}
+    >{commandError}</p>
   {/if}
 </section>

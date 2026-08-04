@@ -26,6 +26,23 @@ defmodule DetectiveWeb.UserChannel do
   def join("user:" <> _user_id, _payload, _socket),
     do: {:error, %{code: "invalid_command"}}
 
+  @impl true
+  def handle_in("sync_state", _payload, socket) do
+    case Games.game_projection(socket.assigns.current_scope, socket.assigns.game_id) do
+      {:ok, projection} ->
+        {:reply,
+         {:ok,
+          %{
+            game_id: projection.public.game_id,
+            version: projection.public.version,
+            state: projection.private
+          }}, socket}
+
+      {:error, reason} ->
+        {:reply, {:error, %{code: error_code(reason)}}, socket}
+    end
+  end
+
   defp error_code(reason)
        when reason in [
               :invalid_game_id,
