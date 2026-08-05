@@ -2,6 +2,7 @@
   import { onDestroy, onMount } from "svelte"
   import ActionDock from "./game/ActionDock.svelte"
   import CasebookDrawer from "./game/CasebookDrawer.svelte"
+  import CasebookWorkspace from "./game/CasebookWorkspace.svelte"
   import GameBoard from "./game/GameBoard.svelte"
   import PlayerHUD from "./game/PlayerHUD.svelte"
 
@@ -133,6 +134,92 @@
         ? "Select a red-ringed location to review a one-action Move."
         : "Select any available Police Station to review free placement.",
   )
+  let casebookView = $derived.by(() => ({
+    role: privateState.role,
+    phase: publicState.phase,
+    result: publicState.result,
+    activeDetective,
+    ownPlayer,
+    availableActions: [...availableActions],
+    search: {
+      suspects: publicState.suspects.map((suspect) => ({
+        ...suspect,
+        location_name: locationName(suspect.location_id),
+      })),
+      selectedSuspectId,
+      searchableSuspectIds: [...searchableSuspectIds],
+      interrogatableSuspectIds: [...interrogatableSuspectIds],
+    },
+    question: {
+      pendingPublic,
+      pendingPrivate: privateState.role === "detective" ? pendingPrivate : null,
+      latestStatement,
+      interrogationOptions,
+      selectedSuspectId,
+      selectedTopicId,
+      selectedSuspectLeverage,
+      spendLeverage,
+      selectedResponseId,
+      blockedSnitchPlayerIds,
+    },
+    evidence: { heldEvidence, knownCaseCards, latestSearch },
+    accusation: {
+      options: accusationOptions,
+      selectedSuspectId: accusationSuspectId,
+      selectedWeaponId: accusationWeaponId,
+      selectedMotiveId: accusationMotiveId,
+      solveAttempt: privateState.solve_attempt ?? null,
+      finalGuess: privateState.final_guess ?? null,
+    },
+    history: {
+      entries: (publicState.public_history ?? []).map((entry) => ({
+        type: entry.type,
+        actorName: entry.player_id
+          ? publicState.players.find((player) => player.id === entry.player_id)?.display_name ??
+            "Detective"
+          : "Case file",
+      })),
+      lastEvent,
+      commandError: publicState.status === "paused" ? null : commandError,
+      commandStatus,
+      retryAvailable: retryCommand !== null,
+    },
+    chisel:
+      privateState.role === "chisel"
+        ? {
+            identity: chisel,
+            pendingInterrogation: pendingPrivate,
+            selectedResponseId,
+            casebook: privateState.casebook ?? null,
+            leverageByDetective: privateState.leverage_by_detective ?? {},
+          }
+        : null,
+  }))
+
+  const casebookActions = {
+    selectSuspect,
+    selectTopic: (topicId) => (selectedTopicId = topicId),
+    setSpendLeverage: (value) => (spendLeverage = value),
+    submitSuspectSearch,
+    submitInterrogation,
+    allowQuestion: () => sendCommand("allow_question", {}),
+    blockQuestion: () => sendCommand("block_question", {}),
+    acceptQuestionBlock: () => sendCommand("accept_question_block", {}),
+    bribeGoon: () => sendCommand("bribe_goon", {}),
+    declineSnitch: () => sendCommand("decline_snitch", {}),
+    chooseSnitch: () => sendCommand("choose_snitch", {}),
+    setBlockedSnitchPlayers: (playerIds) => (blockedSnitchPlayerIds = playerIds),
+    submitSnitchResolution,
+    selectResponse: (responseId) => (selectedResponseId = responseId),
+    submitResponse,
+    acceptResponse: () => sendCommand("accept_response", {}),
+    challengeResponse: () => sendCommand("challenge_response", {}),
+    setAccusationSuspect: (suspectId) => (accusationSuspectId = suspectId),
+    setAccusationWeapon: (weaponId) => (accusationWeaponId = weaponId),
+    setAccusationMotive: (motiveId) => (accusationMotiveId = motiveId),
+    submitAccusation,
+    retryCommand: retryLastCommand,
+  }
 
   function applyPublic(nextState) {
     if (nextState.version < publicState.version) return
@@ -746,9 +833,7 @@
     </header>
 
     {#if commandStatus}
-      <p id="game-sync-status" class="game-sync-status" role="status" aria-live="polite">
-        {commandError}
-      </p>
+      <p id="game-sync-status" class="game-sync-status" role="status" aria-live="polite">{commandError}</p>
     {/if}
 
     <main
@@ -756,667 +841,119 @@
       class:casebook-drawer-open={drawerOpen}
       class="relative grid min-h-0 flex-1 overflow-hidden border border-[#6f5b45] bg-[#d8c9aa] shadow-[0_24px_70px_rgba(0,0,0,0.55)]"
     >
-      <div
-        id="game-casebook-workspace"
-        class="contents"
-        inert={!controlsReady}
-      >
-      {#if drawerOpen}
-        <div class="pointer-events-none absolute inset-y-0 left-1/2 z-30 hidden w-9 -translate-x-1/2 bg-[#5a4430] opacity-35 lg:block" aria-hidden="true"></div>
-        <div class="pointer-events-none absolute inset-y-0 left-1/2 z-30 hidden w-px bg-[#2f2118]/70 lg:block" aria-hidden="true"></div>
-      {/if}
-
-      <svg class="pointer-events-none absolute inset-0 z-20 size-full opacity-[0.07] mix-blend-multiply" aria-hidden="true">
-        <filter id="paper-fibers">
-          <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="3" seed="17" />
-        </filter>
-        <rect width="100%" height="100%" filter="url(#paper-fibers)" />
-      </svg>
-
-      <section id="casebook-map-page" class="relative z-10 flex min-h-[38rem] flex-col border-b border-[#8d765d] bg-[#d9ccb0] lg:min-h-0 lg:border-b-0 lg:border-r">
-        <div class="flex items-start justify-between gap-4 border-b border-[#9f896d] px-4 py-3 sm:px-5">
-          <div>
-            <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-[#8c3f33]">Plate 01 · field map</p>
-            <h1 class="mt-1 font-serif text-2xl font-semibold tracking-[-0.025em] text-[#2e241c]">Greater Los Angeles</h1>
-          </div>
-          <div class="text-right font-mono text-[10px] uppercase tracking-[0.12em] text-[#6f5d49]">
-            <p>{publicState.phase.replaceAll("_", " ")}</p>
-            <p class="mt-1">Active: {activeDetective?.display_name ?? "-"}</p>
-          </div>
-        </div>
-
-        <nav id="casebook-page-tabs" class="casebook-page-tabs" aria-label="Casebook pages">
-          {#each drawerPages as page}
-            <button
-              id={`open-casebook-${page.id}`}
-              type="button"
-              aria-pressed={drawerOpen && drawerPage === page.id}
-              onclick={() => openDrawer(page.id)}
-              class:casebook-page-tab-active={drawerOpen && drawerPage === page.id}
-              class="casebook-page-tab"
-            >{page.label}</button>
-          {/each}
-        </nav>
-
-        <div class="relative overflow-hidden bg-[#b7a78b] p-2 sm:p-3">
-          <div
-            id="map-command-status"
-            class={`pointer-events-none absolute left-4 top-4 z-10 max-w-[18rem] border px-3 py-2 font-mono text-[9px] uppercase tracking-[0.1em] shadow-[0_8px_24px_rgba(35,24,16,0.22)] sm:left-5 sm:top-5 ${mapIntent ? "map-command-pending border-[#8e342d] bg-[#f1dec0] text-[#7d2e28]" : "border-[#776149] bg-[#e8dcc3]/95 text-[#5d4b38]"}`}
-            aria-live="polite"
-            aria-busy={mapIntent !== null}
-          >
-            {mapStatus}
-          </div>
-          <GameBoard
-            locations={publicState.locations}
-            {detectives}
-            {legalLocationIds}
-            {selectedLocationId}
-            pendingLocationId={mapIntent?.locationId ?? null}
-            {lastTravel}
-            disabled={commandPending || !controlsReady}
-            onSelect={selectMapLocation}
-          />
-
-          <p class="mt-2 font-mono text-[8px] leading-3 text-[#594936] sm:text-[9px]">
-            Board artwork © Van Ryder Games / Vincent Dutrait. Unofficial non-commercial fan project; not affiliated with or endorsed by the publisher.
-          </p>
-        </div>
-
-        <section class="flex flex-1 flex-col border-t border-[#8d765d] px-4 py-4 sm:px-5" aria-labelledby="movement-ledger-heading">
-          <div class="grid gap-4 sm:grid-cols-[1.25fr_0.75fr]">
+      <div id="game-casebook-workspace" class="contents" inert={!controlsReady}>
+        <section id="casebook-map-page" class="relative z-10 flex min-h-[38rem] flex-col border-b border-[#8d765d] bg-[#d9ccb0] lg:min-h-0 lg:border-b-0 lg:border-r">
+          <div class="flex items-start justify-between gap-4 border-b border-[#9f896d] px-4 py-3 sm:px-5">
             <div>
-              <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Travel rule · field note</p>
-              <h2 id="movement-ledger-heading" class="mt-1 font-serif text-lg font-semibold">District movement ledger</h2>
-              <p class="mt-2 max-w-xl text-xs leading-5 text-[#695642]">
-                One Move action reaches any location in the current district. A location filed under two districts is a border stop; enter it first, then spend another Move to cross.
-              </p>
+              <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-[#8c3f33]">Plate 01 · field map</p>
+              <h1 class="mt-1 font-serif text-2xl font-semibold tracking-[-0.025em] text-[#2e241c]">Greater Los Angeles</h1>
             </div>
-            <dl class="grid grid-cols-2 gap-x-3 gap-y-2 self-start font-mono text-[9px] uppercase tracking-[0.08em] text-[#6e5943]">
-              <div class="border-t border-[#9e876a] pt-2"><dt>Blue cross</dt><dd class="mt-1 text-[#2f4551]">Police Station</dd></div>
-              <div class="border-t border-[#9e876a] pt-2"><dt>Red marker</dt><dd class="mt-1 text-[#7a302c]">Mob Joint</dd></div>
-              <div class="border-t border-[#9e876a] pt-2"><dt>Red ring</dt><dd class="mt-1 text-[#9e3f34]">Legal command</dd></div>
-              <div class="border-t border-[#9e876a] pt-2"><dt>Border stop</dt><dd class="mt-1">Two districts</dd></div>
-            </dl>
+            <div class="text-right font-mono text-[10px] uppercase tracking-[0.12em] text-[#6f5d49]">
+              <p>{publicState.phase.replaceAll("_", " ")}</p>
+              <p class="mt-1">Active: {activeDetective?.display_name ?? "-"}</p>
+            </div>
           </div>
 
-          <div class="mt-4 border-t border-[#9e876a] pt-3">
-            <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Known persons · public file</p>
-            <div class="mt-2 grid gap-2 sm:grid-cols-3">
-              {#each publicState.suspects as suspect, index}
-                <button
-                  id={`interrogate-suspect-${suspect.id}`}
-                  type="button"
-                  disabled={(!interrogatableSuspectIds.has(suspect.id) && !searchableSuspectIds.has(suspect.id)) || commandPending}
-                  aria-pressed={selectedSuspectId === suspect.id}
-                  onclick={() => selectSuspect(suspect.id)}
-                  class={`flex min-h-14 items-center gap-2 border p-2 text-left transition ${selectedSuspectId === suspect.id ? "border-[#8f342d] bg-[#f0dfbd] ring-2 ring-[#a54235]" : "border-[#a18a6d] bg-[#e6d9bd]"} ${interrogatableSuspectIds.has(suspect.id) || searchableSuspectIds.has(suspect.id) ? "cursor-pointer hover:bg-[#f2e4c8]" : "cursor-default"}`}
-                >
-                  <svg class="size-10 shrink-0 bg-[#30261f]" viewBox="0 0 48 48" role="img" aria-label={`Original portrait sketch for ${suspect.name}`}>
-                    <rect width="48" height="48" fill={["#3d5360", "#6a4337", "#4b5d44"][index % 3]} />
-                    <circle cx="24" cy="20" r="9" fill="#d0aa82" />
-                    <path d={index % 3 === 0 ? "M13 18c4-12 18-12 22 0Z" : index % 3 === 1 ? "M12 17h24l-5-7H18Z" : "M14 20c2-12 18-13 21 0l-6-7-5 6Z"} fill="#211a16" />
-                    <path d="M8 48c2-12 8-18 16-18s14 6 16 18Z" fill="#242321" />
-                  </svg>
-                  <div class="min-w-0">
-                    <h3 class="truncate font-serif text-xs font-semibold">{suspect.name}</h3>
-                    <p class="mt-0.5 truncate font-mono text-[8px] uppercase tracking-[0.06em] text-[#705b45]">{suspect.occupation}</p>
-                    <p class="mt-1 truncate text-[9px] text-[#7e6951]">{locationName(suspect.location_id)}</p>
-                  </div>
-                </button>
-              {/each}
+          <nav id="casebook-page-tabs" class="casebook-page-tabs" aria-label="Casebook pages">
+            {#each drawerPages as page}
+              <button
+                id={"open-casebook-" + page.id}
+                type="button"
+                aria-pressed={drawerOpen && drawerPage === page.id}
+                onclick={() => openDrawer(page.id)}
+                class:casebook-page-tab-active={drawerOpen && drawerPage === page.id}
+                class="casebook-page-tab"
+              >{page.label}</button>
+            {/each}
+          </nav>
+
+          <div class="relative min-h-0 flex-1 overflow-hidden bg-[#b7a78b] p-2 sm:p-3">
+            <div
+              id="map-command-status"
+              class={[
+                "pointer-events-none absolute left-4 top-4 z-10 max-w-[18rem] border px-3 py-2 font-mono text-[9px] uppercase tracking-[0.1em] shadow-[0_8px_24px_rgba(35,24,16,0.22)] sm:left-5 sm:top-5",
+                mapIntent
+                  ? "map-command-pending border-[#8e342d] bg-[#f1dec0] text-[#7d2e28]"
+                  : "border-[#776149] bg-[#e8dcc3]/95 text-[#5d4b38]",
+              ]}
+              aria-live="polite"
+              aria-busy={mapIntent !== null}
+            >
+              {mapStatus}
             </div>
+            <GameBoard
+              locations={publicState.locations}
+              {detectives}
+              {legalLocationIds}
+              {selectedLocationId}
+              pendingLocationId={mapIntent?.locationId ?? null}
+              {lastTravel}
+              disabled={commandPending || !controlsReady}
+              onSelect={selectMapLocation}
+            />
+            <p class="mt-2 font-mono text-[8px] leading-3 text-[#594936] sm:text-[9px]">
+              Board artwork © Van Ryder Games / Vincent Dutrait. Unofficial non-commercial fan project; not affiliated with or endorsed by the publisher.
+            </p>
           </div>
         </section>
-      </section>
 
-      <CasebookDrawer open={drawerOpen} title={drawerTitle} onClose={closeDrawer}>
-      <section id="casebook-action-page" class="relative flex min-h-0 flex-col bg-[#e4d8bd]">
-        <PlayerHUD
-          players={publicState.players}
-          currentDetectiveId={publicState.current_detective_id}
-          {privateState}
-          {onlinePlayerIds}
-          {connectionSnapshotReceived}
-          disconnectLabel={disconnectCountdown}
-        />
-
-        <div class="min-h-0 flex-1">
-          <div class="min-h-0 p-4 sm:p-5">
-            {#if drawerPage === "search"}
-            <div class="flex flex-wrap items-start justify-between gap-4 border-b border-[#a38b6e] pb-4">
-              <div>
-                <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-[#8c3f33]">Action ledger</p>
-                <h2 class="mt-1 font-serif text-2xl font-semibold text-[#2e241c]">{activeDetective?.display_name ?? "Accusation"}</h2>
-                <p class="mt-1 text-sm text-[#695642]">
-                  {privateState.role === "detective" && ownPlayer?.id === publicState.current_detective_id
-                    ? "Your turn. Legal map locations are marked in red ink."
-                    : "Observing the active Detective's turn."}
-                </p>
-              </div>
-              {#if privateState.role === "detective"}
-                <dl class="grid grid-cols-2 gap-4 text-right sm:grid-cols-4">
-                  <div>
-                    <dt class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#80694f]">Actions</dt>
-                    <dd class="mt-1 font-mono text-lg font-semibold">{ownPlayer?.actions_remaining ?? 0}</dd>
-                  </div>
-                  <div>
-                    <dt class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#80694f]">Scratch</dt>
-                    <dd class="mt-1 font-mono text-lg font-semibold">${privateState.scratch}</dd>
-                  </div>
-                  <div>
-                    <dt class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#80694f]">Leverage</dt>
-                    <dd class="mt-1 font-mono text-lg font-semibold">{privateState.leverage_supply}</dd>
-                  </div>
-                  <div>
-                    <dt class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#80694f]">Solve</dt>
-                    <dd class="mt-1 font-mono text-sm font-semibold">{privateState.solve_token_available ? "READY" : "SPENT"}</dd>
-                  </div>
-                </dl>
-              {/if}
-            </div>
-
-            <ActionDock
-              {availableActions}
-              selection={mapSelection}
-              origin={ownLocation}
-              {commandPending}
-              commandError={commandStatus ? null : commandError}
-              commandStatus={false}
-              connectionOnline={controlsReady}
-              onConfirmMove={confirmMapMovement}
-              onCancelMove={cancelMapMovement}
-              onAction={handleDockAction}
+        <CasebookDrawer open={drawerOpen} title={drawerTitle} onClose={closeDrawer}>
+          <section class="relative flex min-h-0 flex-col bg-[#e4d8bd]">
+            <PlayerHUD
+              players={publicState.players}
+              currentDetectiveId={publicState.current_detective_id}
+              {privateState}
+              {onlinePlayerIds}
+              {connectionSnapshotReceived}
+              disconnectLabel={disconnectCountdown}
             />
-            {/if}
 
-            {#if drawerPage === "question"}
-            <section
-              id="interrogation-workspace"
-              class="mt-5 border-y border-[#91785c] bg-[#dccdad] px-3 py-4 sm:px-4"
-              aria-labelledby="interrogation-heading"
-            >
-              <div class="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">ARC interview desk</p>
-                  <h3 id="interrogation-heading" class="mt-1 font-serif text-xl font-semibold">Suspect statement</h3>
-                </div>
-                <p id="interrogation-status" class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]" aria-live="polite">
-                  {publicState.phase.replaceAll("_", " ")}
-                </p>
-              </div>
-
-              {#if publicState.phase === "detective_turn" && availableActions.has("interrogate")}
-                {#if latestStatement}
-                  <div id="challenge-result" class="mt-4 border-l-4 border-[#8c3f33] bg-[#eadbbc] p-4" aria-live="polite">
-                    <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7d6650]">Latest private note · {latestStatement.topic_code}</p>
-                    <p class="mt-2 font-serif text-sm italic leading-6">“{latestStatement.response_text}”</p>
-                    <p class="mt-2 font-mono text-[9px] uppercase tracking-[0.1em] text-[#8c3f33]">{latestStatement.resolution.replaceAll("_", " ")}</p>
-                  </div>
-                {/if}
-
-                {#if selectedInterrogation}
-                  <div class="mt-4 grid gap-4 sm:grid-cols-[0.8fr_1.2fr]">
-                    <div class="border-l-2 border-[#9e4035] pl-3">
-                      <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7b654d]">Subject</p>
-                      <p class="mt-1 font-serif text-lg font-semibold">{selectedInterrogation.suspect_name}</p>
-                      <p class="mt-2 text-xs leading-5 text-[#695642]">Choose one known case card. Free-form questions are not legal commands.</p>
-                    </div>
-
-                    <fieldset id="interrogation-topics">
-                      <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7b654d]">Known topics</legend>
-                      <div class="mt-2 grid gap-2">
-                        {#each selectedInterrogation.topics as topic}
-                          <label
-                            id={`interrogate-topic-${topic.id}`}
-                            class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 transition ${selectedTopicId === topic.id ? "border-[#963a31] bg-[#f1e2c4]" : "border-[#9f896c] bg-[#e4d6b8] hover:bg-[#ecdec1]"}`}
-                          >
-                            <input type="radio" name="interrogation-topic" value={topic.id} bind:group={selectedTopicId} class="accent-[#963a31]" />
-                            <span class="font-mono text-[10px] font-semibold text-[#963a31]">{topic.code}</span>
-                            <span class="text-sm font-semibold">{topic.title}</span>
-                          </label>
-                        {/each}
-                      </div>
-                    </fieldset>
-                  </div>
-
-                  {#if selectedSuspectLeverage > 0}
-                    <label class="mt-4 flex min-h-11 cursor-pointer items-center gap-3 border-t border-[#a48b6c] pt-3 text-xs">
-                      <input type="checkbox" bind:checked={spendLeverage} class="accent-[#963a31]" />
-                      Spend 1 leverage over this suspect to force the most useful response.
-                    </label>
-                  {/if}
-
-                  <button
-                    id="action-interrogate"
-                    type="button"
-                    disabled={!selectedTopic || commandPending}
-                    onclick={submitInterrogation}
-                    class="mt-4 min-h-11 w-full cursor-pointer bg-[#30261f] px-4 text-left text-sm font-semibold text-[#f5e7c9] transition hover:bg-[#49372a] disabled:cursor-not-allowed disabled:opacity-40"
-                  >Question suspect <span class="float-right font-mono text-[10px]">{privateState.free_question_suspect_id ? "FREE" : "1 AP"}</span></button>
-                {:else}
-                  <p class="mt-4 border-l-2 border-[#9e4035] pl-3 text-sm leading-6 text-[#65523f]">Select a highlighted suspect from the public file. You must share their location.</p>
-                {/if}
-              {:else if pendingPublic?.stage === "awaiting_chisel_block"}
-                {#if privateState.role === "chisel" && pendingPrivate}
-                  <div id="chisel-block-decision" class="mt-4 border-l-4 border-[#71372f] bg-[#d3c19f] p-4">
-                    <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">Chisel leverage window</p>
-                    <p class="mt-2 text-sm leading-6 text-[#5f4b39]">
-                      {pendingPrivate.detective.display_name} asks {pendingPrivate.suspect.name} about case card {pendingPrivate.topic.code}.
-                    </p>
-                    <div class="mt-3 grid gap-2 sm:grid-cols-2">
-                      <button
-                        id="action-allow-question"
-                        type="button"
-                        disabled={!availableActions.has("allow_question") || commandPending}
-                        onclick={() => sendCommand("allow_question", {})}
-                        class="min-h-11 cursor-pointer border-2 border-[#344a40] bg-[#d6d2b5] px-3 text-sm font-semibold text-[#263c34] transition hover:bg-[#e5dfc1] disabled:cursor-not-allowed disabled:opacity-40"
-                      >Allow question</button>
-                      <button
-                        id="action-block-question"
-                        type="button"
-                        disabled={!availableActions.has("block_question") || commandPending}
-                        onclick={() => sendCommand("block_question", {})}
-                        class="min-h-11 cursor-pointer border-2 border-[#9b3d34] bg-[#e1c5a9] px-3 text-sm font-semibold text-[#812f29] transition hover:bg-[#ecd2b5] disabled:cursor-not-allowed disabled:opacity-40"
-                      >Spend matching leverage to block</button>
-                    </div>
-                  </div>
-                {:else}
-                  <div class="mt-4 border border-dashed border-[#8e765b] bg-[#d3c19f] p-5 text-center">
-                    <p class="font-serif text-lg italic">Question under review</p>
-                    <p class="mt-2 font-mono text-[9px] uppercase tracking-[0.12em] text-[#745f48]">Waiting for the Chisel's leverage decision</p>
-                  </div>
-                {/if}
-              {:else if pendingPublic?.stage === "question_blocked"}
-                <div id="blocked-question-card" class="mt-4 border-l-4 border-[#9b3d34] bg-[#e1c5a9] p-4">
-                  <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#812f29]">Question blocked</p>
-                  <p class="mt-2 text-sm leading-6 text-[#5f4b39]">The action remains spent. The questioning Detective may abandon the question or pay $2 Scratch to bribe the goon.</p>
-                  {#if availableActions.has("accept_question_block") || availableActions.has("bribe_goon")}
-                    <div class="mt-3 grid gap-2 sm:grid-cols-2">
-                      <button
-                        id="action-accept-question-block"
-                        type="button"
-                        disabled={!availableActions.has("accept_question_block") || commandPending}
-                        onclick={() => sendCommand("accept_question_block", {})}
-                        class="min-h-11 cursor-pointer border border-[#796349] bg-[#d7c7aa] px-3 text-sm font-semibold transition hover:bg-[#e7d8bb] disabled:cursor-not-allowed disabled:opacity-40"
-                      >Abandon question</button>
-                      <button
-                        id="action-bribe-goon"
-                        type="button"
-                        disabled={!availableActions.has("bribe_goon") || commandPending}
-                        onclick={() => sendCommand("bribe_goon", {})}
-                        class="min-h-11 cursor-pointer bg-[#8f372f] px-3 text-sm font-semibold text-[#fff0d6] transition hover:bg-[#a84338] disabled:cursor-not-allowed disabled:opacity-40"
-                      >Pay $2 and proceed</button>
-                    </div>
-                  {/if}
-                </div>
-              {:else if pendingPublic?.stage === "awaiting_snitches"}
-                <div id="snitch-window" class="mt-4 border-y border-[#8e765b] bg-[#d3c19f] p-4">
-                  <div class="flex items-center justify-between gap-3">
-                    <div>
-                      <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#812f29]">Facedown informants</p>
-                      <p class="mt-1 font-serif text-lg font-semibold">Snitch window</p>
-                    </div>
-                    <p class="font-mono text-[9px] uppercase tracking-[0.1em] text-[#725e48]">{pendingPublic.snitch_decisions_recorded}/{pendingPublic.snitch_decisions_required} filed</p>
-                  </div>
-                  {#if availableActions.has("choose_snitch") || availableActions.has("decline_snitch")}
-                    <p class="mt-3 text-sm leading-6 text-[#5f4b39]">Your choice remains hidden until every eligible Detective files a marker. An allowed Snitch costs $3 only after the final response.</p>
-                    <div class="mt-3 grid grid-cols-2 gap-2">
-                      <button
-                        id="action-decline-snitch"
-                        type="button"
-                        disabled={!availableActions.has("decline_snitch") || commandPending}
-                        onclick={() => sendCommand("decline_snitch", {})}
-                        class="min-h-11 cursor-pointer border border-[#796349] bg-[#d7c7aa] px-3 text-sm font-semibold transition hover:bg-[#e7d8bb] disabled:cursor-not-allowed disabled:opacity-40"
-                      >Pass</button>
-                      <button
-                        id="action-choose-snitch"
-                        type="button"
-                        disabled={!availableActions.has("choose_snitch") || commandPending}
-                        onclick={() => sendCommand("choose_snitch", {})}
-                        class="min-h-11 cursor-pointer bg-[#30261f] px-3 text-sm font-semibold text-[#f5e7c9] transition hover:bg-[#49372a] disabled:cursor-not-allowed disabled:opacity-40"
-                      >Place Snitch facedown</button>
-                    </div>
-                  {:else}
-                    <p class="mt-3 text-sm leading-6 text-[#5f4b39]">Waiting for all eligible Detectives to lock their private choice.</p>
-                  {/if}
-                </div>
-              {:else if pendingPublic?.stage === "awaiting_chisel_snitch_block"}
-                {#if privateState.role === "chisel" && pendingPrivate}
-                  <div id="chisel-snitch-blocks" class="mt-4 border-l-4 border-[#71372f] bg-[#d3c19f] p-4">
-                    <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">Revealed Snitch markers</p>
-                    <p class="mt-2 text-sm leading-6 text-[#5f4b39]">Spend one matching leverage marker for each informant you want to block.</p>
-                    <fieldset class="mt-3 grid gap-2">
-                      <legend class="sr-only">Choose Snitches to block</legend>
-                      {#each pendingPrivate.snitch_requests as request}
-                        <label id={`snitch-block-${request.player_id}`} class="flex min-h-11 cursor-pointer items-center justify-between gap-3 border border-[#8e765b] bg-[#e5d6b8] px-3 py-2">
-                          <span class="text-sm font-semibold">{request.display_name}</span>
-                          <span class="flex items-center gap-2 font-mono text-[9px] uppercase text-[#725e48]">
-                            {request.can_block ? "block" : "no leverage"}
-                            <input type="checkbox" value={request.player_id} bind:group={blockedSnitchPlayerIds} disabled={!request.can_block} class="accent-[#963a31]" />
-                          </span>
-                        </label>
-                      {/each}
-                    </fieldset>
-                    <button
-                      id="action-resolve-snitches"
-                      type="button"
-                      disabled={!availableActions.has("resolve_snitches") || commandPending}
-                      onclick={submitSnitchResolution}
-                      class="mt-3 min-h-11 w-full cursor-pointer bg-[#8f372f] px-4 text-sm font-semibold text-[#fff0d6] transition hover:bg-[#a84338] disabled:cursor-not-allowed disabled:opacity-40"
-                    >Resolve Snitches and open response deck</button>
-                  </div>
-                {:else}
-                  <div class="mt-4 border border-dashed border-[#8e765b] bg-[#d3c19f] p-5 text-center">
-                    <p class="font-serif text-lg italic">Snitch markers revealed</p>
-                    <p class="mt-2 font-mono text-[9px] uppercase tracking-[0.12em] text-[#745f48]">Waiting for the Chisel to spend matching leverage</p>
-                  </div>
-                {/if}
-              {:else if pendingPublic?.stage === "awaiting_chisel_response"}
-                {#if privateState.role === "chisel" && pendingPrivate}
-                  <div id="chisel-response-deck" class="mt-4">
-                    <p class="text-sm leading-6 text-[#5f4b39]">
-                      {pendingPrivate.detective.display_name} asks {pendingPrivate.suspect.name} about case card {pendingPrivate.topic.code}.
-                    </p>
-                    <fieldset class="mt-3">
-                      <legend class="sr-only">Choose the suspect response</legend>
-                      <div class="grid gap-2">
-                        {#each pendingPrivate.response_options as response}
-                          <label
-                            id={`chisel-response-${response.id}`}
-                            class={`cursor-pointer border-l-4 px-3 py-3 transition ${selectedResponseId === response.id ? "bg-[#f3e4c5]" : "bg-[#d2c09f] hover:bg-[#dfcead]"} ${response.type === "most_useful" ? "border-[#2f4b42]" : "border-[#9d3d34]"}`}
-                          >
-                            <span class="flex items-center justify-between gap-3">
-                              <span class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#6f5944]">{response.type.replaceAll("_", " ")}</span>
-                              <input type="radio" name="chisel-response" value={response.id} bind:group={selectedResponseId} class="accent-[#963a31]" />
-                            </span>
-                            <span class="mt-2 block font-serif text-sm leading-6">{response.text}</span>
-                          </label>
-                        {/each}
-                      </div>
-                    </fieldset>
-                    <button
-                      id="action-select-response"
-                      type="button"
-                      disabled={!selectedResponseId || commandPending}
-                      onclick={submitResponse}
-                      class="mt-3 min-h-11 w-full cursor-pointer bg-[#8f372f] px-4 text-sm font-semibold text-[#fff0d6] transition hover:bg-[#a84338] disabled:cursor-not-allowed disabled:opacity-40"
-                    >Seal and deliver response</button>
-                  </div>
-                {:else}
-                  <div class="mt-4 border border-dashed border-[#8e765b] bg-[#d3c19f] p-5 text-center">
-                    <p class="font-serif text-lg italic">Statement requested</p>
-                    <p class="mt-2 font-mono text-[9px] uppercase tracking-[0.12em] text-[#745f48]">Waiting for the Chisel to seal a response</p>
-                  </div>
-                {/if}
-              {:else if pendingPublic?.stage === "awaiting_detective_decision"}
-                <div id="published-response-card" class="relative mt-4 border border-[#806749] bg-[#efe0c0] p-4" tabindex="-1">
-                  <span class="absolute right-3 top-3 font-mono text-[9px] uppercase tracking-[0.12em] text-[#963a31]">Statement · {pendingPublic.topic_code}</span>
-                  {#if privateState.role === "detective" && pendingPrivate?.response_text}
-                    <p class="max-w-xl pr-20 font-serif text-base italic leading-7">“{pendingPrivate.response_text}”</p>
-                  {:else if privateState.role === "chisel" && pendingPrivate?.selected_response}
-                    <p class="max-w-xl pr-20 font-serif text-base italic leading-7">“{pendingPrivate.selected_response.text}”</p>
-                  {:else}
-                    <p class="max-w-xl pr-20 font-serif text-base italic leading-7 text-[#76624c]">The statement is sealed for the questioning Detective.</p>
-                  {/if}
-                </div>
-
-                {#if availableActions.has("accept_response") || availableActions.has("challenge_response")}
-                  <div class="mt-3 grid grid-cols-2 gap-2">
-                    <button
-                      id="action-accept-response"
-                      type="button"
-                      disabled={!availableActions.has("accept_response") || commandPending}
-                      onclick={() => sendCommand("accept_response", {})}
-                      class="min-h-12 cursor-pointer border-2 border-[#344a40] bg-[#d6d2b5] font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#263c34] transition hover:bg-[#e5dfc1] disabled:cursor-not-allowed disabled:opacity-40"
-                    >Accept statement</button>
-                    <button
-                      id="action-challenge-response"
-                      type="button"
-                      disabled={!availableActions.has("challenge_response") || commandPending}
-                      onclick={() => sendCommand("challenge_response", {})}
-                      class="min-h-12 cursor-pointer border-2 border-[#9b3d34] bg-[#e1c5a9] font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#812f29] transition hover:bg-[#ecd2b5] disabled:cursor-not-allowed disabled:opacity-40"
-                    >Challenge · stake 1</button>
-                  </div>
-                {/if}
-              {:else if latestStatement}
-                <div id="challenge-result" class="mt-4 border-l-4 border-[#8c3f33] bg-[#eadbbc] p-4" aria-live="polite">
-                  <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7d6650]">Latest private note · {latestStatement.topic_code}</p>
-                  <p class="mt-2 font-serif text-sm italic leading-6">“{latestStatement.response_text}”</p>
-                  <p class="mt-2 font-mono text-[9px] uppercase tracking-[0.1em] text-[#8c3f33]">{latestStatement.resolution.replaceAll("_", " ")}</p>
-                </div>
-              {:else}
-                <p class="mt-4 text-sm leading-6 text-[#695642]">Move to a suspect, choose a known case card, and spend one action to question them.</p>
+            <div class="min-h-0 flex-1 overflow-auto p-4 sm:p-5">
+              {#if drawerPage === "search"}
+                <ActionDock
+                  {availableActions}
+                  selection={mapSelection}
+                  origin={ownLocation}
+                  {commandPending}
+                  commandError={commandStatus ? null : commandError}
+                  commandStatus={false}
+                  connectionOnline={controlsReady}
+                  onConfirmMove={confirmMapMovement}
+                  onCancelMove={cancelMapMovement}
+                  onAction={handleDockAction}
+                />
               {/if}
-            </section>
-            {/if}
 
-            {#if drawerPage === "accusation"}
-            {#if publicState.result}
-              <section id="case-closed-result" class="mt-5 border-2 border-[#71372f] bg-[#eadbbc] p-4 sm:p-5" aria-labelledby="case-result-heading">
-                <div class="flex flex-wrap items-start justify-between gap-4 border-b border-[#9d8669] pb-4">
-                  <div>
-                    <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Case closed</p>
-                    <h3 id="case-result-heading" class="mt-1 font-serif text-2xl font-semibold">The sealed solution</h3>
-                  </div>
-                  <p class="font-mono text-[10px] uppercase tracking-[0.12em] text-[#71372f]">Winner: {publicState.result.winner.role}</p>
-                </div>
-                <dl class="mt-4 grid gap-3 sm:grid-cols-3">
-                  <div class="border-l-2 border-[#71372f] pl-3"><dt class="font-mono text-[9px] uppercase text-[#725e48]">Suspect</dt><dd class="mt-1 font-serif text-base font-semibold">{publicState.result.solution.suspect_name}</dd></div>
-                  <div class="border-l-2 border-[#71372f] pl-3"><dt class="font-mono text-[9px] uppercase text-[#725e48]">Weapon</dt><dd class="mt-1 font-serif text-base font-semibold">{publicState.result.solution.weapon_label}</dd></div>
-                  <div class="border-l-2 border-[#71372f] pl-3"><dt class="font-mono text-[9px] uppercase text-[#725e48]">Motive</dt><dd class="mt-1 font-serif text-base font-semibold">{publicState.result.solution.motive_label}</dd></div>
-                </dl>
-                {#if publicState.result.epilogue}<p class="mt-4 max-w-3xl font-serif text-sm italic leading-6 text-[#4f3e30]">{publicState.result.epilogue}</p>{/if}
-              </section>
-            {:else if privateState.role === "detective" && accusationOptions.motives.length > 0 && (availableActions.has("accuse") || availableActions.has("submit_final_guess") || privateState.solve_attempt || privateState.final_guess || publicState.phase === "accusation")}
-              <section id="accusation-sheet" class="mt-5 border-2 border-[#71372f] bg-[#d7c6a6] p-4" aria-labelledby="accusation-heading">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Sealed deduction</p>
-                    <h3 id="accusation-heading" class="mt-1 font-serif text-xl font-semibold">Suspect, weapon, motive</h3>
-                  </div>
-                  <span class="border border-[#8c3f33] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.1em] text-[#8c3f33]">
-                    {publicState.phase === "accusation" ? "final guess" : "solve token"}
-                  </span>
-                </div>
+              <CasebookWorkspace page={drawerPage} view={casebookView} actions={casebookActions} />
 
-                {#if privateState.solve_attempt}
-                  <p id="solve-attempt-result" class="mt-3 border-l-4 border-[#8c3f33] bg-[#eadbbc] p-3 text-sm font-semibold">
-                    {privateState.solve_attempt.correct_count} of 3 elements were correct. The token is spent; your turn continues.
-                  </p>
-                {/if}
-
-                {#if privateState.final_guess && publicState.phase === "accusation"}
-                  <p id="final-guess-sealed" class="mt-3 border border-dashed border-[#8e765b] p-4 text-center font-serif text-sm italic">Your final guess is sealed. Waiting for the remaining Detectives.</p>
-                {:else}
-                  <div class="mt-4 grid gap-4 lg:grid-cols-3">
-                    <fieldset id="accusation-suspects">
-                      <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">1 / Suspect</legend>
-                      <div class="mt-2 grid gap-2">
-                        {#each accusationOptions.suspects as suspect}
-                          <label class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 ${accusationSuspectId === suspect.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}>
-                            <input type="radio" name="accusation-suspect" value={suspect.id} bind:group={accusationSuspectId} class="accent-[#963a31]" />
-                            <span class="text-sm font-semibold">{suspect.name}</span>
-                          </label>
-                        {/each}
-                      </div>
-                    </fieldset>
-
-                    <fieldset id="accusation-weapons">
-                      <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">2 / Known weapon</legend>
-                      <div class="mt-2 grid gap-2">
-                        {#each accusationOptions.weapons as weapon}
-                          <label class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 ${accusationWeaponId === weapon.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}>
-                            <input type="radio" name="accusation-weapon" value={weapon.id} bind:group={accusationWeaponId} class="accent-[#963a31]" />
-                            <span class="text-sm font-semibold">{weapon.label}</span>
-                          </label>
-                        {/each}
-                      </div>
-                    </fieldset>
-
-                    <fieldset id="accusation-motives">
-                      <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">3 / Motive</legend>
-                      <div class="mt-2 grid gap-2">
-                        {#each accusationOptions.motives as motive}
-                          <label class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 ${accusationMotiveId === motive.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}>
-                            <input type="radio" name="accusation-motive" value={motive.id} bind:group={accusationMotiveId} class="accent-[#963a31]" />
-                            <span class="text-sm font-semibold">{motive.label}</span>
-                          </label>
-                        {/each}
-                      </div>
-                    </fieldset>
-                  </div>
-
-                  <button
-                    id="action-submit-accusation"
-                    type="button"
-                    disabled={(!availableActions.has("accuse") && !availableActions.has("submit_final_guess")) || !accusationSuspectId || !accusationWeaponId || !accusationMotiveId || commandPending}
-                    onclick={submitAccusation}
-                    class="mt-4 min-h-12 w-full cursor-pointer bg-[#8f372f] px-4 text-sm font-semibold text-[#fff0d6] transition hover:bg-[#a84338] disabled:cursor-not-allowed disabled:opacity-40"
-                  >{publicState.phase === "accusation" ? "Seal final guess" : "Spend Solve token"}</button>
-                  {#if publicState.phase !== "accusation"}<p class="mt-2 text-xs leading-5 text-[#695642]">A Solve accusation is legal only at the beginning of your turn, before any action is spent.</p>{/if}
-                {/if}
-              </section>
-            {:else}
-              <p id="accusation-unavailable" class="casebook-empty-page">
-                No accusation sheet is authorized yet. The server opens this folio when a Solve attempt or final guess is legal.
-              </p>
-            {/if}
-            {/if}
-
-            {#if drawerPage === "evidence"}
-            {#if privateState.role === "detective"}
-              <section id="private-evidence-dossier" class="mt-5 border-y border-[#91785c] bg-[#d4c3a3] px-3 py-4 sm:px-4" aria-labelledby="evidence-dossier-heading">
-                <div class="flex flex-wrap items-end justify-between gap-3">
-                  <div>
-                    <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Private folio</p>
-                    <h3 id="evidence-dossier-heading" class="mt-1 font-serif text-xl font-semibold">Search notes and evidence</h3>
-                  </div>
-                  <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#705b45]">{heldEvidence.length} held / {knownCaseCards.length} known</p>
-                </div>
-
-                <div class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1.1fr)_minmax(12rem,0.9fr)]">
-                  <article id="latest-search-note" class="min-h-28 border-l-4 border-[#71372f] bg-[#eadbbc] p-3">
-                    {#if latestSearch}
-                      <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">Day {latestSearch.day} / {latestSearch.target_type.replaceAll("_", " ")}</p>
-                      <p class="mt-2 font-serif text-sm italic leading-6">“{latestSearch.text}”</p>
-                    {:else}
-                      <p class="font-serif text-sm italic leading-6 text-[#725e48]">No private Search card has been filed.</p>
-                    {/if}
-                  </article>
-
-                  <div id="held-evidence-list" class="grid content-start gap-2">
-                    {#each heldEvidence as card}
-                      <article id={`held-evidence-${card.id}`} class="border border-[#8b7257] bg-[#efe0c0] px-3 py-2">
-                        <div class="flex items-center justify-between gap-3">
-                          <span class="font-mono text-[10px] font-semibold text-[#8c3f33]">{card.code}</span>
-                          <span class="font-mono text-[8px] uppercase tracking-[0.1em] text-[#725e48]">held evidence</span>
+              {#if drawerPage === "search"}
+                <section id="keyboard-location-list" class="mt-5 border-t border-[#a38b6e] pt-4" aria-labelledby="location-list-heading">
+                  <h3 id="location-list-heading" class="font-mono text-[10px] uppercase tracking-[0.14em] text-[#80694f]">Location index</h3>
+                  <div class="mt-2 grid gap-1 sm:grid-cols-2">
+                    {#each publicState.locations as location}
+                      {#if legalMapLocation(location.id)}
+                        <button
+                          id={"location-index-" + location.id}
+                          type="button"
+                          onclick={() => selectMapLocation(location)}
+                          class="min-h-11 cursor-pointer bg-[#a54235] px-2 py-1.5 text-left text-xs text-[#fff0d6] transition hover:bg-[#b94d3f]"
+                        >
+                          {location.name}
+                          <span class="float-right font-mono text-[9px] uppercase">legal</span>
+                        </button>
+                      {:else}
+                        <div id={"location-index-" + location.id} class="px-2 py-1.5 text-left text-xs text-[#6f5c47]">
+                          {location.name}
+                          <span class="float-right font-mono text-[9px] uppercase">{location.type.replaceAll("_", " ")}</span>
                         </div>
-                        <h4 class="mt-1 font-serif text-sm font-semibold">{card.title}</h4>
-                        {#if card.description}<p class="mt-1 text-[11px] leading-4 text-[#695642]">{card.description}</p>{/if}
-                      </article>
-                    {:else}
-                      <p class="border border-dashed border-[#8b7257] p-3 text-xs leading-5 text-[#725e48]">No Case card is currently held as evidence.</p>
+                      {/if}
                     {/each}
                   </div>
-                </div>
-              </section>
-            {:else}
-              <p id="evidence-private-seal" class="casebook-empty-page">
-                Detective evidence stays sealed on each private user channel.
-              </p>
-            {/if}
-            {/if}
-
-            {#if drawerPage === "search"}
-            <section id="keyboard-location-list" class="mt-5 border-t border-[#a38b6e] pt-4" aria-labelledby="location-list-heading">
-              <h3 id="location-list-heading" class="font-mono text-[10px] uppercase tracking-[0.14em] text-[#80694f]">Location index</h3>
-              <div class="mt-2 grid gap-1 sm:grid-cols-2">
-                {#each publicState.locations as location}
-                  {#if legalMapLocation(location.id)}
-                    <button
-                      id={`location-index-${location.id}`}
-                      type="button"
-                      onclick={() => selectMapLocation(location)}
-                      class="min-h-11 cursor-pointer bg-[#a54235] px-2 py-1.5 text-left text-xs text-[#fff0d6] transition hover:bg-[#b94d3f]"
-                    >
-                      {location.name}
-                      <span class="float-right font-mono text-[9px] uppercase">legal</span>
-                    </button>
-                  {:else}
-                    <div
-                      id={`location-index-${location.id}`}
-                      class="px-2 py-1.5 text-left text-xs text-[#6f5c47]"
-                    >
-                      {location.name}
-                      <span class="float-right font-mono text-[9px] uppercase">{location.type.replaceAll("_", " ")}</span>
-                    </div>
-                  {/if}
-                {/each}
-              </div>
-            </section>
-            {/if}
-          </div>
-
-          {#if drawerPage === "chisel" && privateState.role === "chisel"}
-            <section id="chisel-casebook-page" class="bg-[#cab99a] p-4" aria-labelledby="chisel-heading">
-              <div class="flex items-center gap-3">
-                <svg class="size-14 shrink-0 border border-[#533b2d] bg-[#231b17]" viewBox="0 0 64 64" role="img" aria-label="Original Chisel portrait token">
-                  <rect width="64" height="64" fill="#352720" />
-                  <path d="M12 25h40L44 12H21Z" fill="#111315" />
-                  <path d="M20 23c0 15 3 24 12 24s13-9 13-24Z" fill="#b18a68" />
-                  <path d="M18 64c2-14 7-20 14-20s14 6 16 20Z" fill="#7b3029" />
-                  <path d="M25 29h5m5 0h5" stroke="#1e1815" stroke-width="2" />
-                </svg>
-                <div class="min-w-0">
-                  <p class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7e3029]">Chisel · private case handler</p>
-                  <h2 id="chisel-heading" class="break-words font-serif text-base font-semibold leading-tight">{chisel?.display_name ?? "Unassigned"}</h2>
-                  <p class="mt-1 font-mono text-[9px] uppercase text-[#715d47]">No turn · reacts to Detective actions</p>
-                </div>
-              </div>
-
-              <div class="mt-5 border-y border-[#9d8669] py-4">
-                <p class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7e3029]">Private casebook</p>
-                <p class="mt-2 font-serif text-sm italic leading-6 text-[#4e3d2f]">{privateState.casebook.briefing}</p>
-                <dl class="mt-4 space-y-2 text-xs">
-                  <div class="flex justify-between gap-3"><dt class="text-[#715d47]">Solution suspect</dt><dd class="font-mono font-semibold">{privateState.casebook.solution?.suspect_id ?? "-"}</dd></div>
-                  <div class="flex justify-between gap-3"><dt class="text-[#715d47]">Leverage held</dt><dd class="font-mono font-semibold">{Object.values(privateState.leverage_by_detective).reduce((sum, value) => sum + value, 0)}</dd></div>
-                  <div class="flex justify-between gap-3"><dt class="text-[#715d47]">Pending response</dt><dd class="font-mono font-semibold">{privateState.pending_interrogation ? "OPEN" : "NONE"}</dd></div>
-                </dl>
-              </div>
-            </section>
-          {/if}
-
-          {#if drawerPage === "history"}
-            <section id="public-case-history" class="casebook-history-page" aria-labelledby="public-history-heading">
-              <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Public event ledger</p>
-              <h3 id="public-history-heading" class="mt-1 font-serif text-xl font-semibold">Investigation history</h3>
-              <p class="mt-2 border-l-2 border-[#8c3f33] pl-3 text-sm leading-6 text-[#4f3e30]" aria-live="polite">{lastEvent}</p>
-
-              <ol id="public-history-list" class="mt-4 grid gap-2">
-                {#each publicState.public_history ?? [] as entry, index}
-                  <li id={`public-history-${index}`} class="casebook-history-entry">
-                    <span>{entry.type.replaceAll("_", " ")}</span>
-                    <span>{entry.player_id ? publicState.players.find((player) => player.id === entry.player_id)?.display_name ?? "Detective" : "Case file"}</span>
-                  </li>
-                {:else}
-                  <li class="casebook-empty-page">No public action has been filed yet.</li>
-                {/each}
-              </ol>
-
-              {#if commandError && !commandStatus && publicState.status !== "paused"}
-                <div id="game-command-error" class="mt-4 border-l-2 border-[#a54235] bg-[#e1cfad] p-3 text-xs leading-5" role="alert">
-                  <p>{commandError}</p>
-                  {#if retryCommand}
-                    <button type="button" onclick={retryLastCommand} class="mt-2 cursor-pointer font-semibold text-[#8e352d] underline underline-offset-2">Retry command</button>
-                  {/if}
-                </div>
+                </section>
               {/if}
-            </section>
-          {/if}
-        </div>
-      </section>
-      </CasebookDrawer>
+            </div>
+          </section>
+        </CasebookDrawer>
       </div>
 
       {#if publicState.status === "paused"}
@@ -1427,20 +964,10 @@
           aria-labelledby="game-pause-heading"
           aria-describedby="game-pause-description"
         >
-          <div
-            id="game-pause-document"
-            class="game-pause-document"
-            role="document"
-            tabindex="-1"
-            bind:this={pauseDocument}
-          >
+          <div id="game-pause-document" class="game-pause-document" role="document" tabindex="-1" bind:this={pauseDocument}>
             <p class="game-pause-kicker">Case sealed</p>
-            <h2 id="game-pause-heading" class="mt-2 font-serif text-3xl font-semibold tracking-[-0.025em] sm:text-4xl">
-              Investigation paused
-            </h2>
-            <p id="game-pause-description" class="mt-3 font-serif text-base italic leading-7">
-              Waiting for every investigator to return.
-            </p>
+            <h2 id="game-pause-heading" class="mt-2 font-serif text-3xl font-semibold tracking-[-0.025em] sm:text-4xl">Investigation paused</h2>
+            <p id="game-pause-description" class="mt-3 font-serif text-base italic leading-7">Waiting for every investigator to return.</p>
 
             <div class="game-pause-ledger">
               <span>Connection ledger</span>
@@ -1462,11 +989,7 @@
               <div id="game-pause-command-error" class="game-pause-command-error" role="alert">
                 <p>{commandError}</p>
                 {#if retryCommand?.type === "resume_game"}
-                  <button
-                    id="action-retry-resume-game"
-                    type="button"
-                    onclick={retryLastCommand}
-                  >Retry resume</button>
+                  <button id="action-retry-resume-game" type="button" onclick={retryLastCommand}>Retry resume</button>
                 {/if}
               </div>
             {/if}
@@ -1485,3 +1008,4 @@
     </main>
   </div>
 </div>
+
