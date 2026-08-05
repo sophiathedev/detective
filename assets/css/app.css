@@ -1486,6 +1486,49 @@
   filter: brightness(1.08);
 }
 
+#suspect-standees {
+  pointer-events: none;
+}
+
+.map-suspect-standee {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: map-suspect-reveal 420ms cubic-bezier(0.22, 0.72, 0.24, 1) both;
+  filter: drop-shadow(0 4px 3px rgb(31 22 15 / 0.58));
+  transition: transform 560ms cubic-bezier(0.22, 0.72, 0.24, 1);
+  will-change: transform;
+}
+
+.map-suspect-card {
+  fill: #d8c59e;
+  stroke: #4a3829;
+  stroke-width: 2;
+}
+
+.map-suspect-portrait {
+  fill: #47382d;
+  stroke: #f0dfbc;
+  stroke-width: 1.5;
+}
+
+.map-suspect-silhouette {
+  fill: #574538;
+}
+
+.map-suspect-initials {
+  fill: #3b2c21;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.map-suspect-base {
+  fill: #32261e;
+  stroke: #d8c59e;
+  stroke-width: 1.5;
+}
+
 .map-travel-trace {
   pointer-events: none;
 }
@@ -1570,6 +1613,17 @@
   }
 }
 
+@keyframes map-suspect-reveal {
+  from {
+    opacity: 0;
+    scale: 0.72;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   #game-book-shell *,
   #game-book-shell *::before,
@@ -1594,6 +1648,11 @@
   }
 
   .map-detective-token {
+    transition: none !important;
+  }
+
+  .map-suspect-standee {
+    animation: none !important;
     transition: none !important;
   }
 }

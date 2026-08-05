@@ -15,6 +15,7 @@ const location = {
 const baseProps = {
   locations: [location],
   detectives: [],
+  suspects: [],
   legalLocationIds: [],
   selectedLocationId: null,
   pendingLocationId: null,
@@ -52,6 +53,22 @@ describe("MapStage", () => {
     render(MapStage, baseProps)
 
     expect(screen.getByText(/Van Ryder Games/)).toBeInTheDocument()
+  })
+
+  it("forwards public suspects to the board", () => {
+    render(MapStage, {
+      ...baseProps,
+      suspects: [
+        {
+          id: "iona-pike",
+          name: "Iona Pike",
+          occupation: "array engineer",
+          location_id: "51",
+        },
+      ],
+    })
+
+    expect(screen.getByTestId("suspect-standee-iona-pike")).toBeInTheDocument()
   })
 
   it("zooms inside the contained map viewport", async () => {

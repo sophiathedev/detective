@@ -24,6 +24,7 @@ const locations = [
 const baseProps = {
   locations,
   detectives: [],
+  suspects: [],
   legalLocationIds: ["51"],
   selectedLocationId: null,
   pendingLocationId: null,
@@ -152,5 +153,56 @@ describe("GameBoard", () => {
     expect(screen.getByTestId("case-card-slot-B")).toContainElement(
       document.querySelector('.noir-case-knowledge-marker[data-seat="1"]'),
     )
+  })
+
+  it("renders revealed suspects as inert standees and separates co-located suspects", () => {
+    render(GameBoard, {
+      ...baseProps,
+      detectives: [
+        {
+          id: "detective-1",
+          role: "detective",
+          seat: 1,
+          display_name: "Marlowe",
+          location_id: "51",
+        },
+      ],
+      suspects: [
+        {
+          id: "iona-pike",
+          name: "Iona Pike",
+          occupation: "array engineer",
+          location_id: "51",
+        },
+        {
+          id: "celeste-rook",
+          name: "Celeste Rook",
+          occupation: "journalist",
+          location_id: "51",
+        },
+        {
+          id: "off-board",
+          name: "Unknown Caller",
+          occupation: "informant",
+          location_id: "404",
+        },
+      ],
+      onSelect: vi.fn(),
+    })
+
+    const iona = screen.getByTestId("suspect-standee-iona-pike")
+    const celeste = screen.getByTestId("suspect-standee-celeste-rook")
+
+    expect(iona).toHaveAccessibleName(
+      "Iona Pike, array engineer, at L.A. Police Department Headquarters",
+    )
+    expect(celeste).toHaveAccessibleName(
+      "Celeste Rook, journalist, at L.A. Police Department Headquarters",
+    )
+    expect(iona).toHaveAttribute("data-location-id", "51")
+    expect(iona).toHaveStyle({ transform: "translate(482px, 360px)" })
+    expect(celeste).toHaveStyle({ transform: "translate(502px, 360px)" })
+    expect(iona.getAttribute("style")).not.toEqual(celeste.getAttribute("style"))
+    expect(screen.queryByTestId("suspect-standee-off-board")).not.toBeInTheDocument()
   })
 })

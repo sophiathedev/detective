@@ -346,6 +346,26 @@ defmodule Detective.Games.ProjectionsTest do
     assert_no_map_destinations(free_question)
   end
 
+  test "public suspect projection reveals standee data only after discovery" do
+    state = engine_state_fixture(hidden_suspect_case_definition())
+    initial_public = Public.render(state)
+
+    refute Enum.any?(initial_public.suspects, &(&1.id == "hidden-suspect"))
+
+    discovered_public =
+      state
+      |> place_detective()
+      |> search_location()
+      |> Public.render()
+
+    assert Enum.find(discovered_public.suspects, &(&1.id == "hidden-suspect")) == %{
+             id: "hidden-suspect",
+             name: "Hidden Suspect",
+             occupation: "courier",
+             location_id: "51"
+           }
+  end
+
   test "Chisel and nonmembers never receive Detective map destination fields" do
     state = engine_state_fixture()
 

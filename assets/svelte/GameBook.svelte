@@ -1083,6 +1083,7 @@
       <MapStage
         locations={publicState.locations}
         {detectives}
+        suspects={publicState.suspects ?? []}
         caseCardSlots={publicState.case_card_slots ?? []}
         legalLocationIds={effectiveLegalLocationIds}
         {selectedLocationId}

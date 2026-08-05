@@ -4,6 +4,7 @@
   let {
     locations = [],
     detectives = [],
+    suspects = [],
     caseCardSlots = [],
     legalLocationIds = [],
     selectedLocationId = null,
@@ -40,6 +41,34 @@
   function tokenColor(seat) {
     return ["#28485c", "#724438", "#3f5d44", "#6b5535"][seat - 1] ?? "#4d4439"
   }
+
+  function suspectInitials(name) {
+    return name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0] ?? "")
+      .join("")
+      .toUpperCase()
+  }
+
+  function suspectPlacement(suspect) {
+    const location = locations.find((candidate) => candidate.id === suspect.location_id)
+    if (!location) return null
+
+    const colocated = suspects.filter((candidate) => candidate.location_id === suspect.location_id)
+    const index = colocated.findIndex((candidate) => candidate.id === suspect.id)
+    const offset = (index - (colocated.length - 1) / 2) * 20
+    const sharesLocationWithDetective = detectives.some(
+      (detective) => detective.location_id === suspect.location_id,
+    )
+
+    return {
+      location,
+      x: location.x * 1000 + offset - (sharesLocationWithDetective ? 28 : 0),
+      y: location.y * 636 + (sharesLocationWithDetective ? 42 : 24),
+    }
+  }
 </script>
 
 <div class="game-board-frame">
@@ -53,7 +82,7 @@
   >
     <title id="game-map-title">Detective: City of Angels investigation board</title>
     <desc id="game-map-description">
-      Official game board with server-authorized location hotspots and Detective tokens.
+      Official game board with server-authorized location hotspots, Detective tokens, and revealed suspect standees.
     </desc>
     <defs>
       <filter id="board-ink">
@@ -152,6 +181,46 @@
             >{location.id}</text>
           {/if}
         </g>
+      {/each}
+    </g>
+
+    <g id="suspect-standees" aria-label="Revealed suspects">
+      {#each suspects as suspect (suspect.id)}
+        {@const placement = suspectPlacement(suspect)}
+        {#if placement}
+          <g
+            id={`suspect-map-standee-${suspect.id}`}
+            data-testid={`suspect-standee-${suspect.id}`}
+            data-location-id={placement.location.id}
+            class="map-suspect-standee"
+            style={`transform: translate(${placement.x}px, ${placement.y}px);`}
+            role="img"
+            aria-label={`${suspect.name}, ${suspect.occupation}, at ${placement.location.name}`}
+          >
+            <title>{suspect.name}, {suspect.occupation}, at {placement.location.name}</title>
+            <rect
+              x="-14"
+              y="-25"
+              width="28"
+              height="37"
+              rx="3"
+              class="map-suspect-card"
+              vector-effect="non-scaling-stroke"
+            />
+            <circle cx="0" cy="-13" r="7" class="map-suspect-portrait" />
+            <path d="M-9 5C-8-4-4-7 0-7S8-4 9 5Z" class="map-suspect-silhouette" />
+            <text
+              y="9"
+              text-anchor="middle"
+              class="map-suspect-initials"
+            >{suspectInitials(suspect.name)}</text>
+            <path
+              d="M-17 12H17L12 20H-12Z"
+              class="map-suspect-base"
+              vector-effect="non-scaling-stroke"
+            />
+          </g>
+        {/if}
       {/each}
     </g>
 
