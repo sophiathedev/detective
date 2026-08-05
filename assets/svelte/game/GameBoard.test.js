@@ -120,4 +120,37 @@ describe("GameBoard", () => {
     expect(screen.getByTestId("map-hotspot-48")).toHaveAttribute("data-selected", "true")
     expect(screen.getByTestId("map-hotspot-51")).toHaveAttribute("aria-busy", "true")
   })
+
+  it("mounts Case cards and knowledge markers on the board plane", () => {
+    render(GameBoard, {
+      ...baseProps,
+      detectives: [
+        {
+          id: "detective-1",
+          role: "detective",
+          seat: 1,
+          display_name: "Marlowe",
+          location_id: null,
+        },
+      ],
+      caseCardSlots: [
+        {
+          code: "B",
+          position: 2,
+          status: "facedown",
+          knowledge_player_ids: ["detective-1"],
+          evidence_holder_player_id: null,
+          evidence_release_day: null,
+        },
+      ],
+      onSelect: vi.fn(),
+    })
+
+    expect(screen.getByTestId("case-card-slot-B")).toHaveAccessibleName(
+      "Case B facedown. Known by D1 Marlowe.",
+    )
+    expect(screen.getByTestId("case-card-slot-B")).toContainElement(
+      document.querySelector('.noir-case-knowledge-marker[data-seat="1"]'),
+    )
+  })
 })

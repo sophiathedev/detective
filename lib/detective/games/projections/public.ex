@@ -26,6 +26,7 @@ defmodule Detective.Games.Projections.Public do
       locations: public_locations(state),
       suspects: public_suspects(state),
       case_cards: public_case_cards(state),
+      case_card_slots: public_case_card_slots(state),
       archived_searches: state.archived_searches,
       taken_evidence: public_taken_evidence(state),
       pending_interrogation: pending_interrogation(state),
@@ -98,6 +99,50 @@ defmodule Detective.Games.Projections.Public do
     |> Enum.filter(&(&1.id in state.public_case_card_ids))
     |> Enum.map(&Map.take(&1, [:id, :code, :title, :type, :description]))
   end
+
+  defp public_case_card_slots(state) do
+    detectives =
+      state.players
+      |> Map.values()
+      |> Enum.filter(&(&1.role == "detective"))
+      |> Enum.sort_by(& &1.seat)
+
+    state.case_definition
+    |> ResponseMatrix.topics()
+    |> Enum.with_index(1)
+    |> Enum.map(fn {card, position} ->
+      faceup? = card.id in state.public_case_card_ids
+      taken = Map.get(state.taken_evidence, card.id)
+
+      knowledge_player_ids =
+        if faceup? do
+          []
+        else
+          detectives
+          |> Enum.filter(&(card.id in &1.knowledge))
+          |> Enum.map(& &1.id)
+        end
+
+      slot = %{
+        code: card.code,
+        position: position,
+        status: case_card_status(faceup?, taken),
+        knowledge_player_ids: knowledge_player_ids,
+        evidence_holder_player_id: taken && taken["player_id"],
+        evidence_release_day: taken && taken["release_day"]
+      }
+
+      if faceup? do
+        Map.merge(slot, %{title: card.title, type: card.type})
+      else
+        slot
+      end
+    end)
+  end
+
+  defp case_card_status(_faceup?, taken) when is_map(taken), do: "removed"
+  defp case_card_status(true, _taken), do: "faceup"
+  defp case_card_status(false, _taken), do: "facedown"
 
   defp public_taken_evidence(state) do
     state.taken_evidence

@@ -148,6 +148,73 @@ defmodule Detective.Games.ProjectionsTest do
     assert Enum.map(chisel.private.casebook.case_cards, & &1["id"]) == ["hidden-card", "topic"]
   end
 
+  test "Case card slots expose board markers without hidden card contents" do
+    detective_id = "10000000-0000-0000-0000-000000000001"
+    base = state_fixture()
+
+    hidden_card = %{
+      "id" => "hidden-card",
+      "code" => "B",
+      "title" => "Hidden Fingerprint",
+      "type" => "evidence",
+      "description" => "A private clue.",
+      "takeable" => true,
+      "initially_known" => false
+    }
+
+    state = %{
+      base
+      | public_case_card_ids: ["topic"],
+        players:
+          Map.update!(base.players, detective_id, fn detective ->
+            Map.update!(detective, :knowledge, &["hidden-card" | &1])
+          end),
+        case_definition:
+          Map.update!(base.case_definition, "case_cards", fn cards -> cards ++ [hidden_card] end)
+    }
+
+    public = Public.render(state)
+    faceup = Enum.find(public.case_card_slots, &(&1.code == "A"))
+    facedown = Enum.find(public.case_card_slots, &(&1.code == "B"))
+
+    assert faceup.status == "faceup"
+    assert faceup.title == "Known Topic"
+    assert faceup.knowledge_player_ids == []
+
+    assert facedown == %{
+             code: "B",
+             position: 2,
+             status: "facedown",
+             knowledge_player_ids: [detective_id],
+             evidence_holder_player_id: nil,
+             evidence_release_day: nil
+           }
+
+    facedown_json = Jason.encode!(facedown)
+    refute facedown_json =~ "hidden-card"
+    refute facedown_json =~ "Hidden Fingerprint"
+    refute facedown_json =~ "private clue"
+
+    removed =
+      state
+      |> Map.put(:taken_evidence, %{
+        "hidden-card" => %{
+          "player_id" => detective_id,
+          "taken_day" => 1,
+          "release_day" => 4
+        }
+      })
+      |> Public.render()
+      |> Map.fetch!(:case_card_slots)
+      |> Enum.find(&(&1.code == "B"))
+
+    assert removed.status == "removed"
+    assert removed.evidence_holder_player_id == detective_id
+    assert removed.evidence_release_day == 4
+    refute Map.has_key?(removed, :title)
+    refute Map.has_key?(removed, :type)
+  end
+
   test "paused public projection allow-lists pause metadata without private interrogation data" do
     detective_id = "10000000-0000-0000-0000-000000000001"
 

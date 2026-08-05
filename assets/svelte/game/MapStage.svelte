@@ -4,6 +4,7 @@
   let {
     locations = [],
     detectives = [],
+    caseCardSlots = [],
     legalLocationIds = [],
     selectedLocationId = null,
     pendingLocationId = null,
@@ -51,6 +52,7 @@
       <GameBoard
         {locations}
         {detectives}
+        {caseCardSlots}
         legalLocationIds={disabled ? [] : legalLocationIds}
         {selectedLocationId}
         {pendingLocationId}

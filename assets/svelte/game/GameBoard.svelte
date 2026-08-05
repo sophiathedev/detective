@@ -1,7 +1,10 @@
 <script>
+  import CaseCardRail from "./CaseCardRail.svelte"
+
   let {
     locations = [],
     detectives = [],
+    caseCardSlots = [],
     legalLocationIds = [],
     selectedLocationId = null,
     pendingLocationId = null,
@@ -182,6 +185,8 @@
       {/each}
     </g>
   </svg>
+
+  <CaseCardRail slots={caseCardSlots} players={detectives} />
 
   <nav
     id="legal-map-destinations"

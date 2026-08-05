@@ -71,7 +71,7 @@
 
             <div class="noir-detective-public-stats">
               <span>AP {detective.actions_remaining}/4</span>
-              <span>LOC {detective.location_id ?? "—"}</span>
+              <span>LOC {detective.location_id ?? "-"}</span>
             </div>
 
             {#if ownPlayerId === detective.id && privateResources}
