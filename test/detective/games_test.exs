@@ -121,4 +121,18 @@ defmodule Detective.GamesTest do
              finished: 0
            }
   end
+
+  test "lists only active memberships as allow-listed dashboard dossiers" do
+    user = user_fixture()
+    outsider = user_fixture()
+    %{game: own_game} = game_fixture(user, %{title: "Own File", max_detectives: 3})
+    %{game: other_game} = game_fixture(outsider, %{title: "Secret File"})
+
+    dossiers = Games.list_game_dossiers(Scope.for_user(user))
+
+    assert [%{id: id, title: "Own File", role: "chisel", max_detectives: 3}] = dossiers.waiting
+    assert id == own_game.id
+    refute Enum.any?(dossiers.waiting, &(&1.id == other_game.id))
+    refute Map.has_key?(hd(dossiers.waiting), :case_content)
+  end
 end

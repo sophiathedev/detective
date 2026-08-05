@@ -137,6 +137,47 @@ defmodule Detective.Games do
     end)
   end
 
+  def list_game_dossiers(%Scope{user: user}) do
+    detective_counts =
+      GamePlayer
+      |> where([player], player.status == "active" and player.role == "detective")
+      |> group_by([player], player.game_id)
+      |> select([player], %{game_id: player.game_id, count: count(player.id)})
+
+    rows =
+      GamePlayer
+      |> join(:inner, [player], game in assoc(player, :game))
+      |> join(:inner, [_player, game], version in assoc(game, :case_version))
+      |> join(:inner, [_player, _game, version], case_file in assoc(version, :case_file))
+      |> join(:left, [_player, game], counts in subquery(detective_counts),
+        on: counts.game_id == game.id
+      )
+      |> where(
+        [player, game],
+        player.user_id == ^user.id and player.status == "active" and
+          game.status in ["waiting", "active", "paused", "finished"]
+      )
+      |> order_by([_player, game], desc: game.updated_at)
+      |> select([player, game, _version, case_file, counts], %{
+        id: game.id,
+        title: game.title,
+        room_code: game.room_code,
+        status: game.status,
+        phase: game.phase,
+        role: player.role,
+        case_title: case_file.title,
+        detective_count: fragment("COALESCE(?, 0)", counts.count),
+        max_detectives: game.max_detectives,
+        updated_at: game.updated_at
+      })
+      |> Repo.all()
+
+    Enum.reduce(rows, %{waiting: [], active: [], finished: []}, fn row, acc ->
+      bucket = dashboard_bucket(row.status)
+      Map.update!(acc, bucket, &(&1 ++ [row]))
+    end)
+  end
+
   def get_lobby(%Scope{user: user}, game_id) do
     with {:ok, game_id} <- cast_game_id(game_id),
          %{id: _id} = membership <- membership_projection(game_id, user.id),
@@ -243,6 +284,10 @@ defmodule Detective.Games do
       _ -> @default_invite_hours
     end
   end
+
+  defp dashboard_bucket("waiting"), do: :waiting
+  defp dashboard_bucket(status) when status in ["active", "paused"], do: :active
+  defp dashboard_bucket("finished"), do: :finished
 
   defp parse_integer(value) do
     case Integer.parse(value) do
