@@ -1447,6 +1447,54 @@
   opacity: 0.45;
 }
 
+.noir-paused-player-list {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+  padding: 0;
+  list-style: none;
+}
+
+.noir-paused-player-list li {
+  display: flex;
+  min-height: 2.25rem;
+  align-items: center;
+  gap: 0.6rem;
+  border-bottom: 1px solid rgb(111 86 61 / 0.34);
+  color: #4c392b;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.noir-paused-player-list li > span {
+  width: 0.58rem;
+  height: 0.58rem;
+  flex: none;
+  border: 1px solid #652b27;
+  border-radius: 50%;
+  background: #a33e34;
+  box-shadow: 0 0 0 3px rgb(163 62 52 / 0.15);
+}
+
+.noir-paused-player-list .noir-paused-player-list-empty {
+  color: #78634c;
+  font-weight: 400;
+}
+
+.noir-pause-waiting {
+  margin-top: 1rem;
+  border: 1px dashed #876d51;
+  padding: 0.75rem;
+  color: #6b5540;
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-size: 0.86rem;
+  font-style: italic;
+  text-align: center;
+}
+
 @media (max-width: 63.999rem) {
   .game-pause-seal {
     place-items: start center;
