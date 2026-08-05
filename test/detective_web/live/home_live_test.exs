@@ -7,6 +7,7 @@ defmodule DetectiveWeb.HomeLiveTest do
   test "renders LiveSvelte as the primary frontend", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/")
 
+    assert has_element?(view, "#app-shell.noir-app-shell")
     assert has_element?(view, "#home-frontend")
 
     component = get_svelte(view, id: "home-frontend")

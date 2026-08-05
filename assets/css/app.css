@@ -139,6 +139,27 @@
 .noir-portrait-md { width: 3.5rem; }
 .noir-portrait-lg { width: 5rem; }
 
+.noir-app-shell {
+  min-height: calc(100dvh - 3.5rem);
+  background:
+    radial-gradient(circle at 50% -20%, rgb(61 51 42 / 0.45), transparent 40%),
+    var(--noir-ebony-950);
+}
+
+.noir-wood-nav {
+  background-color: var(--noir-ebony-800);
+  background-image: url("/images/ui/noir/wood-grain.svg");
+  box-shadow: inset 0 -1px var(--noir-gold-700), 0 0.5rem 1.5rem rgb(0 0 0 / 0.28);
+}
+
+.noir-flash-paper {
+  border: 1px solid var(--noir-gold-700);
+  border-radius: 0.35rem;
+  background: var(--noir-paper-100) url("/images/ui/noir/paper-fiber.svg");
+  color: var(--noir-ink-900);
+  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 0.45);
+}
+
 @custom-variant phx-click-loading (.phx-click-loading&, .phx-click-loading &);
 @custom-variant phx-submit-loading (.phx-submit-loading&, .phx-submit-loading &);
 @custom-variant phx-change-loading (.phx-change-loading&, .phx-change-loading &);

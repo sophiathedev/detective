@@ -35,7 +35,7 @@ defmodule DetectiveWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <main id="app-shell">
+    <main id="app-shell" class="noir-app-shell">
       {render_slot(@inner_block)}
     </main>
 

@@ -63,9 +63,9 @@ defmodule DetectiveWeb.CoreComponents do
       {@rest}
     >
       <div class={[
-        "flex w-80 max-w-[calc(100vw-2rem)] items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-lg sm:w-96",
-        @kind == :info && "border-blue-200 bg-blue-50 text-blue-950",
-        @kind == :error && "border-red-200 bg-red-50 text-red-950"
+        "noir-flash-paper flex w-80 max-w-[calc(100vw-2rem)] items-start gap-3 px-4 py-3 text-sm sm:w-96",
+        @kind == :info && "text-[var(--noir-ink-900)]",
+        @kind == :error && "border-[var(--noir-red-700)] text-[var(--noir-red-700)]"
       ]}>
         <.icon :if={@kind == :info} name="hero-information-circle" class="size-5 shrink-0" />
         <.icon :if={@kind == :error} name="hero-exclamation-circle" class="size-5 shrink-0" />
