@@ -83,6 +83,7 @@ defmodule DetectiveWeb.GameChannelTest do
     refute public_json =~ "solution"
     refute public_json =~ "response_matrix"
     refute public_json =~ "scratch"
+    assert public_json =~ "Test Clock"
 
     assert {:ok, private_reply, _user_socket} =
              subscribe_and_join(socket, "user:#{context.detective.id}", %{
@@ -491,6 +492,9 @@ defmodule DetectiveWeb.GameChannelTest do
 
     assert reply.state.role == "chisel"
     assert Map.has_key?(reply.state.casebook, :solution)
+
+    assert Enum.map(reply.state.casebook.special_rules, & &1["id"]) == ["test-clock"]
+
     refute Map.has_key?(reply.state, :scratch)
     refute Map.has_key?(reply.state, :actions_remaining)
   end

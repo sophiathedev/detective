@@ -6,7 +6,7 @@ defmodule Detective.Games.State do
   server-only and must only leave this struct through projection modules.
   """
 
-  @schema_version 3
+  @schema_version 4
 
   defstruct schema_version: @schema_version,
             game_id: nil,
@@ -29,6 +29,7 @@ defmodule Detective.Games.State do
             public_case_card_ids: [],
             archived_searches: [],
             taken_evidence: %{},
+            triggered_special_rule_ids: [],
             pending_action: nil,
             winner: nil,
             public_history: []

@@ -681,7 +681,26 @@
   {/if}
 
 {:else if page === "history"}
-  <section id="public-case-history" class="casebook-history-page" aria-labelledby="public-history-heading">
+  <div class="grid gap-4">
+    {#if (view.specialRules?.length ?? 0) > 0}
+      <section id="case-special-rules" class="casebook-workspace-page border-2 border-[#75503b] bg-[#d8c7a7] p-4 sm:p-5" aria-labelledby="case-special-rules-heading">
+        <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Case directives · override standing orders</p>
+        <h3 id="case-special-rules-heading" class="mt-1 font-serif text-xl font-semibold">Special rules</h3>
+        <ul class="mt-4 grid gap-3">
+          {#each view.specialRules as rule}
+            <li id={`case-special-rule-${rule.id}`} class="border-l-4 border-[#754238] bg-[#e4d6b8] px-4 py-3">
+              <div class="flex flex-wrap items-start justify-between gap-2">
+                <h4 class="font-serif text-base font-semibold">{rule.title}</h4>
+                <span class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#765d47]">{rule.triggered ? "IN EFFECT" : rule.trigger.replaceAll("_", " ")}</span>
+              </div>
+              <p class="mt-2 text-sm leading-6 text-[#4f3e30]">{rule.text}</p>
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
+
+    <section id="public-case-history" class="casebook-history-page" aria-labelledby="public-history-heading">
     <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Public event ledger</p>
     <h3 id="public-history-heading" class="mt-1 font-serif text-xl font-semibold">Investigation history</h3>
     <p class="mt-2 border-l-2 border-[#8c3f33] pl-3 text-sm leading-6 text-[#4f3e30]" aria-live="polite">{history.lastEvent}</p>
@@ -691,7 +710,8 @@
     {#if history.commandError && !history.commandStatus}
       <div id="game-command-error" class="mt-4 border-l-2 border-[#a54235] bg-[#e1cfad] p-3 text-xs leading-5" role="alert"><p>{history.commandError}</p>{#if history.retryAvailable}<button type="button" onclick={() => actions.retryCommand?.()} class="mt-2 cursor-pointer font-semibold text-[#8e352d] underline underline-offset-2">Retry command</button>{/if}</div>
     {/if}
-  </section>
+    </section>
+  </div>
 
 {:else if page === "chisel" && view.role === "chisel" && view.chisel}
   <section id="chisel-casebook-page" class="casebook-workspace-page bg-[#cab99a] p-4 sm:p-5" aria-labelledby="chisel-heading">
@@ -702,6 +722,19 @@
     <div class="mt-5 border-y border-[#9d8669] py-4">
       <p class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7e3029]">Private casebook</p>
       <p class="mt-2 font-serif text-sm italic leading-6 text-[#4e3d2f]">{view.chisel.casebook?.briefing ?? "No private briefing filed."}</p>
+      {#if (view.chisel.casebook?.special_rules?.length ?? 0) > 0}
+        <section id="chisel-special-rules" class="mt-4 border border-[#76523e] bg-[#d9c8a8] p-3" aria-labelledby="chisel-special-rules-heading">
+          <h3 id="chisel-special-rules-heading" class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7e3029]">Special handling</h3>
+          <ul class="mt-2 grid gap-2">
+            {#each view.chisel.casebook.special_rules as rule}
+              <li id={`chisel-special-rule-${rule.id}`} class="border-l-2 border-[#7e3029] pl-3">
+                <p class="font-serif text-sm font-semibold">{rule.title}</p>
+                <p class="mt-1 text-xs leading-5 text-[#5d4938]">{rule.text}</p>
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {/if}
       <dl class="mt-4 space-y-2 text-xs"><div class="flex justify-between gap-3"><dt class="text-[#715d47]">Solution suspect</dt><dd class="font-mono font-semibold">{view.chisel.casebook?.solution?.suspect_id ?? "-"}</dd></div><div class="flex justify-between gap-3"><dt class="text-[#715d47]">Leverage held</dt><dd class="font-mono font-semibold">{Object.values(view.chisel.leverageByDetective ?? {}).reduce((sum, value) => sum + value, 0)}</dd></div><div class="flex justify-between gap-3"><dt class="text-[#715d47]">Pending response</dt><dd class="font-mono font-semibold">{view.chisel.pendingInterrogation ? "OPEN" : "NONE"}</dd></div></dl>
     </div>
   </section>

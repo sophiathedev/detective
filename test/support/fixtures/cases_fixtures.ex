@@ -55,6 +55,19 @@ defmodule Detective.CasesFixtures do
           "briefing" => "An original test mystery.",
           "max_days" => 3,
           "board_id" => "dcoa_classic",
+          "special_rules" => [
+            %{
+              "id" => "test-clock",
+              "title" => "Test Clock",
+              "text" => "Use three days for this test case.",
+              "visibility" => "public",
+              "trigger" => "setup",
+              "effect" => %{
+                "type" => "starting_days",
+                "days_by_detective_count" => %{"2" => 3, "3" => 3, "4" => 3}
+              }
+            }
+          ],
           "case_cards" => [
             %{
               "id" => "victim-file",

@@ -249,6 +249,7 @@
     role: privateState.role,
     phase: publicState.phase,
     result: publicState.result,
+    specialRules: publicState.special_rules ?? [],
     detectives,
     activeDetective,
     ownPlayer,

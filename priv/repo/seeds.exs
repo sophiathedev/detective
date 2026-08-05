@@ -204,6 +204,35 @@ solution = %{
   "motive_id" => "relay-code-cover-up"
 }
 
+special_rules = [
+  %{
+    "id" => "closing-signal-window",
+    "title" => "Closing Signal Window",
+    "text" =>
+      "The harbor transmission is fading. Start with 6 days for two Detectives, 5 for three, or 4 for four.",
+    "visibility" => "public",
+    "trigger" => "setup",
+    "effect" => %{
+      "type" => "starting_days",
+      "days_by_detective_count" => %{"2" => 6, "3" => 5, "4" => 4}
+    }
+  },
+  %{
+    "id" => "breakwater-flare",
+    "title" => "Flare Beyond the Breakwater",
+    "text" =>
+      "At the start of Day 3, a harbor patrol recovers the signal flare and enters it into public evidence.",
+    "visibility" => "chisel",
+    "trigger" => "day_started",
+    "effect" => %{
+      "type" => "day_reveal",
+      "day" => 3,
+      "reveal_case_card_ids" => ["harbor-flare"],
+      "reveal_suspect_ids" => []
+    }
+  }
+]
+
 {:ok, _result} =
   Repo.transaction(fn ->
     case Repo.get_by(CaseFile, slug: slug) do
@@ -223,6 +252,7 @@ solution = %{
           "board_id" => "dcoa_classic",
           "briefing" =>
             "At 00:17, Dr. Mara Venn sent a broken distress call from Meridian Array. By sunrise she was dead, the station log had been altered, and an unknown ship had vanished beyond the breakwater. Determine who killed her, what was used, and why the midnight signal had to be silenced.",
+          "special_rules" => special_rules,
           "case_cards" => [
             %{
               "id" => "mara-venn",
@@ -371,10 +401,11 @@ solution = %{
         version
 
       case_file ->
-        case Repo.get_by(CaseVersion, case_id: case_file.id, version: 6) do
+        case Repo.get_by(CaseVersion, case_id: case_file.id, version: 7) do
           nil ->
             legacy_version =
-              Repo.get_by(CaseVersion, case_id: case_file.id, version: 5) ||
+              Repo.get_by(CaseVersion, case_id: case_file.id, version: 6) ||
+                Repo.get_by(CaseVersion, case_id: case_file.id, version: 5) ||
                 Repo.get_by(CaseVersion, case_id: case_file.id, version: 4) ||
                 Repo.get_by(CaseVersion, case_id: case_file.id, version: 3) ||
                 Repo.get_by(CaseVersion, case_id: case_file.id, version: 2) ||
@@ -394,10 +425,11 @@ solution = %{
               |> Map.put("search_results", search_results)
               |> Map.put("accusation_options", accusation_options)
               |> Map.put("solution", solution)
+              |> Map.put("special_rules", special_rules)
 
             {:ok, version} =
               Cases.create_version(case_file, %{
-                version: 6,
+                version: 7,
                 content: upgraded_content,
                 published_at: DateTime.utc_now() |> DateTime.truncate(:second)
               })

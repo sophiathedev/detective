@@ -1,7 +1,7 @@
 defmodule Detective.Games.Projections.Public do
   @moduledoc false
 
-  alias Detective.Cases.{AccusationSheet, ResponseMatrix}
+  alias Detective.Cases.{AccusationSheet, ResponseMatrix, SpecialRules}
   alias Detective.Games.State
 
   def render(%State{} = state) do
@@ -29,6 +29,8 @@ defmodule Detective.Games.Projections.Public do
       case_card_slots: public_case_card_slots(state),
       archived_searches: state.archived_searches,
       taken_evidence: public_taken_evidence(state),
+      special_rules:
+        SpecialRules.public_rules(state.case_definition, state.triggered_special_rule_ids),
       pending_interrogation: pending_interrogation(state),
       winner: state.winner,
       result: public_result(state),

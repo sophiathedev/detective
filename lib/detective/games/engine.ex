@@ -13,6 +13,7 @@ defmodule Detective.Games.Engine do
     LegacyBoardAdapter,
     ResponseMatrix,
     SearchDeck,
+    SpecialRules,
     Validator
   }
 
@@ -79,7 +80,11 @@ defmodule Detective.Games.Engine do
 
       detective_order = Enum.map(detectives, & &1.id)
       default_days = Map.fetch!(@classic_days, length(detectives))
-      max_days = positive_integer(case_definition["max_days"], default_days)
+
+      max_days =
+        case_definition["max_days"]
+        |> positive_integer(default_days)
+        |> then(&SpecialRules.starting_days(case_definition, length(detectives), &1))
 
       {:ok,
        %State{
@@ -1381,13 +1386,14 @@ defmodule Detective.Games.Engine do
     }
 
     {next_state, evidence_events} = release_due_evidence(next_state)
+    {next_state, special_rule_events} = apply_day_special_rules(next_state)
 
     events = [
       %Event{
         type: :day_advanced,
         public_payload: %{day: next_state.day, days_remaining: next_state.days_remaining}
       }
-      | evidence_events
+      | evidence_events ++ special_rule_events
     ]
 
     events =
@@ -1395,6 +1401,89 @@ defmodule Detective.Games.Engine do
         [%Event{type: :turn_started, public_payload: %{player_id: next_id, day: next_state.day}}]
 
     {next_state, events}
+  end
+
+  defp apply_day_special_rules(state) do
+    state.case_definition
+    |> SpecialRules.day_rules(state.day)
+    |> Enum.reject(&(&1["id"] in state.triggered_special_rule_ids))
+    |> Enum.reduce({state, []}, fn rule, {next_state, events} ->
+      effect = rule["effect"]
+      case_card_ids = effect["reveal_case_card_ids"] || []
+      suspect_ids = effect["reveal_suspect_ids"] || []
+
+      {next_state, revealed_case_card_ids} = reveal_public_case_cards(next_state, case_card_ids)
+      {next_state, revealed_suspect_ids} = reveal_public_suspects(next_state, suspect_ids)
+
+      next_state = %{
+        next_state
+        | triggered_special_rule_ids:
+            Enum.uniq([rule["id"] | next_state.triggered_special_rule_ids])
+      }
+
+      next_state =
+        append_history(next_state, %{
+          type: "special_rule_triggered",
+          special_rule_id: rule["id"],
+          title: rule["title"],
+          day: next_state.day
+        })
+
+      event = %Event{
+        type: :special_rule_triggered,
+        public_payload: %{
+          special_rule_id: rule["id"],
+          title: rule["title"],
+          text: rule["text"],
+          day: next_state.day,
+          revealed_case_card_codes: case_card_codes(next_state, revealed_case_card_ids),
+          revealed_suspect_ids: revealed_suspect_ids
+        }
+      }
+
+      {next_state, events ++ [event]}
+    end)
+  end
+
+  defp reveal_public_case_cards(state, case_card_ids) do
+    newly_revealed_ids = case_card_ids -- state.public_case_card_ids
+
+    players =
+      Map.new(state.players, fn
+        {player_id, %{role: "detective"} = player} ->
+          {player_id,
+           %{
+             player
+             | knowledge: Enum.uniq(player.knowledge ++ case_card_ids),
+               evidence: player.evidence -- case_card_ids
+           }}
+
+        entry ->
+          entry
+      end)
+
+    next_state = %{
+      state
+      | players: players,
+        public_case_card_ids: Enum.uniq(state.public_case_card_ids ++ case_card_ids),
+        taken_evidence: Map.drop(state.taken_evidence, case_card_ids)
+    }
+
+    {next_state, newly_revealed_ids}
+  end
+
+  defp reveal_public_suspects(state, suspect_ids) do
+    newly_revealed_ids =
+      Enum.filter(suspect_ids, fn suspect_id ->
+        match?(%{revealed: false}, Map.get(state.suspects, suspect_id))
+      end)
+
+    suspects =
+      Enum.reduce(suspect_ids, state.suspects, fn suspect_id, suspects ->
+        Map.update!(suspects, suspect_id, &%{&1 | revealed: true})
+      end)
+
+    {%{state | suspects: suspects}, newly_revealed_ids}
   end
 
   defp release_due_evidence(state) do

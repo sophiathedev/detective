@@ -9,7 +9,8 @@ defmodule Detective.Cases.Validator do
     BoardTopology,
     LegacyBoardAdapter,
     ResponseMatrix,
-    SearchDeck
+    SearchDeck,
+    SpecialRules
   }
 
   def validate(case_definition) when is_map(case_definition) do
@@ -19,6 +20,7 @@ defmodule Detective.Cases.Validator do
          :ok <- validate_suspect_locations(case_definition["suspects"], locations),
          :ok <- ResponseMatrix.validate(case_definition),
          :ok <- SearchDeck.validate(case_definition, locations),
+         :ok <- SpecialRules.validate(case_definition),
          :ok <- AccusationSheet.validate(case_definition) do
       :ok
     end

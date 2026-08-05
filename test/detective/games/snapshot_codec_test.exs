@@ -70,7 +70,8 @@ defmodule Detective.Games.SnapshotCodecTest do
           "taken_day" => 2,
           "release_day" => 5
         }
-      }
+      },
+      triggered_special_rule_ids: ["late-witness"]
     }
 
     dumped = SnapshotCodec.dump(state)
@@ -91,6 +92,20 @@ defmodule Detective.Games.SnapshotCodecTest do
     assert restored.public_case_card_ids == ["public-log"]
     assert restored.archived_searches == ["location:51"]
     assert restored.taken_evidence["signal-log"]["release_day"] == 5
+    assert restored.triggered_special_rule_ids == ["late-witness"]
+  end
+
+  test "migrates schema version 3 snapshots without triggered special rules" do
+    state = %State{players: %{}, locations: %{}, suspects: %{}}
+
+    dumped =
+      state
+      |> SnapshotCodec.dump()
+      |> Map.put("schema_version", 3)
+      |> Map.delete("triggered_special_rule_ids")
+
+    assert {:ok, restored} = SnapshotCodec.load(dumped)
+    assert restored.triggered_special_rule_ids == []
   end
 
   test "round-trips a pending interrogation with string keys" do

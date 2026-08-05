@@ -12,7 +12,7 @@ defmodule Detective.Games.SnapshotCodec do
   end
 
   def load(%{"schema_version" => schema_version} = data)
-      when schema_version in [1, 2, @schema_version] do
+      when schema_version in [1, 2, 3, @schema_version] do
     with {:ok, status} <- status(data["status"]),
          {:ok, phase} <- phase(data["phase"]),
          {:ok, paused_from_phase} <- optional_phase(data["paused_from_phase"]),
@@ -43,6 +43,7 @@ defmodule Detective.Games.SnapshotCodec do
          public_case_card_ids: data["public_case_card_ids"] || [],
          archived_searches: data["archived_searches"] || [],
          taken_evidence: data["taken_evidence"] || %{},
+         triggered_special_rule_ids: data["triggered_special_rule_ids"] || [],
          pending_action: data["pending_action"],
          winner: data["winner"],
          public_history: data["public_history"] || []

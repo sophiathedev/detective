@@ -48,6 +48,56 @@ defmodule Detective.Games.ProjectionsTest do
     refute Map.has_key?(chisel.private, :actions_remaining)
   end
 
+  test "Chisel-only special rules stay private until their server trigger fires" do
+    rules = [
+      %{
+        "id" => "public-clock",
+        "title" => "Short Clock",
+        "text" => "The case uses a shortened Day track.",
+        "visibility" => "public",
+        "trigger" => "setup",
+        "effect" => %{
+          "type" => "starting_days",
+          "days_by_detective_count" => %{"2" => 6, "3" => 5, "4" => 4}
+        }
+      },
+      %{
+        "id" => "hidden-arrival",
+        "title" => "Hidden Arrival",
+        "text" => "A secret witness arrives on Day 2.",
+        "visibility" => "chisel",
+        "trigger" => "day_started",
+        "effect" => %{
+          "type" => "day_reveal",
+          "day" => 2,
+          "reveal_case_card_ids" => ["topic"],
+          "reveal_suspect_ids" => []
+        }
+      }
+    ]
+
+    base = state_fixture()
+    state = %{base | case_definition: Map.put(base.case_definition, "special_rules", rules)}
+
+    public = Public.render(state)
+    {:ok, chisel} = Projections.for_user(state, chisel_user_id())
+
+    assert Enum.map(public.special_rules, & &1.id) == ["public-clock"]
+    refute Jason.encode!(public) =~ "Hidden Arrival"
+
+    assert Enum.map(chisel.private.casebook.special_rules, & &1["id"]) == [
+             "public-clock",
+             "hidden-arrival"
+           ]
+
+    triggered = %{state | triggered_special_rule_ids: ["hidden-arrival"]}
+
+    assert Enum.map(Public.render(triggered).special_rules, & &1.id) == [
+             "public-clock",
+             "hidden-arrival"
+           ]
+  end
+
   test "pending response options and truth metadata remain role-private" do
     state =
       %{state_fixture() | phase: :waiting_for_chisel, pending_action: pending_interrogation()}

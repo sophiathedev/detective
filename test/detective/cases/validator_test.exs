@@ -1,7 +1,7 @@
 defmodule Detective.Cases.ValidatorTest do
   use ExUnit.Case, async: true
 
-  alias Detective.Cases.{ResponseMatrix, Validator}
+  alias Detective.Cases.{ResponseMatrix, SpecialRules, Validator}
 
   test "validates an exact pre-catalog published fixture through the legacy adapter" do
     legacy = %{
@@ -222,6 +222,72 @@ defmodule Detective.Cases.ValidatorTest do
     assert {:error, :invalid_accusation_options} = Validator.validate(invalid_case_card)
   end
 
+  test "validates allow-listed special rules and their server-owned references" do
+    case_definition =
+      valid_case()
+      |> Map.put("case_cards", [
+        %{
+          "id" => "late-report",
+          "code" => "A",
+          "title" => "Late Report",
+          "type" => "information",
+          "initially_known" => false
+        }
+      ])
+      |> Map.put("special_rules", [
+        starting_days_rule(),
+        %{
+          "id" => "late-witness",
+          "title" => "Late Witness",
+          "text" => "At the start of Day 2, reveal the witness and report.",
+          "visibility" => "chisel",
+          "trigger" => "day_started",
+          "effect" => %{
+            "type" => "day_reveal",
+            "day" => 2,
+            "reveal_case_card_ids" => ["late-report"],
+            "reveal_suspect_ids" => ["suspect"]
+          }
+        }
+      ])
+
+    assert :ok = Validator.validate(case_definition)
+    assert SpecialRules.starting_days(case_definition, 3, 8) == 5
+    assert Enum.map(SpecialRules.day_rules(case_definition, 2), & &1["id"]) == ["late-witness"]
+
+    invalid_reference =
+      put_in(
+        case_definition,
+        ["special_rules", Access.at(1), "effect", "reveal_case_card_ids"],
+        ["missing"]
+      )
+
+    assert {:error, :invalid_special_rules} = Validator.validate(invalid_reference)
+
+    unknown_effect =
+      put_in(
+        case_definition,
+        ["special_rules", Access.at(1), "effect", "type"],
+        "run_case_script"
+      )
+
+    assert {:error, :invalid_special_rules} = Validator.validate(unknown_effect)
+
+    unreachable_day =
+      put_in(
+        case_definition,
+        ["special_rules", Access.at(1), "effect", "day"],
+        7
+      )
+
+    assert {:error, :invalid_special_rules} = Validator.validate(unreachable_day)
+
+    duplicate_setup =
+      Map.update!(case_definition, "special_rules", &[starting_days_rule() | &1])
+
+    assert {:error, :invalid_special_rules} = Validator.validate(duplicate_setup)
+  end
+
   defp valid_case do
     %{
       "board_id" => "dcoa_classic",
@@ -236,6 +302,20 @@ defmodule Detective.Cases.ValidatorTest do
       "reveal_case_card_ids" => reveal_ids,
       "take_case_card_ids" => take_ids,
       "reveal_suspect_ids" => []
+    }
+  end
+
+  defp starting_days_rule do
+    %{
+      "id" => "short-clock",
+      "title" => "Short Clock",
+      "text" => "Use the shortened Day track for this case.",
+      "visibility" => "public",
+      "trigger" => "setup",
+      "effect" => %{
+        "type" => "starting_days",
+        "days_by_detective_count" => %{"2" => 6, "3" => 5, "4" => 4}
+      }
     }
   end
 

@@ -2,6 +2,7 @@ defmodule Detective.Games.EngineTest do
   use ExUnit.Case, async: true
 
   alias Detective.Games.{Command, Engine, Rules, State}
+  alias Detective.Games.Projections.Public
 
   test "accepts exactly one Chisel and two to four Detectives" do
     cases = [
@@ -50,6 +51,26 @@ defmodule Detective.Games.EngineTest do
     assert {:ok, state} =
              Engine.new(game(), classic_players(2), Map.put(case_definition(), "max_days", 5))
 
+    assert state.days_remaining == 5
+  end
+
+  test "setup special rule overrides starting days by Detective count" do
+    special_case =
+      Map.put(case_definition(), "special_rules", [
+        %{
+          "id" => "short-clock",
+          "title" => "Short Clock",
+          "text" => "Use the shortened Day track.",
+          "visibility" => "public",
+          "trigger" => "setup",
+          "effect" => %{
+            "type" => "starting_days",
+            "days_by_detective_count" => %{"2" => 6, "3" => 5, "4" => 4}
+          }
+        }
+      ])
+
+    assert {:ok, state} = Engine.new(game(), classic_players(3), special_case)
     assert state.days_remaining == 5
   end
 
@@ -502,6 +523,76 @@ defmodule Detective.Games.EngineTest do
     assert day_four.taken_evidence == %{}
     refute "sealed-ledger" in player(day_four, "detective-1").evidence
     assert "sealed-ledger" in player(day_four, "detective-2").knowledge
+  end
+
+  test "day special rule reveals case-owned cards and hidden suspects once" do
+    special_case =
+      case_definition()
+      |> update_in(["suspects"], fn suspects ->
+        [
+          %{
+            "id" => "late-witness",
+            "name" => "Late Witness",
+            "occupation" => "dock watchman",
+            "location_id" => "51",
+            "initially_known" => false
+          }
+          | suspects
+        ]
+      end)
+      |> put_in(
+        ["search_results", "suspects", "late-witness"],
+        search_result("The witness carries no evidence.", true)
+      )
+      |> Map.put("special_rules", [
+        %{
+          "id" => "late-witness-arrives",
+          "title" => "A Witness Comes Forward",
+          "text" => "At the start of Day 2, reveal the witness and sealed ledger.",
+          "visibility" => "chisel",
+          "trigger" => "day_started",
+          "effect" => %{
+            "type" => "day_reveal",
+            "day" => 2,
+            "reveal_case_card_ids" => ["sealed-ledger"],
+            "reveal_suspect_ids" => ["late-witness"]
+          }
+        }
+      ])
+
+    assert {:ok, initial} = Engine.new(game(), players(), special_case)
+
+    refute Enum.any?(Public.render(initial).special_rules, &(&1.id == "late-witness-arrives"))
+    refute Map.fetch!(initial.suspects, "late-witness").revealed
+
+    {:ok, first_placed, _events} =
+      apply_command(initial, "detective-1", :place, %{"location_id" => "51"})
+
+    {:ok, second_turn, _events} = apply_command(first_placed, "detective-1", :end_turn)
+
+    {:ok, second_placed, _events} =
+      apply_command(second_turn, "detective-2", :place, %{"location_id" => "84"})
+
+    assert {:ok, day_two, events} = apply_command(second_placed, "detective-2", :end_turn)
+
+    assert Enum.map(events, & &1.type) == [
+             :turn_ended,
+             :day_advanced,
+             :special_rule_triggered,
+             :turn_started
+           ]
+
+    special_event = Enum.find(events, &(&1.type == :special_rule_triggered))
+    assert special_event.public_payload.revealed_case_card_codes == ["B"]
+    assert special_event.public_payload.revealed_suspect_ids == ["late-witness"]
+    assert day_two.triggered_special_rule_ids == ["late-witness-arrives"]
+    assert "sealed-ledger" in day_two.public_case_card_ids
+    assert Enum.all?(day_two.detective_order, &("sealed-ledger" in day_two.players[&1].knowledge))
+    assert Map.fetch!(day_two.suspects, "late-witness").revealed
+
+    assert Enum.any?(Public.render(day_two).special_rules, fn rule ->
+             rule.id == "late-witness-arrives" and rule.triggered
+           end)
   end
 
   test "discovering a hidden suspect grants an immediate free question or decline" do

@@ -394,6 +394,27 @@ describe("CasebookWorkspace", () => {
     expect(document.querySelector("#public-case-history")).toHaveTextContent("case opened")
   })
 
+  it("renders public special rules as casebook directives", () => {
+    const view = {
+      ...baseView,
+      specialRules: [
+        {
+          id: "short-clock",
+          title: "Short Clock",
+          text: "Use the shortened Day track.",
+          trigger: "setup",
+          triggered: false,
+        },
+      ],
+    }
+
+    render(CasebookWorkspace, { page: "history", view, actions: noActions })
+
+    expect(document.querySelector("#case-special-rule-short-clock")).toHaveTextContent(
+      "Use the shortened Day track.",
+    )
+  })
+
   it("does not render Chisel data in a Detective view", () => {
     render(CasebookWorkspace, { page: "chisel", view: baseView, actions: noActions })
 
@@ -409,7 +430,17 @@ describe("CasebookWorkspace", () => {
         identity: { display_name: "The Chisel" },
         pendingInterrogation: null,
         selectedResponseId: null,
-        casebook: { briefing: "Private briefing", solution: { suspect_id: "s1" } },
+        casebook: {
+          briefing: "Private briefing",
+          solution: { suspect_id: "s1" },
+          special_rules: [
+            {
+              id: "hidden-arrival",
+              title: "Hidden Arrival",
+              text: "Reveal a witness on Day 2.",
+            },
+          ],
+        },
         leverageByDetective: { d1: 2 },
       },
     }
@@ -418,5 +449,8 @@ describe("CasebookWorkspace", () => {
 
     expect(document.querySelector("#chisel-casebook-page")).toHaveTextContent("Private briefing")
     expect(document.querySelector("#chisel-casebook-page")).toHaveTextContent("s1")
+    expect(document.querySelector("#chisel-special-rule-hidden-arrival")).toHaveTextContent(
+      "Reveal a witness on Day 2.",
+    )
   })
 })
