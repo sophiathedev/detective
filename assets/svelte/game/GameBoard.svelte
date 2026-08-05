@@ -43,7 +43,7 @@
   <svg
     id="game-map"
     data-testid="game-map"
-    class="game-map-board aspect-[1000/636] w-full select-none border border-[#6e5c48] bg-[#c9b998]"
+    class="game-map-board aspect-[1000/636] w-full select-none bg-[#c9b998]"
     viewBox="0 0 1000 636"
     preserveAspectRatio="xMidYMid meet"
     aria-labelledby="game-map-title game-map-description"
@@ -185,18 +185,19 @@
 
   <nav
     id="legal-map-destinations"
-    class="border-x border-b border-[#6e5c48] bg-[#d2c19f] px-3 py-2"
+    class="map-destination-fallback"
     aria-label="Legal map destinations"
   >
     {#if legalLocations.length > 0}
-      <div class="flex gap-2 overflow-x-auto pb-1">
+      <p class="map-destination-fallback-title">Keyboard destinations</p>
+      <div class="map-destination-fallback-list">
         {#each legalLocations as location}
           <button
             id={`map-destination-${location.id}`}
             type="button"
             data-location-id={location.id}
             aria-controls="game-map"
-            class="min-h-11 shrink-0 cursor-pointer border border-[#7b6249] bg-[#eadcbd] px-3 font-mono text-[10px] font-semibold uppercase tracking-[0.06em] text-[#3e2c20] transition hover:border-[#973b32] hover:bg-[#f4e8ce] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8e342d]"
+            class="map-destination-fallback-button"
             aria-pressed={selectedLocationId === location.id}
             onclick={(event) => select(event, location)}
           >
@@ -205,7 +206,7 @@
         {/each}
       </div>
     {:else}
-      <p class="font-mono text-[9px] uppercase tracking-[0.08em] text-[#765f48]">
+      <p class="map-destination-fallback-empty">
         No map destination is available for this player.
       </p>
     {/if}
