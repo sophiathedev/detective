@@ -186,7 +186,7 @@
 .noir-game-table {
   position: relative;
   height: calc(100dvh - 3.5rem);
-  min-height: 34rem;
+  min-height: 0;
   overflow: hidden;
   background:
     radial-gradient(circle at 50% 42%, rgb(66 52 36 / 0.18), transparent 48%),
@@ -264,6 +264,12 @@
 
 .noir-map-rotate-notice {
   display: none;
+}
+
+.noir-game-book-shell {
+  min-height: calc(100dvh - 3.5rem);
+  overflow: hidden;
+  background: var(--noir-ebony-950);
 }
 
 .noir-detective-tray {
@@ -455,6 +461,130 @@
 .noir-chisel-sealed-copy {
   color: #9f8967;
   font-weight: 400;
+}
+
+@media (max-width: 63.999rem) {
+  .noir-game-detective-rail {
+    top: auto;
+    right: 0.75rem;
+    bottom: 5.75rem;
+    left: 0.75rem;
+    translate: 0 0;
+  }
+
+  .noir-game-chisel {
+    top: 0.75rem;
+    right: 0.75rem;
+    max-width: min(17rem, 55vw);
+  }
+
+  .noir-game-context {
+    top: auto;
+    right: 0.75rem;
+    bottom: 10rem;
+    left: 0.75rem;
+  }
+
+  .noir-game-actions {
+    bottom: 0.75rem;
+    width: calc(100% - 1.5rem);
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .noir-game-phase {
+    top: 0.75rem;
+    left: 0.75rem;
+    width: min(22rem, 40vw);
+    min-width: 0;
+    translate: 0 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.15rem;
+  }
+
+  .noir-game-phase strong {
+    text-align: left;
+  }
+
+  .noir-detective-tray {
+    width: 100%;
+    padding: 0.35rem;
+  }
+
+  .noir-detective-tray-header {
+    display: none;
+  }
+
+  .noir-detective-tray-list {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.25rem;
+    margin-top: 0;
+  }
+
+  .noir-detective-slot {
+    min-height: 3.8rem;
+    gap: 0.35rem;
+    padding: 0.35rem;
+  }
+
+  .noir-detective-slot .noir-portrait-md {
+    width: 2.4rem;
+  }
+
+  .noir-detective-public-stats,
+  .noir-detective-private-stats {
+    gap: 0.15rem 0.35rem;
+    margin-top: 0.2rem;
+    font-size: 0.44rem;
+  }
+
+  .noir-detective-private-stats {
+    padding-top: 0.2rem;
+  }
+
+  .noir-chisel-console {
+    width: 100%;
+  }
+
+  .noir-chisel-console .noir-portrait-lg {
+    width: 3.3rem;
+  }
+
+  .noir-chisel-identity {
+    padding: 0.5rem;
+  }
+
+  .noir-map-status {
+    top: 5.4rem;
+    left: 0.75rem;
+    max-width: min(22rem, calc(100% - 1.5rem));
+  }
+}
+
+@media (orientation: portrait) and (max-width: 40rem) {
+  .noir-map-rotate-notice {
+    position: absolute;
+    z-index: 28;
+    top: 44%;
+    left: 50%;
+    display: grid;
+    width: min(18rem, calc(100% - 2rem));
+    translate: -50% -50%;
+    place-items: center;
+    pointer-events: none;
+    border: 1px solid var(--noir-gold-700);
+    border-radius: 0.35rem;
+    background: rgb(15 13 12 / 0.92) url("/images/ui/noir/wood-grain.svg");
+    box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 0.56);
+    padding: 0.9rem 1rem;
+    color: var(--noir-paper-300);
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.625rem;
+    letter-spacing: 0.08em;
+    line-height: 1.55;
+    text-align: center;
+    text-transform: uppercase;
+  }
 }
 
 .noir-map-stage {
@@ -1300,6 +1430,79 @@
 
   .map-detective-token {
     transition: none !important;
+  }
+}
+
+@media (max-width: 63.999rem) {
+  .noir-map-status {
+    top: 5.4rem;
+    left: 0.75rem;
+    max-width: min(22rem, calc(100% - 1.5rem));
+  }
+
+  .noir-action-rail {
+    width: max-content;
+    min-width: 100%;
+    max-width: none;
+  }
+
+  #action-open-casebook {
+    order: -1;
+  }
+}
+
+@media (max-width: 63.999rem) and (max-height: 35rem) {
+  .noir-chisel-console-header {
+    display: none;
+  }
+
+  .noir-chisel-sealed-copy,
+  .noir-chisel-private-ledger {
+    padding-block: 0.45rem;
+  }
+}
+
+@media (orientation: portrait) and (max-width: 40rem) {
+  .noir-game-phase {
+    width: 38vw;
+  }
+
+  .noir-detective-slot {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .noir-detective-slot > .relative {
+    position: absolute;
+    top: 0.35rem;
+    left: 0.35rem;
+  }
+
+  .noir-detective-slot > .min-w-0 {
+    width: 100%;
+    padding-top: 2.45rem;
+  }
+
+  .noir-detective-slot .noir-connection-label {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.3rem;
+    max-width: 2.4rem;
+    overflow: hidden;
+    font-size: 0.4rem;
+    text-overflow: ellipsis;
+  }
+
+  .noir-detective-slot .truncate {
+    font-size: 0.65rem;
+  }
+
+  .noir-map-status {
+    top: 11.5rem;
+  }
+
+  .noir-map-zoom-controls {
+    display: none;
   }
 }
 

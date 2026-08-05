@@ -50,4 +50,25 @@ describe("PauseCurtain", () => {
 
     expect(screen.queryByRole("dialog", { name: "Case paused" })).not.toBeInTheDocument()
   })
+
+  it("keeps keyboard focus inside the blocking curtain", async () => {
+    render(PauseCurtain, {
+      active: true,
+      reason: "Detective disconnected",
+      offlinePlayers: [],
+      canResume: true,
+      commandPending: false,
+      commandError: null,
+      onResume: vi.fn(),
+    })
+
+    const outside = document.createElement("button")
+    outside.textContent = "Underlying map control"
+    document.body.append(outside)
+    outside.focus()
+
+    await fireEvent.keyDown(window, { key: "Tab" })
+    expect(screen.getByRole("button", { name: "Resume game" })).toHaveFocus()
+    outside.remove()
+  })
 })

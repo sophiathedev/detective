@@ -27,6 +27,29 @@
     })
   }
 
+  function keepFocusInside(event) {
+    if (!active || event.key !== "Tab" || !pauseDocument) return
+
+    const controls = [...pauseDocument.querySelectorAll("button:not(:disabled), [tabindex='0']")]
+    if (controls.length === 0) {
+      event.preventDefault()
+      pauseDocument.focus({ preventScroll: true })
+      return
+    }
+
+    const first = controls[0]
+    const last = controls[controls.length - 1]
+    const focusOutside = !pauseDocument.contains(document.activeElement)
+
+    if (focusOutside || (!event.shiftKey && document.activeElement === last)) {
+      event.preventDefault()
+      first.focus({ preventScroll: true })
+    } else if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last.focus({ preventScroll: true })
+    }
+  }
+
   $effect(() => {
     if (active && !wasActive && typeof document !== "undefined") {
       returnFocus = document.activeElement
@@ -42,6 +65,8 @@
     if (active) restoreFocus()
   })
 </script>
+
+<svelte:window onkeydown={keepFocusInside} />
 
 {#if active}
   <div
