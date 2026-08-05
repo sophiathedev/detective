@@ -847,6 +847,7 @@
       invalid_special_interaction: "That case-specific interaction is not available.",
       special_actor_not_at_location: "Move to the special contact's location first.",
       special_interaction_used: "That case-specific interaction has already been resolved.",
+      special_choice_resolved: "Another approach to that contact has already been filed.",
       special_actor_blocks_action: "Counter-surveillance is blocking that action at this location.",
       question_block_unavailable: "No matching Chisel leverage remains to block this question.",
       question_not_blocked: "This question is not waiting on a goon decision.",
@@ -1179,9 +1180,25 @@
     gameChannel.on("suspect_searched", (message) =>
       recordPublicEvent(message, "A Detective searched a suspect."),
     )
-    gameChannel.on("special_actor_interacted", (message) =>
-      recordPublicEvent(message, "A case-specific contact changed the investigation."),
-    )
+    gameChannel.on("special_actor_interacted", (message) => {
+      const payload = message.payload ?? {}
+      const contactMoved =
+        payload.actor_from_location_id &&
+        payload.actor_location_id &&
+        payload.actor_from_location_id !== payload.actor_location_id
+      const openedLead =
+        payload.revealed_case_card_codes?.length > 0 || payload.revealed_suspect_ids?.length > 0
+
+      const summary = contactMoved
+        ? openedLead
+          ? "A contact relocated and opened a public lead."
+          : "A case-specific contact relocated."
+        : openedLead
+          ? "A case-specific contact opened a public lead."
+          : "A case-specific contact changed the investigation."
+
+      recordPublicEvent(message, summary)
+    })
     gameChannel.on("evidence_submitted", (message) =>
       recordPublicEvent(message, "Held evidence returned to the public casefile."),
     )

@@ -294,9 +294,22 @@ special_actors = [
         "action_cost" => 1,
         "scratch_cost" => 2,
         "once" => true,
+        "choice_group" => "harbor-tail-approach",
         "effects" => [
           %{"type" => "disable_actor"},
           %{"type" => "private_case_cards", "case_card_ids" => ["receiver-cable"]}
+        ]
+      },
+      %{
+        "id" => "shadow-the-tail",
+        "label" => "Shadow the lookout to Topsy's",
+        "action_cost" => 2,
+        "scratch_cost" => 0,
+        "once" => true,
+        "choice_group" => "harbor-tail-approach",
+        "effects" => [
+          %{"type" => "move_actor", "location_id" => "96"},
+          %{"type" => "public_case_cards", "case_card_ids" => ["harbor-flare"]}
         ]
       }
     ]
@@ -450,10 +463,11 @@ special_actors = [
         version
 
       case_file ->
-        case Repo.get_by(CaseVersion, case_id: case_file.id, version: 11) do
+        case Repo.get_by(CaseVersion, case_id: case_file.id, version: 12) do
           nil ->
             legacy_version =
-              Repo.get_by(CaseVersion, case_id: case_file.id, version: 9) ||
+              Repo.get_by(CaseVersion, case_id: case_file.id, version: 11) ||
+                Repo.get_by(CaseVersion, case_id: case_file.id, version: 9) ||
                 Repo.get_by(CaseVersion, case_id: case_file.id, version: 8) ||
                 Repo.get_by(CaseVersion, case_id: case_file.id, version: 7) ||
                 Repo.get_by(CaseVersion, case_id: case_file.id, version: 6) ||
@@ -483,7 +497,7 @@ special_actors = [
 
             {:ok, version} =
               Cases.create_version(case_file, %{
-                version: 11,
+                version: 12,
                 content: upgraded_content,
                 published_at: DateTime.utc_now() |> DateTime.truncate(:second)
               })

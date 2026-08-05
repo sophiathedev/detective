@@ -114,9 +114,22 @@ defmodule Detective.Games.ProjectionsTest do
           "action_cost" => 1,
           "scratch_cost" => 2,
           "once" => true,
+          "choice_group" => "tail-approach",
           "effects" => [
             %{"type" => "disable_actor"},
             %{"type" => "private_case_cards", "case_card_ids" => ["sealed-file"]}
+          ]
+        },
+        %{
+          "id" => "shadow-tail",
+          "label" => "Shadow the lookout",
+          "action_cost" => 2,
+          "scratch_cost" => 0,
+          "once" => true,
+          "choice_group" => "tail-approach",
+          "effects" => [
+            %{"type" => "move_actor", "location_id" => "51"},
+            %{"type" => "public_case_cards", "case_card_ids" => ["sealed-file"]}
           ]
         }
       ]
@@ -198,7 +211,15 @@ defmodule Detective.Games.ProjectionsTest do
                    id: "buy-off",
                    label: "Buy off the lookout",
                    action_cost: 1,
-                   scratch_cost: 2
+                   scratch_cost: 2,
+                   choice_group: "tail-approach"
+                 },
+                 %{
+                   id: "shadow-tail",
+                   label: "Shadow the lookout",
+                   action_cost: 2,
+                   scratch_cost: 0,
+                   choice_group: "tail-approach"
                  }
                ]
              }
@@ -206,6 +227,8 @@ defmodule Detective.Games.ProjectionsTest do
 
     refute Jason.encode!(public) =~ "sealed-file"
     refute Jason.encode!(detective) =~ "private_case_cards"
+    refute Jason.encode!(detective) =~ "public_case_cards"
+    refute Jason.encode!(detective) =~ "move_actor"
     refute Jason.encode!(detective.private.special_actor_interactions) =~ "sealed-file"
     assert get_in(chisel.private.casebook, [:special_actors, Access.at(0), "options"])
   end

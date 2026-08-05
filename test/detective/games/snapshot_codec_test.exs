@@ -76,10 +76,12 @@ defmodule Detective.Games.SnapshotCodecTest do
               action_cost: 1,
               scratch_cost: 2,
               once: true,
+              choice_group: "tail-approach",
               effects: [%{"type" => "disable_actor"}]
             }
           ],
-          used_option_ids: ["buy-off"]
+          used_option_ids: ["buy-off"],
+          resolved_choice_groups: ["tail-approach"]
         }
       },
       case_definition: %{
@@ -116,6 +118,8 @@ defmodule Detective.Games.SnapshotCodecTest do
     assert restored.special_actors["station-tail"].visible
     assert restored.special_actors["station-tail"].interaction_disabled
     assert restored.special_actors["station-tail"].used_option_ids == ["buy-off"]
+    assert restored.special_actors["station-tail"].resolved_choice_groups == ["tail-approach"]
+    assert hd(restored.special_actors["station-tail"].options).choice_group == "tail-approach"
     assert restored.case_definition["solution"]["suspect_id"] == "secret"
     assert restored.public_case_card_ids == ["public-log"]
     assert restored.archived_searches == ["location:51"]
@@ -166,7 +170,8 @@ defmodule Detective.Games.SnapshotCodecTest do
           interaction_disabled: false,
           blocks: ["search_location"],
           options: [],
-          used_option_ids: []
+          used_option_ids: [],
+          resolved_choice_groups: []
         }
       }
     }
@@ -182,6 +187,40 @@ defmodule Detective.Games.SnapshotCodecTest do
     assert {:ok, restored} = SnapshotCodec.load(dumped)
     assert restored.special_actors["tail"].visible
     refute restored.special_actors["tail"].interaction_disabled
+    assert restored.special_actors["tail"].resolved_choice_groups == []
+  end
+
+  test "migrates schema version 6 actors without resolved choice groups" do
+    state = %State{
+      players: %{},
+      locations: %{},
+      suspects: %{},
+      special_actors: %{
+        "tail" => %{
+          id: "tail",
+          name: "Tail",
+          role: "lookout",
+          kind: "counter_surveillance",
+          location_id: "51",
+          visible: true,
+          active: true,
+          interaction_disabled: false,
+          blocks: ["search_location"],
+          options: [],
+          used_option_ids: [],
+          resolved_choice_groups: []
+        }
+      }
+    }
+
+    dumped =
+      state
+      |> SnapshotCodec.dump()
+      |> Map.put("schema_version", 6)
+      |> update_in(["special_actors", "tail"], &Map.delete(&1, "resolved_choice_groups"))
+
+    assert {:ok, restored} = SnapshotCodec.load(dumped)
+    assert restored.special_actors["tail"].resolved_choice_groups == []
   end
 
   test "round-trips a pending interrogation with string keys" do

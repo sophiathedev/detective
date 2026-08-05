@@ -134,6 +134,14 @@ describe("ContextStack", () => {
           label: "Buy off the lookout",
           action_cost: 1,
           scratch_cost: 2,
+          choice_group: "tail-approach",
+        },
+        {
+          id: "shadow-tail",
+          label: "Shadow the lookout",
+          action_cost: 2,
+          scratch_cost: 0,
+          choice_group: "tail-approach",
         },
       ],
     }
@@ -156,13 +164,16 @@ describe("ContextStack", () => {
     expect(document.querySelector("#special-actor-slip")).not.toHaveTextContent(
       "private_case_cards",
     )
+    expect(document.querySelector("#special-actor-choice-warning")).toHaveTextContent(
+      "permanently closes the alternatives",
+    )
 
-    await fireEvent.click(screen.getByRole("button", { name: /Buy off the lookout/ }))
+    await fireEvent.click(screen.getByRole("button", { name: /Shadow the lookout/ }))
     await fireEvent.click(screen.getByRole("button", { name: "Close contact" }))
 
     expect(onInteractSpecialActor).toHaveBeenCalledWith(
       specialActorSelection,
-      specialActorSelection.options[0],
+      specialActorSelection.options[1],
     )
     expect(onCancelSpecialActor).toHaveBeenCalledWith(specialActorSelection)
   })

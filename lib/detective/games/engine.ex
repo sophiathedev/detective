@@ -494,13 +494,16 @@ defmodule Detective.Games.Engine do
            SpecialActors.fetch_option(state.special_actors, actor_id, option_id),
          :ok <- validate_special_actor_location(actor, special_actor),
          :ok <- validate_special_actor_option(actor, special_actor, option),
-         case_card_ids <- SpecialActors.private_case_card_ids(option),
-         {:ok, case_cards} <- SearchDeck.case_cards(state.case_definition, case_card_ids) do
+         private_case_card_ids <- SpecialActors.private_case_card_ids(option),
+         public_case_card_ids <- SpecialActors.public_case_card_ids(option),
+         revealed_suspect_ids <- SpecialActors.revealed_suspect_ids(option),
+         {:ok, case_cards} <-
+           SearchDeck.case_cards(state.case_definition, private_case_card_ids) do
       next_actor = %{
         actor
         | actions_remaining: actor.actions_remaining - option.action_cost,
           scratch: actor.scratch - option.scratch_cost,
-          knowledge: Enum.uniq(actor.knowledge ++ case_card_ids)
+          knowledge: Enum.uniq(actor.knowledge ++ private_case_card_ids)
       }
 
       next_state = %{
@@ -508,10 +511,19 @@ defmodule Detective.Games.Engine do
         | special_actors: SpecialActors.mark_used(state.special_actors, special_actor.id, option)
       }
 
-      {next_state, newly_public_ids} =
+      {next_state, effect_public_ids} =
         next_state
         |> put_player(next_actor)
+        |> reveal_public_case_cards(public_case_card_ids)
+
+      {next_state, newly_revealed_suspect_ids} =
+        reveal_public_suspects(next_state, revealed_suspect_ids)
+
+      {next_state, shared_public_ids} =
+        next_state
         |> promote_shared_knowledge()
+
+      newly_public_ids = Enum.uniq(effect_public_ids ++ shared_public_ids)
 
       next_actor = Map.fetch!(next_state.players, actor.id)
       next_special_actor = Map.fetch!(next_state.special_actors, special_actor.id)
@@ -535,7 +547,10 @@ defmodule Detective.Games.Engine do
           option_label: option.label,
           actions_remaining: next_actor.actions_remaining,
           actor_active: next_special_actor.active,
-          revealed_case_card_codes: case_card_codes(next_state, newly_public_ids)
+          actor_from_location_id: special_actor.location_id,
+          actor_location_id: next_special_actor.location_id,
+          revealed_case_card_codes: case_card_codes(next_state, newly_public_ids),
+          revealed_suspect_ids: newly_revealed_suspect_ids
         },
         private_payloads: %{
           actor.user_id => %{
@@ -1841,6 +1856,10 @@ defmodule Detective.Games.Engine do
       cond do
         option.once and option.id in special_actor.used_option_ids ->
           {:error, :special_interaction_used}
+
+        Map.get(option, :choice_group) &&
+            Map.get(option, :choice_group) in Map.get(special_actor, :resolved_choice_groups, []) ->
+          {:error, :special_choice_resolved}
 
         actor.actions_remaining < option.action_cost ->
           {:error, :no_actions_remaining}

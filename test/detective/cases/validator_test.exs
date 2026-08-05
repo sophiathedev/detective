@@ -352,6 +352,83 @@ defmodule Detective.Cases.ValidatorTest do
     assert {:error, :invalid_special_actors} = Validator.validate(hidden_but_active)
   end
 
+  test "validates mutually exclusive special actor branches and referenced effects" do
+    first_option =
+      special_actor()
+      |> get_in(["options", Access.at(0)])
+      |> Map.put("choice_group", "tail-approach")
+
+    second_option = %{
+      "id" => "shadow-tail",
+      "label" => "Shadow the lookout",
+      "action_cost" => 2,
+      "scratch_cost" => 0,
+      "once" => true,
+      "choice_group" => "tail-approach",
+      "effects" => [
+        %{"type" => "move_actor", "location_id" => "96"},
+        %{"type" => "public_case_cards", "case_card_ids" => ["sealed-file"]},
+        %{"type" => "reveal_suspects", "suspect_ids" => ["suspect"]}
+      ]
+    }
+
+    actor = put_in(special_actor(), ["options"], [first_option, second_option])
+
+    valid =
+      valid_case()
+      |> Map.put("case_cards", [
+        %{
+          "id" => "sealed-file",
+          "code" => "A",
+          "title" => "Sealed File",
+          "type" => "information",
+          "initially_known" => false
+        }
+      ])
+      |> Map.put("special_actors", [actor])
+
+    assert :ok = Validator.validate(valid)
+
+    single_branch =
+      put_in(valid, ["special_actors", Access.at(0), "options"], [first_option])
+
+    assert {:error, :invalid_special_actors} = Validator.validate(single_branch)
+
+    invalid_destination =
+      put_in(
+        valid,
+        [
+          "special_actors",
+          Access.at(0),
+          "options",
+          Access.at(1),
+          "effects",
+          Access.at(0),
+          "location_id"
+        ],
+        "404"
+      )
+
+    assert {:error, :invalid_special_actors} = Validator.validate(invalid_destination)
+
+    invalid_suspect =
+      put_in(
+        valid,
+        [
+          "special_actors",
+          Access.at(0),
+          "options",
+          Access.at(1),
+          "effects",
+          Access.at(2),
+          "suspect_ids"
+        ],
+        ["missing"]
+      )
+
+    assert {:error, :invalid_special_actors} = Validator.validate(invalid_suspect)
+  end
+
   test "validates day-driven special actor reveal, activation, and movement" do
     hidden_actor =
       special_actor()

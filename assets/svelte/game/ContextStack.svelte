@@ -124,7 +124,11 @@
 
     {#if specialActorSelection}
       <article id="special-actor-slip" class="noir-movement-slip noir-paper-sheet" aria-live="polite">
-        <div class="noir-movement-slip-stamp" aria-hidden="true">SPECIAL</div>
+        <div class="noir-movement-slip-stamp" aria-hidden="true">
+          {specialActorSelection.options.some((option) => option.choice_group)
+            ? "DECISION"
+            : "SPECIAL"}
+        </div>
         <p class="noir-movement-slip-kicker">Case-specific interaction</p>
         <h3 class="noir-action-slip-title">{specialActorSelection.actor.name}</h3>
         <p class="noir-action-slip-description">
@@ -133,6 +137,11 @@
         <p class="noir-movement-slip-districts">
           The server will resolve the selected cost and any private result.
         </p>
+        {#if specialActorSelection.options.some((option) => option.choice_group)}
+          <p id="special-actor-choice-warning" class="noir-action-slip-description">
+            Choose one marked approach. Filing it permanently closes the alternatives.
+          </p>
+        {/if}
 
         <div class="noir-special-actor-options">
           {#each specialActorSelection.options as option}
@@ -144,7 +153,9 @@
               onclick={() => onInteractSpecialActor(specialActorSelection, option)}
             >
               <span>{option.label}</span>
-              <small>{option.action_cost} AP · ${option.scratch_cost}</small>
+              <small>
+                {option.choice_group ? "Exclusive route · " : ""}{option.action_cost} AP · ${option.scratch_cost}
+              </small>
             </button>
           {/each}
           <button

@@ -8,15 +8,17 @@ defmodule Detective.Cases.SpecialActors do
 
   @kinds ~w(counter_surveillance contact witness)
   @blocked_actions ~w(search_location search_suspect interrogate)
-  @effect_types ~w(disable_actor private_case_cards)
+  @effect_types ~w(disable_actor move_actor private_case_cards public_case_cards reveal_suspects)
 
   def validate(case_definition, locations) when is_map(case_definition) and is_list(locations) do
     actors = actors(case_definition)
     location_ids = locations |> ids() |> MapSet.new()
     case_card_ids = case_definition |> Map.get("case_cards", []) |> ids() |> MapSet.new()
+    suspect_ids = case_definition |> Map.get("suspects", []) |> ids() |> MapSet.new()
+    valid_ids = %{locations: location_ids, case_cards: case_card_ids, suspects: suspect_ids}
 
     with true <- unique_ids?(actors),
-         true <- Enum.all?(actors, &valid_actor?(&1, location_ids, case_card_ids)) do
+         true <- Enum.all?(actors, &valid_actor?(&1, valid_ids)) do
       :ok
     else
       _invalid -> {:error, :invalid_special_actors}
@@ -41,7 +43,8 @@ defmodule Detective.Cases.SpecialActors do
          interaction_disabled: false,
          blocks: actor["blocks"] || [],
          options: Enum.map(actor["options"], &normalize_option/1),
-         used_option_ids: []
+         used_option_ids: [],
+         resolved_choice_groups: []
        }}
     end)
   end
@@ -104,7 +107,11 @@ defmodule Detective.Cases.SpecialActors do
     do: {:error, :invalid_special_interaction}
 
   def option_available?(option, actor, player) do
+    choice_group = Map.get(option, :choice_group)
+
     (not option.once or option.id not in actor.used_option_ids) and
+      (is_nil(choice_group) or
+         choice_group not in Map.get(actor, :resolved_choice_groups, [])) and
       player.actions_remaining >= option.action_cost and player.scratch >= option.scratch_cost
   end
 
@@ -127,6 +134,23 @@ defmodule Detective.Cases.SpecialActors do
           actor
         end
 
+      actor =
+        if choice_group = Map.get(option, :choice_group) do
+          Map.put(
+            actor,
+            :resolved_choice_groups,
+            Enum.uniq([choice_group | Map.get(actor, :resolved_choice_groups, [])])
+          )
+        else
+          actor
+        end
+
+      actor =
+        case destination_location_id(option) do
+          nil -> actor
+          location_id -> %{actor | location_id: location_id}
+        end
+
       if Enum.any?(option.effects, &(&1["type"] == "disable_actor")) do
         %{actor | active: false, interaction_disabled: true}
       else
@@ -140,6 +164,21 @@ defmodule Detective.Cases.SpecialActors do
     |> Enum.filter(&(&1["type"] == "private_case_cards"))
     |> Enum.flat_map(& &1["case_card_ids"])
     |> Enum.uniq()
+  end
+
+  def public_case_card_ids(option) do
+    effect_ids(option, "public_case_cards", "case_card_ids")
+  end
+
+  def revealed_suspect_ids(option) do
+    effect_ids(option, "reveal_suspects", "suspect_ids")
+  end
+
+  def destination_location_id(option) do
+    case Enum.find(option.effects, &(&1["type"] == "move_actor")) do
+      nil -> nil
+      effect -> effect["location_id"]
+    end
   end
 
   def apply_lifecycle_updates(runtime_actors, updates)
@@ -176,7 +215,7 @@ defmodule Detective.Cases.SpecialActors do
     end
   end
 
-  defp valid_actor?(actor, location_ids, case_card_ids) when is_map(actor) do
+  defp valid_actor?(actor, valid_ids) when is_map(actor) do
     blocks = actor["blocks"] || []
     options = actor["options"]
     initially_visible = Map.get(actor, "initially_visible", true)
@@ -184,40 +223,61 @@ defmodule Detective.Cases.SpecialActors do
 
     non_empty_binary?(actor["id"]) and non_empty_binary?(actor["name"]) and
       non_empty_binary?(actor["role"]) and actor["kind"] in @kinds and
-      MapSet.member?(location_ids, actor["location_id"]) and valid_blocks?(blocks) and
+      MapSet.member?(valid_ids.locations, actor["location_id"]) and valid_blocks?(blocks) and
       is_boolean(initially_visible) and is_boolean(initially_active) and
       (not initially_active or initially_visible) and
       (actor["kind"] != "counter_surveillance" or blocks != []) and
       is_list(options) and options != [] and unique_ids?(options) and
-      Enum.all?(options, &valid_option?(&1, case_card_ids))
+      valid_choice_groups?(options) and Enum.all?(options, &valid_option?(&1, valid_ids))
   end
 
-  defp valid_actor?(_actor, _location_ids, _case_card_ids), do: false
+  defp valid_actor?(_actor, _valid_ids), do: false
 
-  defp valid_option?(option, case_card_ids) when is_map(option) do
+  defp valid_option?(option, valid_ids) when is_map(option) do
     effects = option["effects"]
+    choice_group = option["choice_group"]
 
     non_empty_binary?(option["id"]) and non_empty_binary?(option["label"]) and
       integer_between?(option["action_cost"], 0, 4) and
       non_negative_integer?(option["scratch_cost"]) and is_boolean(option["once"]) and
+      (is_nil(choice_group) or non_empty_binary?(choice_group)) and
       is_list(effects) and effects != [] and unique_effect_types?(effects) and
-      Enum.all?(effects, &valid_effect?(&1, case_card_ids))
+      Enum.all?(effects, &valid_effect?(&1, valid_ids)) and
+      disjoint_card_effects?(effects)
   end
 
-  defp valid_option?(_option, _case_card_ids), do: false
+  defp valid_option?(_option, _valid_ids), do: false
 
-  defp valid_effect?(%{"type" => "disable_actor"} = effect, _case_card_ids),
+  defp valid_effect?(%{"type" => "disable_actor"} = effect, _valid_ids),
     do: Map.keys(effect) == ["type"]
+
+  defp valid_effect?(%{"type" => "move_actor", "location_id" => location_id} = effect, valid_ids) do
+    Enum.sort(Map.keys(effect)) == ["location_id", "type"] and
+      MapSet.member?(valid_ids.locations, location_id)
+  end
 
   defp valid_effect?(
          %{"type" => "private_case_cards", "case_card_ids" => ids} = effect,
          valid_ids
        ) do
     Enum.sort(Map.keys(effect)) == ["case_card_ids", "type"] and valid_id_list?(ids) and
-      MapSet.subset?(MapSet.new(ids), valid_ids)
+      MapSet.subset?(MapSet.new(ids), valid_ids.case_cards)
   end
 
-  defp valid_effect?(_effect, _case_card_ids), do: false
+  defp valid_effect?(
+         %{"type" => "public_case_cards", "case_card_ids" => ids} = effect,
+         valid_ids
+       ) do
+    Enum.sort(Map.keys(effect)) == ["case_card_ids", "type"] and valid_id_list?(ids) and
+      MapSet.subset?(MapSet.new(ids), valid_ids.case_cards)
+  end
+
+  defp valid_effect?(%{"type" => "reveal_suspects", "suspect_ids" => ids} = effect, valid_ids) do
+    Enum.sort(Map.keys(effect)) == ["suspect_ids", "type"] and valid_id_list?(ids) and
+      MapSet.subset?(MapSet.new(ids), valid_ids.suspects)
+  end
+
+  defp valid_effect?(_effect, _valid_ids), do: false
 
   defp normalize_option(option) do
     %{
@@ -226,12 +286,42 @@ defmodule Detective.Cases.SpecialActors do
       action_cost: option["action_cost"],
       scratch_cost: option["scratch_cost"],
       once: option["once"],
+      choice_group: option["choice_group"],
       effects: option["effects"]
     }
   end
 
   defp public_option(option) do
-    Map.take(option, [:id, :label, :action_cost, :scratch_cost])
+    public = Map.take(option, [:id, :label, :action_cost, :scratch_cost])
+
+    case Map.get(option, :choice_group) do
+      nil -> public
+      choice_group -> Map.put(public, :choice_group, choice_group)
+    end
+  end
+
+  defp effect_ids(option, effect_type, id_key) do
+    option.effects
+    |> Enum.filter(&(&1["type"] == effect_type))
+    |> Enum.flat_map(& &1[id_key])
+    |> Enum.uniq()
+  end
+
+  defp valid_choice_groups?(options) do
+    group_counts =
+      options
+      |> Enum.map(& &1["choice_group"])
+      |> Enum.reject(&is_nil/1)
+      |> Enum.frequencies()
+
+    Enum.all?(group_counts, fn {_group, count} -> count >= 2 end)
+  end
+
+  defp disjoint_card_effects?(effects) do
+    private_ids = effect_ids(%{effects: effects}, "private_case_cards", "case_card_ids")
+    public_ids = effect_ids(%{effects: effects}, "public_case_cards", "case_card_ids")
+
+    MapSet.disjoint?(MapSet.new(private_ids), MapSet.new(public_ids))
   end
 
   defp unique_ids?(entries) when is_list(entries) do

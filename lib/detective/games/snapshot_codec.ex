@@ -12,7 +12,7 @@ defmodule Detective.Games.SnapshotCodec do
   end
 
   def load(%{"schema_version" => schema_version} = data)
-      when schema_version in [1, 2, 3, 4, 5, @schema_version] do
+      when schema_version in [1, 2, 3, 4, 5, 6, @schema_version] do
     with {:ok, status} <- status(data["status"]),
          {:ok, phase} <- phase(data["phase"]),
          {:ok, paused_from_phase} <- optional_phase(data["paused_from_phase"]),
@@ -179,7 +179,9 @@ defmodule Detective.Games.SnapshotCodec do
            Map.get(actor, "interaction_disabled", false),
          blocks when is_list(blocks) <- actor["blocks"],
          options when is_list(options) <- actor["options"],
-         used_option_ids when is_list(used_option_ids) <- actor["used_option_ids"] do
+         used_option_ids when is_list(used_option_ids) <- actor["used_option_ids"],
+         resolved_choice_groups when is_list(resolved_choice_groups) <-
+           Map.get(actor, "resolved_choice_groups", []) do
       {:ok,
        %{
          id: id,
@@ -192,7 +194,8 @@ defmodule Detective.Games.SnapshotCodec do
          interaction_disabled: interaction_disabled,
          blocks: blocks,
          options: Enum.map(options, &load_special_option/1),
-         used_option_ids: used_option_ids
+         used_option_ids: used_option_ids,
+         resolved_choice_groups: resolved_choice_groups
        }}
     else
       _invalid -> {:error, :invalid_snapshot_special_actors}
@@ -208,6 +211,7 @@ defmodule Detective.Games.SnapshotCodec do
       action_cost: option["action_cost"],
       scratch_cost: option["scratch_cost"],
       once: option["once"],
+      choice_group: option["choice_group"],
       effects: option["effects"] || []
     }
   end

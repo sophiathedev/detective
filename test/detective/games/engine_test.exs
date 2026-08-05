@@ -1,6 +1,7 @@
 defmodule Detective.Games.EngineTest do
   use ExUnit.Case, async: true
 
+  alias Detective.Cases.SpecialActors
   alias Detective.Games.{Command, Engine, Rules, State}
   alias Detective.Games.Projections.Public
 
@@ -366,6 +367,61 @@ defmodule Detective.Games.EngineTest do
 
     assert {:error, :invalid_special_interaction} =
              apply_command(resolved, "detective-1", :interact_special_actor, %{
+               "actor_id" => "station-tail",
+               "option_id" => "buy-off"
+             })
+  end
+
+  test "special actor branch moves the actor, reveals public leads, and locks alternatives" do
+    assert {:ok, state} =
+             Engine.new(game(), players(), branching_special_actor_case_definition())
+
+    assert {:ok, placed, _events} =
+             apply_command(state, "detective-1", :place, %{"location_id" => "51"})
+
+    legacy_placed =
+      update_in(placed.special_actors["station-tail"], fn special_actor ->
+        Map.delete(special_actor, :resolved_choice_groups)
+      end)
+
+    assert {:ok, resolved, [event]} =
+             apply_command(legacy_placed, "detective-1", :interact_special_actor, %{
+               "actor_id" => "station-tail",
+               "option_id" => "shadow-tail"
+             })
+
+    special_actor = resolved.special_actors["station-tail"]
+    assert special_actor.active
+    assert special_actor.location_id == "96"
+    assert special_actor.resolved_choice_groups == ["tail-approach"]
+    assert resolved.suspects["night-clerk"].revealed
+    assert "sealed-ledger" in resolved.public_case_card_ids
+
+    assert event.public_payload.actor_from_location_id == "51"
+    assert event.public_payload.actor_location_id == "96"
+    assert event.public_payload.revealed_case_card_codes == ["B"]
+    assert event.public_payload.revealed_suspect_ids == ["night-clerk"]
+    refute Jason.encode!(event.public_payload) =~ "public_case_cards"
+    refute Jason.encode!(event.public_payload) =~ "move_actor"
+
+    actor_at_destination =
+      %{
+        resolved
+        | players:
+            Map.update!(
+              resolved.players,
+              resolved.current_detective_id,
+              &%{&1 | location_id: "96"}
+            )
+      }
+
+    assert SpecialActors.available_interactions(
+             actor_at_destination.special_actors,
+             player(actor_at_destination, "detective-1")
+           ) == []
+
+    assert {:error, :special_choice_resolved} =
+             apply_command(actor_at_destination, "detective-1", :interact_special_actor, %{
                "actor_id" => "station-tail",
                "option_id" => "buy-off"
              })
@@ -1620,6 +1676,29 @@ defmodule Detective.Games.EngineTest do
         ]
       }
     ])
+  end
+
+  defp branching_special_actor_case_definition do
+    special_actor_case_definition()
+    |> put_in(["suspects", Access.at(0), "initially_known"], false)
+    |> update_in(["special_actors", Access.at(0), "options"], fn [buy_off] ->
+      [
+        Map.put(buy_off, "choice_group", "tail-approach"),
+        %{
+          "id" => "shadow-tail",
+          "label" => "Shadow the lookout",
+          "action_cost" => 2,
+          "scratch_cost" => 0,
+          "once" => true,
+          "choice_group" => "tail-approach",
+          "effects" => [
+            %{"type" => "move_actor", "location_id" => "96"},
+            %{"type" => "public_case_cards", "case_card_ids" => ["sealed-ledger"]},
+            %{"type" => "reveal_suspects", "suspect_ids" => ["night-clerk"]}
+          ]
+        }
+      ]
+    end)
   end
 
   defp legacy_location(id, name, type, district_ids, x, y) do
