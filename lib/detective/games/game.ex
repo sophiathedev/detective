@@ -45,7 +45,7 @@ defmodule Detective.Games.Game do
     |> validate_format(:room_code, ~r/^[A-Z2-9]{6}$/)
     |> validate_inclusion(:status, ~w(waiting active paused finished cancelled))
     |> validate_inclusion(:phase, ~w(lobby))
-    |> validate_number(:max_detectives, greater_than_or_equal_to: 1, less_than_or_equal_to: 4)
+    |> validate_number(:max_detectives, greater_than_or_equal_to: 2, less_than_or_equal_to: 4)
     |> validate_number(:current_version, greater_than_or_equal_to: 0)
     |> foreign_key_constraint(:host_user_id)
     |> foreign_key_constraint(:case_version_id)

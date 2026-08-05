@@ -53,10 +53,12 @@ defmodule Detective.InvitationsTest do
     host = user_fixture()
     first = user_fixture()
     second = user_fixture()
-    %{game: game, invite_token: token} = game_fixture(host, %{max_detectives: 1})
+    third = user_fixture()
+    %{game: game, invite_token: token} = game_fixture(host, %{max_detectives: 2})
 
     assert {:ok, _result} = Invitations.accept(Scope.for_user(first), token)
-    assert {:error, reason} = Invitations.accept(Scope.for_user(second), token)
+    assert {:ok, _result} = Invitations.accept(Scope.for_user(second), token)
+    assert {:error, reason} = Invitations.accept(Scope.for_user(third), token)
     assert reason in [:invite_exhausted, :room_full]
 
     assert Repo.aggregate(
@@ -66,6 +68,6 @@ defmodule Detective.InvitationsTest do
                    player.status == "active"
              ),
              :count
-           ) == 1
+           ) == 2
   end
 end

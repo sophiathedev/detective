@@ -74,6 +74,21 @@ defmodule Detective.GamesTest do
     assert "must be less than or equal to 4" in errors_on(changeset).max_detectives
   end
 
+  test "rejects a one-Detective Classic room" do
+    user = user_fixture()
+    case_version = case_version_fixture()
+
+    changeset =
+      Games.change_game(Scope.for_user(user), %{
+        title: "Head to head",
+        case_version_id: case_version.id,
+        max_detectives: 1
+      })
+
+    refute changeset.valid?
+    assert "must be greater than or equal to 2" in errors_on(changeset).max_detectives
+  end
+
   test "detective readiness is versioned and rejects stale commands" do
     host = user_fixture()
     detective = user_fixture()
