@@ -160,6 +160,62 @@
   box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 0.45);
 }
 
+.noir-auth-desk {
+  position: relative;
+  min-height: calc(100dvh - 3.5rem);
+  background:
+    linear-gradient(112deg, transparent 0 63%, rgb(194 163 95 / 0.08) 63.1% 63.25%, transparent 63.35%),
+    radial-gradient(circle at 20% 0%, rgb(170 57 47 / 0.14), transparent 32%);
+}
+
+.noir-auth-desk::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgb(194 163 95 / 0.035) 1px, transparent 1px),
+    linear-gradient(rgb(194 163 95 / 0.035) 1px, transparent 1px);
+  background-size: 4rem 4rem;
+  content: "";
+  mask-image: linear-gradient(to bottom, black, transparent 85%);
+}
+
+.noir-auth-desk > .noir-paper-sheet {
+  z-index: 1;
+}
+
+.noir-auth-desk label {
+  color: var(--noir-ink-900);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.noir-auth-desk input:not([type="checkbox"]):not([type="hidden"]),
+.noir-auth-desk select,
+.noir-auth-desk textarea {
+  border-color: var(--noir-paper-500);
+  border-radius: 0.25rem;
+  background-color: var(--noir-paper-100);
+  color: var(--noir-ink-900);
+  box-shadow: inset 0 0.15rem 0.35rem rgb(73 48 29 / 0.16);
+}
+
+.noir-auth-desk input:not([type="checkbox"]):not([type="hidden"]):focus,
+.noir-auth-desk select:focus,
+.noir-auth-desk textarea:focus {
+  border-color: var(--noir-red-500);
+  outline: 3px solid var(--noir-focus);
+  outline-offset: 2px;
+  --tw-ring-color: transparent;
+}
+
+.noir-auth-desk [data-phx-feedback-for] {
+  color: var(--noir-red-700);
+}
+
 @custom-variant phx-click-loading (.phx-click-loading&, .phx-click-loading &);
 @custom-variant phx-submit-loading (.phx-submit-loading&, .phx-submit-loading &);
 @custom-variant phx-change-loading (.phx-change-loading&, .phx-change-loading &);

@@ -8,47 +8,71 @@ defmodule DetectiveWeb.UserLive.Registration do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <div class="mx-auto max-w-md px-6 py-16 sm:py-24">
-        <div class="text-center">
-          <.header>
-            Register for an account
-            <:subtitle>
-              Already registered?
-              <.link navigate={~p"/users/log-in"} class="font-semibold text-amber-700 hover:underline">
-                Log in
-              </.link>
-              to your account now.
-            </:subtitle>
-          </.header>
-        </div>
-
-        <.form for={@form} id="registration_form" phx-submit="save" phx-change="validate">
-          <.input
-            field={@form[:display_name]}
-            type="text"
-            label="Display name"
-            autocomplete="name"
-            required
-            phx-mounted={JS.focus()}
-          />
-          <.input
-            field={@form[:email]}
-            type="email"
-            label="Email"
-            autocomplete="username"
-            spellcheck="false"
-            required
-          />
-
-          <.button
-            variant="primary"
-            phx-disable-with="Creating account..."
-            class="w-full rounded-lg bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600"
+      <section
+        class="noir-auth-desk px-4 py-12 sm:px-6 sm:py-20"
+        aria-labelledby="registration-title"
+      >
+        <div
+          id="auth-registration-sheet"
+          class="noir-paper-sheet mx-auto max-w-lg p-6 sm:p-10"
+        >
+          <p class="font-mono text-xs uppercase tracking-[0.18em] text-[var(--noir-red-700)]">
+            New investigator record
+          </p>
+          <h1
+            id="registration-title"
+            class="mt-3 font-serif text-4xl font-semibold text-[var(--noir-ink-900)]"
           >
-            Create an account
-          </.button>
-        </.form>
-      </div>
+            Register an investigator
+          </h1>
+          <p class="mt-3 text-sm leading-6 text-[#66513c]">
+            Already registered?
+            <.link
+              navigate={~p"/users/log-in"}
+              class="font-semibold text-[var(--noir-red-700)] hover:underline"
+            >
+              Log in
+            </.link>
+            to reopen your file.
+          </p>
+
+          <.form
+            for={@form}
+            id="registration_form"
+            phx-submit="save"
+            phx-change="validate"
+            class="mt-7"
+          >
+            <.input
+              field={@form[:display_name]}
+              type="text"
+              label="Display name"
+              autocomplete="name"
+              required
+              phx-mounted={JS.focus()}
+            />
+            <.input
+              field={@form[:email]}
+              type="email"
+              label="Email"
+              autocomplete="username"
+              spellcheck="false"
+              required
+            />
+
+            <.button
+              variant="primary"
+              phx-disable-with="Creating account..."
+              class="noir-physical-button w-full px-4 text-sm font-semibold"
+            >
+              Create an account
+            </.button>
+          </.form>
+          <p class="mt-6 border-t border-[var(--noir-paper-500)] pt-5 text-xs leading-5 text-[#705a42]">
+            Your display name is public inside a room. Your email remains account-only.
+          </p>
+        </div>
+      </section>
     </Layouts.app>
     """
   end

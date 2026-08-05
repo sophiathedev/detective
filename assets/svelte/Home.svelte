@@ -1,101 +1,104 @@
 <script>
-  let { app_name, count, phoenix_version, live_svelte_version } = $props()
+  import PaperSheet from "./ui/PaperSheet.svelte"
+  import StatusStamp from "./ui/StatusStamp.svelte"
+  import WoodFrame from "./ui/WoodFrame.svelte"
+
+  let { signed_in = false } = $props()
 </script>
 
-<div id="home-svelte" class="min-h-screen bg-stone-50 text-zinc-950">
-  <header class="border-b border-zinc-200 bg-stone-50/95">
-    <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 lg:px-8">
-      <a href="/" class="text-base font-semibold tracking-tight transition hover:text-emerald-700">
-        {app_name}
-      </a>
-      <nav class="flex items-center gap-1" aria-label="Resources">
-        <a
-          href="https://hexdocs.pm/live_svelte/"
-          class="rounded-md px-3 py-2 text-sm text-zinc-600 transition hover:bg-zinc-200/60 hover:text-zinc-950"
-        >
-          LiveSvelte docs
-        </a>
-        <a
-          href="https://tailwindcss.com/docs"
-          class="rounded-md px-3 py-2 text-sm text-zinc-600 transition hover:bg-zinc-200/60 hover:text-zinc-950"
-        >
-          Tailwind docs
-        </a>
-      </nav>
-    </div>
-  </header>
+<div id="home-svelte" class="relative min-h-[calc(100dvh-3.5rem)] overflow-hidden px-4 py-8 sm:px-6 sm:py-12 lg:px-10">
+  <div class="pointer-events-none absolute inset-0 opacity-40" aria-hidden="true">
+    <div class="absolute -left-24 top-12 h-px w-[34rem] rotate-[-22deg] bg-[var(--noir-gold-700)]"></div>
+    <div class="absolute -right-16 bottom-20 h-px w-[30rem] rotate-[19deg] bg-[var(--noir-gold-700)]"></div>
+  </div>
 
-  <main class="mx-auto grid max-w-7xl gap-16 px-6 py-20 lg:grid-cols-[minmax(0,1fr)_24rem] lg:px-8 lg:py-28">
-    <section class="max-w-3xl">
-      <p class="font-mono text-sm text-emerald-700">Phoenix / LiveSvelte / Tailwind CSS</p>
-      <h1 class="mt-6 text-5xl font-semibold tracking-[-0.045em] text-balance sm:text-7xl">
-        Phoenix data.<br />Svelte interface.
-      </h1>
-      <p class="mt-8 max-w-2xl text-lg leading-8 text-zinc-600">
-        LiveSvelte now owns the primary interface. Phoenix keeps server state and realtime transport;
-        Svelte renders the product experience; Tailwind CSS supplies the design system.
-      </p>
+  <WoodFrame
+    as="main"
+    id="home-case-desk"
+    labelledby="home-case-title"
+    class="relative mx-auto grid min-h-[calc(100dvh-8.5rem)] max-w-[92rem] overflow-hidden p-3 sm:p-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(22rem,0.7fr)]"
+  >
+    <section class="relative flex min-h-[34rem] flex-col justify-end overflow-hidden border border-[var(--noir-gold-700)] bg-[var(--noir-ebony-900)] px-6 py-10 sm:px-10 sm:py-14 lg:px-14 lg:py-16">
+      <div class="pointer-events-none absolute inset-0" aria-hidden="true">
+        <div class="absolute inset-x-0 top-0 h-2/3 bg-[radial-gradient(circle_at_30%_15%,rgba(194,163,95,0.18),transparent_46%)]"></div>
+        <div class="absolute -right-16 top-16 h-72 w-72 rotate-12 border border-[var(--noir-gold-700)] opacity-30"></div>
+        <div class="absolute right-10 top-28 h-44 w-44 rounded-full border border-[var(--noir-red-500)] opacity-25"></div>
+        <div class="absolute bottom-0 left-0 h-48 w-full bg-[linear-gradient(165deg,transparent_35%,rgba(0,0,0,0.72)_36%)]"></div>
+      </div>
 
-      <div class="mt-12 flex flex-wrap gap-3">
-        <a
-          href="https://hexdocs.pm/live_svelte/basic_usage.html"
-          class="inline-flex items-center rounded-lg bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-        >
-          Build first screen
-        </a>
-        <a
-          href="https://hexdocs.pm/phoenix_live_view/"
-          class="inline-flex items-center rounded-lg border border-zinc-300 bg-transparent px-4 py-2.5 text-sm font-semibold text-zinc-800 transition hover:border-zinc-400 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500"
-        >
-          LiveView reference
-        </a>
+      <div class="relative max-w-4xl">
+        <StatusStamp tone="sealed">Case file 1940-LA</StatusStamp>
+        <p class="mt-7 font-mono text-xs uppercase tracking-[0.24em] text-[var(--noir-gold-500)]">
+          Los Angeles · Midnight detail
+        </p>
+        <h1 id="home-case-title" class="mt-4 max-w-4xl font-serif text-5xl font-semibold leading-[0.93] tracking-[-0.055em] text-[var(--noir-paper-100)] sm:text-7xl lg:text-[6.7rem]">
+          Every witness has a story.
+        </h1>
+        <p class="mt-7 max-w-2xl font-serif text-lg leading-8 text-stone-300 sm:text-xl">
+          Detectives chase contradictions across the city. The Chisel guards the truth, shapes every testimony, and lets the evidence decide who was listening.
+        </p>
       </div>
     </section>
 
-    <aside class="border-t border-zinc-300 pt-8 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0">
-      <h2 class="text-sm font-semibold text-zinc-950">Server round trip</h2>
-      <p class="mt-2 text-sm leading-6 text-zinc-600">
-        Buttons send LiveView events. Updated count returns through LiveSvelte props.
-      </p>
+    <PaperSheet
+      as="aside"
+      labelledby="home-brief-title"
+      tilt="right"
+      class="m-2 flex flex-col justify-between p-6 sm:m-4 sm:p-9 lg:m-6"
+    >
+      <div>
+        <p class="font-mono text-[0.65rem] uppercase tracking-[0.2em] text-[var(--noir-red-700)]">
+          Assignment brief
+        </p>
+        <h2 id="home-brief-title" class="mt-3 font-serif text-3xl font-semibold leading-tight">
+          Enter the investigation
+        </h2>
+        <div class="mt-5 h-px bg-[var(--noir-paper-500)]"></div>
 
-      <div class="mt-8 flex items-center gap-5">
-        <button
-          id="decrement-count"
-          type="button"
-          phx-click="decrement"
-          aria-label="Decrease count"
-          class="flex size-11 cursor-pointer items-center justify-center rounded-lg border border-zinc-300 bg-white text-xl transition hover:border-zinc-500 hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500"
-        >
-          −
-        </button>
-        <output id="server-count" class="min-w-12 text-center font-mono text-4xl font-semibold" aria-live="polite">
-          {count}
-        </output>
-        <button
-          id="increment-count"
-          type="button"
-          phx-click="increment"
-          aria-label="Increase count"
-          class="flex size-11 cursor-pointer items-center justify-center rounded-lg bg-zinc-950 text-xl text-white transition hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-        >
-          +
-        </button>
+        <ol class="mt-7 space-y-6" aria-label="How a case unfolds">
+          <li class="grid grid-cols-[2rem_1fr] gap-3">
+            <span class="font-mono text-sm font-semibold text-[var(--noir-red-700)]">01</span>
+            <div>
+              <h3 class="font-serif text-lg font-semibold">Assemble the room</h3>
+              <p class="mt-1 text-sm leading-6 text-[#5d4936]">One Chisel invites up to four Detectives into a private case.</p>
+            </div>
+          </li>
+          <li class="grid grid-cols-[2rem_1fr] gap-3">
+            <span class="font-mono text-sm font-semibold text-[var(--noir-red-700)]">02</span>
+            <div>
+              <h3 class="font-serif text-lg font-semibold">Read the city</h3>
+              <p class="mt-1 text-sm leading-6 text-[#5d4936]">Move, search, and interrogate while the server enforces every turn.</p>
+            </div>
+          </li>
+          <li class="grid grid-cols-[2rem_1fr] gap-3">
+            <span class="font-mono text-sm font-semibold text-[var(--noir-red-700)]">03</span>
+            <div>
+              <h3 class="font-serif text-lg font-semibold">Challenge the lie</h3>
+              <p class="mt-1 text-sm leading-6 text-[#5d4936]">Commit to a theory before the case closes around you.</p>
+            </div>
+          </li>
+        </ol>
       </div>
 
-      <dl class="mt-12 space-y-4 border-t border-zinc-300 pt-6 text-sm">
-        <div class="flex items-center justify-between gap-4">
-          <dt class="text-zinc-500">Phoenix</dt>
-          <dd class="font-mono text-zinc-800">v{phoenix_version}</dd>
-        </div>
-        <div class="flex items-center justify-between gap-4">
-          <dt class="text-zinc-500">LiveSvelte</dt>
-          <dd class="font-mono text-zinc-800">v{live_svelte_version}</dd>
-        </div>
-        <div class="flex items-center justify-between gap-4">
-          <dt class="text-zinc-500">Tailwind CSS</dt>
-          <dd class="font-mono text-zinc-800">v4</dd>
-        </div>
-      </dl>
-    </aside>
-  </main>
+      <div class="mt-10 border-t border-[var(--noir-paper-500)] pt-6">
+        {#if signed_in}
+          <a href="/dashboard" class="noir-physical-button inline-flex w-full items-center justify-center px-5 text-sm font-semibold">
+            Open case cabinet
+          </a>
+        {:else}
+          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            <a href="/users/register" class="noir-physical-button inline-flex items-center justify-center px-5 text-sm font-semibold">
+              Open an account
+            </a>
+            <a href="/users/log-in" class="inline-flex min-h-11 items-center justify-center border border-[var(--noir-ink-900)] px-5 text-sm font-semibold text-[var(--noir-ink-900)] transition hover:bg-[var(--noir-ink-900)] hover:text-[var(--noir-paper-100)] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[var(--noir-red-700)]">
+              Log in
+            </a>
+          </div>
+        {/if}
+        <p class="mt-5 text-xs leading-5 text-[#705a42]">
+          Non-commercial fan project. Not affiliated with Van Ryder Games or the original publishers.
+        </p>
+      </div>
+    </PaperSheet>
+  </WoodFrame>
 </div>

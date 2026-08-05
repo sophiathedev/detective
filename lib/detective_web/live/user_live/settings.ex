@@ -10,80 +10,115 @@ defmodule DetectiveWeb.UserLive.Settings do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <div class="mx-auto max-w-2xl space-y-8 px-6 py-16 sm:py-24">
-        <div class="text-center">
-          <.header>
-            Account Settings
-            <:subtitle>Manage your public identity, email address, and password</:subtitle>
-          </.header>
+      <section
+        class="noir-auth-desk px-4 py-12 sm:px-6 sm:py-20"
+        aria-labelledby="settings-title"
+      >
+        <div
+          id="account-settings-dossier"
+          class="noir-paper-sheet mx-auto max-w-3xl p-6 sm:p-10"
+        >
+          <p class="font-mono text-xs uppercase tracking-[0.18em] text-[var(--noir-red-700)]">
+            Investigator record
+          </p>
+          <h1
+            id="settings-title"
+            class="mt-3 font-serif text-4xl font-semibold text-[var(--noir-ink-900)]"
+          >
+            Account settings
+          </h1>
+          <p class="mt-3 text-sm leading-6 text-[#66513c]">
+            Manage your public identity, private email address, and password.
+          </p>
+
+          <.form
+            for={@profile_form}
+            id="profile_form"
+            phx-submit="update_profile"
+            phx-change="validate_profile"
+            class="mt-8 border-t border-[var(--noir-paper-500)] pt-7"
+          >
+            <h2 class="font-serif text-xl font-semibold">Public identity</h2>
+            <.input
+              field={@profile_form[:display_name]}
+              type="text"
+              label="Display name"
+              autocomplete="name"
+              required
+            />
+            <.button
+              variant="primary"
+              phx-disable-with="Saving..."
+              class="noir-physical-button px-5 text-sm font-semibold"
+            >Save Profile</.button>
+          </.form>
+
+          <.form
+            for={@email_form}
+            id="email_form"
+            phx-submit="update_email"
+            phx-change="validate_email"
+            class="mt-8 border-t border-[var(--noir-paper-500)] pt-7"
+          >
+            <h2 class="font-serif text-xl font-semibold">Secure correspondence</h2>
+            <.input
+              field={@email_form[:email]}
+              type="email"
+              label="Email"
+              autocomplete="username"
+              spellcheck="false"
+              required
+            />
+            <.button
+              variant="primary"
+              phx-disable-with="Changing..."
+              class="noir-physical-button px-5 text-sm font-semibold"
+            >Change Email</.button>
+          </.form>
+
+          <.form
+            for={@password_form}
+            id="password_form"
+            action={~p"/users/update-password"}
+            method="post"
+            phx-change="validate_password"
+            phx-submit="update_password"
+            phx-trigger-action={@trigger_submit}
+            class="mt-8 border-t border-[var(--noir-paper-500)] pt-7"
+          >
+            <h2 class="font-serif text-xl font-semibold">Password cipher</h2>
+            <input
+              name={@password_form[:email].name}
+              type="hidden"
+              id="hidden_user_email"
+              spellcheck="false"
+              value={@current_email}
+            />
+            <.input
+              field={@password_form[:password]}
+              type="password"
+              label="New password"
+              autocomplete="new-password"
+              spellcheck="false"
+              required
+            />
+            <.input
+              field={@password_form[:password_confirmation]}
+              type="password"
+              label="Confirm new password"
+              autocomplete="new-password"
+              spellcheck="false"
+            />
+            <.button
+              variant="primary"
+              phx-disable-with="Saving..."
+              class="noir-physical-button px-5 text-sm font-semibold"
+            >
+              Save Password
+            </.button>
+          </.form>
         </div>
-
-        <.form
-          for={@profile_form}
-          id="profile_form"
-          phx-submit="update_profile"
-          phx-change="validate_profile"
-        >
-          <.input
-            field={@profile_form[:display_name]}
-            type="text"
-            label="Display name"
-            autocomplete="name"
-            required
-          />
-          <.button variant="primary" phx-disable-with="Saving...">Save Profile</.button>
-        </.form>
-
-        <.form for={@email_form} id="email_form" phx-submit="update_email" phx-change="validate_email">
-          <.input
-            field={@email_form[:email]}
-            type="email"
-            label="Email"
-            autocomplete="username"
-            spellcheck="false"
-            required
-          />
-          <.button variant="primary" phx-disable-with="Changing...">Change Email</.button>
-        </.form>
-
-        <hr class="my-8 border-zinc-200" />
-
-        <.form
-          for={@password_form}
-          id="password_form"
-          action={~p"/users/update-password"}
-          method="post"
-          phx-change="validate_password"
-          phx-submit="update_password"
-          phx-trigger-action={@trigger_submit}
-        >
-          <input
-            name={@password_form[:email].name}
-            type="hidden"
-            id="hidden_user_email"
-            spellcheck="false"
-            value={@current_email}
-          />
-          <.input
-            field={@password_form[:password]}
-            type="password"
-            label="New password"
-            autocomplete="new-password"
-            spellcheck="false"
-            required
-          />
-          <.input
-            field={@password_form[:password_confirmation]}
-            type="password"
-            label="Confirm new password"
-            autocomplete="new-password"
-            spellcheck="false"
-          />
-          <.button variant="primary" phx-disable-with="Saving...">
-            Save Password
-          </.button>
-        </.form>
-      </div>
+      </section>
     </Layouts.app>
     """
   end

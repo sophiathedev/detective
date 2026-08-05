@@ -6,8 +6,10 @@ defmodule DetectiveWeb.UserLive.RegistrationTest do
 
   describe "Registration page" do
     test "renders registration page", %{conn: conn} do
-      {:ok, _lv, html} = live(conn, ~p"/users/register")
+      {:ok, lv, html} = live(conn, ~p"/users/register")
 
+      assert has_element?(lv, "#auth-registration-sheet.noir-paper-sheet")
+      assert has_element?(lv, "#registration_form")
       assert html =~ "Register"
       assert html =~ "Log in"
     end

@@ -7,11 +7,15 @@ defmodule DetectiveWeb.UserLive.SettingsTest do
 
   describe "Settings page" do
     test "renders settings page", %{conn: conn} do
-      {:ok, _lv, html} =
+      {:ok, lv, html} =
         conn
         |> log_in_user(user_fixture())
         |> live(~p"/users/settings")
 
+      assert has_element?(lv, "#account-settings-dossier.noir-paper-sheet")
+      assert has_element?(lv, "#profile_form")
+      assert has_element?(lv, "#email_form")
+      assert has_element?(lv, "#password_form")
       assert html =~ "Change Email"
       assert html =~ "Save Profile"
       assert html =~ "Save Password"

@@ -6,8 +6,11 @@ defmodule DetectiveWeb.UserLive.LoginTest do
 
   describe "login page" do
     test "renders login page", %{conn: conn} do
-      {:ok, _lv, html} = live(conn, ~p"/users/log-in")
+      {:ok, lv, html} = live(conn, ~p"/users/log-in")
 
+      assert has_element?(lv, "#auth-login-sheet.noir-paper-sheet")
+      assert has_element?(lv, "#login_form_magic")
+      assert has_element?(lv, "#login_form_password")
       assert html =~ "Log in"
       assert html =~ "Sign up"
       assert html =~ "Log in with email"

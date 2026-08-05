@@ -5,20 +5,9 @@ defmodule DetectiveWeb.HomeLive do
   def mount(_params, _session, socket) do
     {:ok,
      assign(socket,
-       page_title: "Home",
-       count: 0,
-       phoenix_version: to_string(Application.spec(:phoenix, :vsn)),
-       live_svelte_version: to_string(Application.spec(:live_svelte, :vsn))
+       page_title: "Detective: City of Angels",
+       signed_in: not is_nil(socket.assigns.current_scope)
      )}
-  end
-
-  @impl true
-  def handle_event("increment", _params, socket) do
-    {:noreply, update(socket, :count, &(&1 + 1))}
-  end
-
-  def handle_event("decrement", _params, socket) do
-    {:noreply, update(socket, :count, &max(&1 - 1, 0))}
   end
 
   @impl true
@@ -28,14 +17,7 @@ defmodule DetectiveWeb.HomeLive do
       <.svelte
         id="home-frontend"
         name="Home"
-        props={
-          %{
-            app_name: "Detective",
-            count: @count,
-            phoenix_version: @phoenix_version,
-            live_svelte_version: @live_svelte_version
-          }
-        }
+        props={%{signed_in: @signed_in}}
         socket={@socket}
       />
     </Layouts.app>

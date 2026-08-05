@@ -17,7 +17,8 @@ defmodule DetectiveWeb.UserLive.ConfirmationTest do
           Accounts.deliver_login_instructions(user, url)
         end)
 
-      {:ok, _lv, html} = live(conn, ~p"/users/log-in/#{token}")
+      {:ok, lv, html} = live(conn, ~p"/users/log-in/#{token}")
+      assert has_element?(lv, "#auth-confirmation-sheet.noir-paper-sheet")
       assert html =~ "Confirm and stay logged in"
     end
 

@@ -7,79 +7,98 @@ defmodule DetectiveWeb.UserLive.Confirmation do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <div class="mx-auto max-w-md px-6 py-16 sm:py-24">
-        <div class="text-center">
-          <.header>Welcome {@user.email}</.header>
-        </div>
-
-        <.form
-          :if={!@user.confirmed_at}
-          for={@form}
-          id="confirmation_form"
-          phx-mounted={JS.focus_first()}
-          phx-submit="submit"
-          action={~p"/users/log-in?_action=confirmed"}
-          phx-trigger-action={@trigger_submit}
+      <section
+        class="noir-auth-desk px-4 py-12 sm:px-6 sm:py-20"
+        aria-labelledby="confirmation-title"
+      >
+        <div
+          id="auth-confirmation-sheet"
+          class="noir-paper-sheet mx-auto max-w-lg p-6 sm:p-10"
         >
-          <input type="hidden" name={@form[:token].name} value={@form[:token].value} />
-          <.button
-            name={@form[:remember_me].name}
-            value="true"
-            phx-disable-with="Confirming..."
-            class="w-full rounded-lg bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600"
+          <p class="font-mono text-xs uppercase tracking-[0.18em] text-[var(--noir-red-700)]">
+            Identity verification
+          </p>
+          <h1
+            id="confirmation-title"
+            class="mt-3 font-serif text-3xl font-semibold text-[var(--noir-ink-900)]"
           >
-            Confirm and stay logged in
-          </.button>
-          <.button
-            phx-disable-with="Confirming..."
-            class="mt-2 w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-900 transition hover:border-zinc-500 hover:bg-zinc-50"
-          >
-            Confirm and log in only this time
-          </.button>
-        </.form>
+            Welcome {@user.email}
+          </h1>
+          <p class="mt-3 text-sm leading-6 text-[#66513c]">
+            Confirm this sealed link to finish opening your investigator record.
+          </p>
 
-        <.form
-          :if={@user.confirmed_at}
-          for={@form}
-          id="login_form"
-          phx-submit="submit"
-          phx-mounted={JS.focus_first()}
-          action={~p"/users/log-in"}
-          phx-trigger-action={@trigger_submit}
-        >
-          <input type="hidden" name={@form[:token].name} value={@form[:token].value} />
-          <%= if @current_scope do %>
-            <.button
-              phx-disable-with="Logging in..."
-              class="w-full rounded-lg bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-700"
-            >
-              Log in
-            </.button>
-          <% else %>
+          <.form
+            :if={!@user.confirmed_at}
+            for={@form}
+            id="confirmation_form"
+            phx-mounted={JS.focus_first()}
+            phx-submit="submit"
+            action={~p"/users/log-in?_action=confirmed"}
+            phx-trigger-action={@trigger_submit}
+            class="mt-7"
+          >
+            <input type="hidden" name={@form[:token].name} value={@form[:token].value} />
             <.button
               name={@form[:remember_me].name}
               value="true"
-              phx-disable-with="Logging in..."
-              class="w-full rounded-lg bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-700"
+              phx-disable-with="Confirming..."
+              class="noir-physical-button w-full px-4 text-sm font-semibold"
             >
-              Keep me logged in on this device
+              Confirm and stay logged in
             </.button>
             <.button
-              phx-disable-with="Logging in..."
-              class="mt-2 w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-900 transition hover:border-zinc-500 hover:bg-zinc-50"
+              phx-disable-with="Confirming..."
+              class="mt-2 w-full border border-[var(--noir-ink-900)] bg-transparent px-4 py-2.5 text-sm font-semibold text-[var(--noir-ink-900)] transition hover:bg-[var(--noir-ink-900)] hover:text-[var(--noir-paper-100)]"
             >
-              Log me in only this time
+              Confirm and log in only this time
             </.button>
-          <% end %>
-        </.form>
+          </.form>
 
-        <p
-          :if={!@user.confirmed_at}
-          class="mt-8 border-l-2 border-amber-600 bg-amber-50 px-4 py-3 text-sm text-amber-950"
-        >
-          Tip: If you prefer passwords, you can enable them in the user settings.
-        </p>
-      </div>
+          <.form
+            :if={@user.confirmed_at}
+            for={@form}
+            id="login_form"
+            phx-submit="submit"
+            phx-mounted={JS.focus_first()}
+            action={~p"/users/log-in"}
+            phx-trigger-action={@trigger_submit}
+            class="mt-7"
+          >
+            <input type="hidden" name={@form[:token].name} value={@form[:token].value} />
+            <%= if @current_scope do %>
+              <.button
+                phx-disable-with="Logging in..."
+                class="noir-physical-button w-full px-4 text-sm font-semibold"
+              >
+                Log in
+              </.button>
+            <% else %>
+              <.button
+                name={@form[:remember_me].name}
+                value="true"
+                phx-disable-with="Logging in..."
+                class="noir-physical-button w-full px-4 text-sm font-semibold"
+              >
+                Keep me logged in on this device
+              </.button>
+              <.button
+                phx-disable-with="Logging in..."
+                class="mt-2 w-full border border-[var(--noir-ink-900)] bg-transparent px-4 py-2.5 text-sm font-semibold text-[var(--noir-ink-900)] transition hover:bg-[var(--noir-ink-900)] hover:text-[var(--noir-paper-100)]"
+              >
+                Log me in only this time
+              </.button>
+            <% end %>
+          </.form>
+
+          <p
+            :if={!@user.confirmed_at}
+            class="mt-8 border-l-2 border-[var(--noir-red-500)] bg-[#d8c7a5] px-4 py-3 text-sm text-[var(--noir-ink-900)]"
+          >
+            Tip: If you prefer passwords, you can enable them in the user settings.
+          </p>
+        </div>
+      </section>
     </Layouts.app>
     """
   end
