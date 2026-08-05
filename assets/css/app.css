@@ -183,6 +183,89 @@
     var(--noir-ebony-950);
 }
 
+.noir-game-table {
+  position: relative;
+  height: calc(100dvh - 3.5rem);
+  min-height: 34rem;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 42%, rgb(66 52 36 / 0.18), transparent 48%),
+    var(--noir-ebony-950);
+  color: var(--noir-paper-100);
+  isolation: isolate;
+}
+
+.noir-game-map-region {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.noir-game-phase {
+  position: absolute;
+  z-index: 30;
+  top: 1rem;
+  left: 50%;
+  display: grid;
+  min-width: min(28rem, calc(100% - 24rem));
+  translate: -50% 0;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.8rem;
+  border: 1px solid var(--noir-gold-700);
+  border-radius: 0.35rem;
+  background: rgb(15 13 12 / 0.94) url("/images/ui/noir/wood-grain.svg");
+  box-shadow: 0 0.75rem 2rem rgb(0 0 0 / 0.46), inset 0 0 0 1px rgb(194 163 95 / 0.12);
+  padding: 0.65rem 0.85rem;
+  color: var(--noir-paper-300);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.625rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.noir-game-phase strong {
+  overflow: hidden;
+  color: var(--noir-paper-100);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.noir-game-detective-rail {
+  position: absolute;
+  z-index: 30;
+  top: 50%;
+  left: 1rem;
+  translate: 0 -50%;
+}
+
+.noir-game-chisel {
+  position: absolute;
+  z-index: 30;
+  top: 1rem;
+  right: 1rem;
+}
+
+.noir-game-context {
+  position: absolute;
+  z-index: 29;
+  top: 11.75rem;
+  right: 1rem;
+}
+
+.noir-game-actions {
+  position: absolute;
+  z-index: 30;
+  bottom: 1rem;
+  left: 50%;
+  translate: -50% 0;
+}
+
+.noir-map-rotate-notice {
+  display: none;
+}
+
 .noir-wood-nav {
   background-color: var(--noir-ebony-800);
   background-image: url("/images/ui/noir/wood-grain.svg");
