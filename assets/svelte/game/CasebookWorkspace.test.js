@@ -127,6 +127,66 @@ describe("CasebookWorkspace", () => {
     expect(document.querySelector("#casebook-submit-interrogation")).toHaveTextContent("FREE")
   })
 
+  it("requires a sealed confirmation before spending a Solve token", async () => {
+    const submitAccusation = vi.fn()
+    const view = {
+      ...baseView,
+      availableActions: ["accuse"],
+      accusation: {
+        ...baseView.accusation,
+        options: {
+          suspects: [{ id: "iona-pike", name: "Iona Pike" }],
+          weapons: [{ id: "wire", label: "Piano Wire" }],
+          motives: [{ id: "blackmail", label: "Blackmail" }],
+        },
+        selectedSuspectId: "iona-pike",
+        selectedWeaponId: "wire",
+        selectedMotiveId: "blackmail",
+      },
+    }
+
+    render(CasebookWorkspace, {
+      page: "accusation",
+      view,
+      actions: { ...noActions, submitAccusation },
+    })
+
+    await fireEvent.click(document.querySelector("#casebook-submit-accusation"))
+    expect(submitAccusation).not.toHaveBeenCalled()
+    expect(document.querySelector("#accusation-confirmation")).toHaveTextContent(
+      "Iona Pike",
+    )
+
+    await fireEvent.click(document.querySelector("#casebook-confirm-accusation"))
+    expect(submitAccusation).toHaveBeenCalledOnce()
+  })
+
+  it("shows public final-guess filing progress without revealing choices", () => {
+    const view = {
+      ...baseView,
+      phase: "accusation",
+      availableActions: ["submit_final_guess"],
+      detectives: [
+        { id: "d1", display_name: "Marlowe", final_guess_submitted: true },
+        { id: "d2", display_name: "Rowan", final_guess_submitted: false },
+      ],
+      accusation: {
+        ...baseView.accusation,
+        options: {
+          suspects: [{ id: "iona-pike", name: "Iona Pike" }],
+          weapons: [{ id: "wire", label: "Piano Wire" }],
+          motives: [{ id: "blackmail", label: "Blackmail" }],
+        },
+      },
+    }
+
+    render(CasebookWorkspace, { page: "accusation", view, actions: noActions })
+
+    expect(document.querySelector("#final-guess-progress")).toHaveTextContent("1 / 2 filed")
+    expect(document.querySelector("#final-guess-player-d1")).toHaveTextContent("FILED")
+    expect(document.querySelector("#final-guess-player-d2")).toHaveTextContent("PENDING")
+  })
+
   it("requires confirmation before searching the current location", async () => {
     const submitLocationSearch = vi.fn()
     const view = {

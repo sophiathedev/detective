@@ -48,7 +48,8 @@ defmodule Detective.Games.Projections.Public do
           seat: player.seat,
           location_id: player.location_id,
           actions_remaining: player.actions_remaining,
-          leverage_on_suspects: player.leverage_on_suspects
+          leverage_on_suspects: player.leverage_on_suspects,
+          final_guess_submitted: is_map(Map.get(player, :final_guess))
         }
 
       %{role: "chisel"} = player ->

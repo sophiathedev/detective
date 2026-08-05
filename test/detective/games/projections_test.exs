@@ -184,6 +184,33 @@ defmodule Detective.Games.ProjectionsTest do
     end
   end
 
+  test "public projection exposes only final-guess filing status" do
+    detective_id = "10000000-0000-0000-0000-000000000001"
+    base = state_fixture()
+
+    state = %{
+      base
+      | phase: :accusation,
+        players:
+          Map.update!(base.players, detective_id, fn detective ->
+            Map.put(detective, :final_guess, %{
+              "suspect_id" => "sealed-suspect-choice",
+              "weapon_id" => "sealed-weapon-choice",
+              "motive_id" => "sealed-motive-choice"
+            })
+          end)
+    }
+
+    public = Public.render(state)
+    detective = Enum.find(public.players, &(&1.id == detective_id))
+    public_json = Jason.encode!(public)
+
+    assert detective.final_guess_submitted
+    refute public_json =~ "sealed-suspect-choice"
+    refute public_json =~ "sealed-weapon-choice"
+    refute public_json =~ "sealed-motive-choice"
+  end
+
   test "active unplaced Detective receives only placement destination IDs" do
     state = engine_state_fixture()
     placement_ids = state |> Rules.police_stations() |> Enum.map(& &1.id)

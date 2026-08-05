@@ -7,6 +7,7 @@
   let evidence = $derived(view?.evidence ?? {})
   let accusation = $derived(view?.accusation ?? {})
   let history = $derived(view?.history ?? {})
+  let accusationConfirming = $state(false)
   let selectedInterrogation = $derived(
     (question.interrogationOptions ?? []).find(
       (option) => option.suspect_id === question.selectedSuspectId,
@@ -14,6 +15,24 @@
   )
   let selectedTopic = $derived(
     selectedInterrogation?.topics?.find((topic) => topic.id === question.selectedTopicId),
+  )
+  let selectedAccusationSuspect = $derived(
+    (accusation.options?.suspects ?? []).find(
+      (suspect) => suspect.id === accusation.selectedSuspectId,
+    ),
+  )
+  let selectedAccusationWeapon = $derived(
+    (accusation.options?.weapons ?? []).find(
+      (weapon) => weapon.id === accusation.selectedWeaponId,
+    ),
+  )
+  let selectedAccusationMotive = $derived(
+    (accusation.options?.motives ?? []).find(
+      (motive) => motive.id === accusation.selectedMotiveId,
+    ),
+  )
+  let finalGuessFiledCount = $derived(
+    (view?.detectives ?? []).filter((detective) => detective.final_guess_submitted).length,
   )
 
   function toggleBlockedPlayer(playerId, checked) {
@@ -26,6 +45,16 @@
   function caseCardLabel(cardId) {
     const card = (evidence.knownCaseCards ?? []).find((candidate) => candidate.id === cardId)
     return card ? `${card.code} ${card.title}` : cardId
+  }
+
+  function setAccusationSelection(action, value) {
+    accusationConfirming = false
+    action?.(value)
+  }
+
+  function confirmAccusation() {
+    accusationConfirming = false
+    actions.submitAccusation?.()
   }
 </script>
 
@@ -396,16 +425,56 @@
   {:else if view.role === "detective" && (accusation.options?.motives?.length ?? 0) > 0 && (availableActions.has("accuse") || availableActions.has("submit_final_guess") || accusation.solveAttempt || accusation.finalGuess || view.phase === "accusation")}
     <section id="accusation-sheet" class="casebook-workspace-page border-2 border-[#71372f] bg-[#d7c6a6] p-4 sm:p-5" aria-labelledby="accusation-heading">
       <div class="flex flex-wrap items-start justify-between gap-3"><div><p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Sealed deduction</p><h3 id="accusation-heading" class="mt-1 font-serif text-xl font-semibold">Suspect, weapon, motive</h3></div><span class="border border-[#8c3f33] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.1em] text-[#8c3f33]">{view.phase === "accusation" ? "final guess" : "solve token"}</span></div>
+
+      {#if view.phase === "accusation"}
+        <section id="final-guess-progress" class="mt-4 border-y border-[#9d8669] py-3" aria-labelledby="final-guess-progress-heading" aria-live="polite">
+          <div class="flex items-center justify-between gap-3">
+            <h4 id="final-guess-progress-heading" class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">Sealed envelopes</h4>
+            <span class="font-mono text-[9px] font-semibold uppercase text-[#8c3f33]">{finalGuessFiledCount} / {view.detectives?.length ?? 0} filed</span>
+          </div>
+          <ul class="mt-2 grid gap-2 sm:grid-cols-2">
+            {#each view.detectives ?? [] as detective}
+              <li id={`final-guess-player-${detective.id}`} class="flex min-h-10 items-center justify-between border border-[#9d8669] bg-[#e4d6b8] px-3 text-sm">
+                <span class="font-serif font-semibold">{detective.display_name}</span>
+                <span class={`font-mono text-[9px] font-semibold uppercase tracking-[0.1em] ${detective.final_guess_submitted ? "text-[#315046]" : "text-[#8c3f33]"}`}>
+                  {detective.final_guess_submitted ? "FILED" : "PENDING"}
+                </span>
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {/if}
+
       {#if accusation.solveAttempt}<p id="solve-attempt-result" class="mt-3 border-l-4 border-[#8c3f33] bg-[#eadbbc] p-3 text-sm font-semibold">{accusation.solveAttempt.correct_count} of 3 elements were correct. The token is spent; your turn continues.</p>{/if}
       {#if accusation.finalGuess && view.phase === "accusation"}
         <p id="final-guess-sealed" class="mt-3 border border-dashed border-[#8e765b] p-4 text-center font-serif text-sm italic">Your final guess is sealed. Waiting for the remaining Detectives.</p>
       {:else}
         <div class="mt-4 grid gap-4 lg:grid-cols-3">
-          <fieldset id="accusation-suspects"><legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">1 / Suspect</legend><div class="mt-2 grid gap-2">{#each accusation.options?.suspects ?? [] as suspect}<label class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 ${accusation.selectedSuspectId === suspect.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}><input type="radio" name="accusation-suspect" value={suspect.id} checked={accusation.selectedSuspectId === suspect.id} onchange={() => actions.setAccusationSuspect?.(suspect.id)} class="accent-[#963a31]" /><span class="text-sm font-semibold">{suspect.name}</span></label>{/each}</div></fieldset>
-          <fieldset id="accusation-weapons"><legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">2 / Known weapon</legend><div class="mt-2 grid gap-2">{#each accusation.options?.weapons ?? [] as weapon}<label class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 ${accusation.selectedWeaponId === weapon.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}><input type="radio" name="accusation-weapon" value={weapon.id} checked={accusation.selectedWeaponId === weapon.id} onchange={() => actions.setAccusationWeapon?.(weapon.id)} class="accent-[#963a31]" /><span class="text-sm font-semibold">{weapon.label}</span></label>{/each}</div></fieldset>
-          <fieldset id="accusation-motives"><legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">3 / Motive</legend><div class="mt-2 grid gap-2">{#each accusation.options?.motives ?? [] as motive}<label class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 ${accusation.selectedMotiveId === motive.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}><input type="radio" name="accusation-motive" value={motive.id} checked={accusation.selectedMotiveId === motive.id} onchange={() => actions.setAccusationMotive?.(motive.id)} class="accent-[#963a31]" /><span class="text-sm font-semibold">{motive.label}</span></label>{/each}</div></fieldset>
+          <fieldset id="accusation-suspects"><legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">1 / Suspect</legend><div class="mt-2 grid gap-2">{#each accusation.options?.suspects ?? [] as suspect}<label class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 ${accusation.selectedSuspectId === suspect.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}><input type="radio" name="accusation-suspect" value={suspect.id} checked={accusation.selectedSuspectId === suspect.id} onchange={() => setAccusationSelection(actions.setAccusationSuspect, suspect.id)} class="accent-[#963a31]" /><span class="text-sm font-semibold">{suspect.name}</span></label>{/each}</div></fieldset>
+          <fieldset id="accusation-weapons"><legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">2 / Known weapon</legend><div class="mt-2 grid gap-2">{#each accusation.options?.weapons ?? [] as weapon}<label class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 ${accusation.selectedWeaponId === weapon.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}><input type="radio" name="accusation-weapon" value={weapon.id} checked={accusation.selectedWeaponId === weapon.id} onchange={() => setAccusationSelection(actions.setAccusationWeapon, weapon.id)} class="accent-[#963a31]" /><span class="text-sm font-semibold">{weapon.label}</span></label>{/each}</div></fieldset>
+          <fieldset id="accusation-motives"><legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">3 / Motive</legend><div class="mt-2 grid gap-2">{#each accusation.options?.motives ?? [] as motive}<label class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 ${accusation.selectedMotiveId === motive.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}><input type="radio" name="accusation-motive" value={motive.id} checked={accusation.selectedMotiveId === motive.id} onchange={() => setAccusationSelection(actions.setAccusationMotive, motive.id)} class="accent-[#963a31]" /><span class="text-sm font-semibold">{motive.label}</span></label>{/each}</div></fieldset>
         </div>
-        <button id="casebook-submit-accusation" type="button" disabled={(!availableActions.has("accuse") && !availableActions.has("submit_final_guess")) || !accusation.selectedSuspectId || !accusation.selectedWeaponId || !accusation.selectedMotiveId} onclick={() => actions.submitAccusation?.()} class="mt-4 min-h-12 w-full cursor-pointer bg-[#8f372f] px-4 text-sm font-semibold text-[#fff0d6] disabled:cursor-not-allowed disabled:opacity-40">{view.phase === "accusation" ? "Seal final guess" : "Spend Solve token"}</button>
+
+        {#if accusationConfirming}
+          <div id="accusation-confirmation" class="mt-4 border-2 border-[#8c3f33] bg-[#eadbbc] p-4" role="alert">
+            <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#8c3f33]">Final seal check</p>
+            <p class="mt-2 font-serif text-base font-semibold">
+              {selectedAccusationSuspect?.name} / {selectedAccusationWeapon?.label} / {selectedAccusationMotive?.label}
+            </p>
+            <p class="mt-2 text-xs leading-5 text-[#695642]">
+              {view.phase === "accusation"
+                ? "This envelope cannot be changed after filing. Its contents stay private until every Detective submits."
+                : "This spends your only Solve token. An incorrect accusation reveals only how many elements matched."}
+            </p>
+            <div class="mt-3 grid grid-cols-2 gap-2">
+              <button id="casebook-cancel-accusation" type="button" onclick={() => (accusationConfirming = false)} class="min-h-11 cursor-pointer border border-[#796349] bg-[#d7c7aa] px-3 text-sm font-semibold">Revise deduction</button>
+              <button id="casebook-confirm-accusation" type="button" onclick={confirmAccusation} class="min-h-11 cursor-pointer bg-[#8f372f] px-3 text-sm font-semibold text-[#fff0d6]">{view.phase === "accusation" ? "File sealed guess" : "Spend Solve token"}</button>
+            </div>
+          </div>
+        {:else}
+          <button id="casebook-submit-accusation" type="button" disabled={(!availableActions.has("accuse") && !availableActions.has("submit_final_guess")) || !selectedAccusationSuspect || !selectedAccusationWeapon || !selectedAccusationMotive} onclick={() => (accusationConfirming = true)} class="mt-4 min-h-12 w-full cursor-pointer bg-[#8f372f] px-4 text-sm font-semibold text-[#fff0d6] disabled:cursor-not-allowed disabled:opacity-40">{view.phase === "accusation" ? "Review final guess" : "Review Solve accusation"}</button>
+        {/if}
+
         {#if view.phase !== "accusation"}<p class="mt-2 text-xs leading-5 text-[#695642]">A Solve accusation is legal only at the beginning of your turn, before any action is spent.</p>{/if}
       {/if}
     </section>

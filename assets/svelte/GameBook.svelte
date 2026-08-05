@@ -174,6 +174,7 @@
     role: privateState.role,
     phase: publicState.phase,
     result: publicState.result,
+    detectives,
     activeDetective,
     ownPlayer,
     availableActions: [...availableActions],
@@ -328,6 +329,13 @@
     if (!recordPublicEvent(message, description)) return false
 
     openDrawer("question")
+    return true
+  }
+
+  function recordAccusationEvent(message, description) {
+    if (!recordPublicEvent(message, description)) return false
+
+    openDrawer("accusation")
     return true
   }
 
@@ -814,19 +822,19 @@
       recordPublicEvent(message, "The investigation advanced one day."),
     )
     gameChannel.on("accusation_opened", (message) =>
-      recordPublicEvent(message, "Time expired. The accusation phase is open."),
+      recordAccusationEvent(message, "Time expired. The accusation phase is open."),
     )
     gameChannel.on("accusation_submitted", (message) =>
-      recordPublicEvent(message, "A Detective submitted a Solve accusation."),
+      recordAccusationEvent(message, "A Detective submitted a Solve accusation."),
     )
     gameChannel.on("accusation_rejected", (message) =>
-      recordPublicEvent(message, "A Solve accusation was incorrect."),
+      recordAccusationEvent(message, "A Solve accusation was incorrect."),
     )
     gameChannel.on("final_guess_submitted", (message) =>
-      recordPublicEvent(message, "A sealed final guess entered the casefile."),
+      recordAccusationEvent(message, "A sealed final guess entered the casefile."),
     )
     gameChannel.on("game_finished", (message) =>
-      recordPublicEvent(message, "The case is closed and the solution is public."),
+      recordAccusationEvent(message, "The case is closed and the solution is public."),
     )
 
     userChannel.on("private_state", ({ game_id: eventGameId, state, version }) => {
@@ -861,8 +869,10 @@
         lastEvent = payload.solved
           ? "Your accusation solved all three parts of the case."
           : `${payload.correct_count} of 3 accusation elements were correct.`
+        openDrawer("accusation")
       } else if (payload.type === "final_guess_recorded") {
         lastEvent = "Your final guess is sealed until every Detective submits."
+        openDrawer("accusation")
       }
     })
 
