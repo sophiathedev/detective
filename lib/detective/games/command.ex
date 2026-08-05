@@ -13,6 +13,7 @@ defmodule Detective.Games.Command do
           | :kickback
           | :search_location
           | :search_suspect
+          | :interact_special_actor
           | :interrogate
           | :skip_free_question
           | :allow_question
@@ -65,6 +66,7 @@ defmodule Detective.Games.Command do
   defp command_type("kickback"), do: {:ok, :kickback}
   defp command_type("search_location"), do: {:ok, :search_location}
   defp command_type("search_suspect"), do: {:ok, :search_suspect}
+  defp command_type("interact_special_actor"), do: {:ok, :interact_special_actor}
   defp command_type("interrogate"), do: {:ok, :interrogate}
   defp command_type("skip_free_question"), do: {:ok, :skip_free_question}
   defp command_type("allow_question"), do: {:ok, :allow_question}

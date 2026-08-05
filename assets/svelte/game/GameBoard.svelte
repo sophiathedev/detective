@@ -13,6 +13,10 @@
     interrogatableSuspectIds = [],
     selectedSuspectId = null,
     suspectInteractionsDisabled = false,
+    specialActors = [],
+    interactableSpecialActorIds = [],
+    selectedSpecialActorId = null,
+    specialActorInteractionsDisabled = false,
     caseCardSlots = [],
     inspectableCaseCardCodes = [],
     selectedCaseCardCode = null,
@@ -24,6 +28,7 @@
     onSelect = () => {},
     onSelectDetective = () => {},
     onSelectSuspect = () => {},
+    onSelectSpecialActor = () => {},
     onSelectCaseCard = () => {},
   } = $props()
 
@@ -33,6 +38,11 @@
   )
   let interrogatableIds = $derived(
     new Set(disabled || suspectInteractionsDisabled ? [] : interrogatableSuspectIds),
+  )
+  let interactableActorIds = $derived(
+    new Set(
+      disabled || specialActorInteractionsDisabled ? [] : interactableSpecialActorIds,
+    ),
   )
   let availableDetectiveActions = $derived(
     disabled || detectiveInteractionsDisabled ? [] : detectiveActionTypes,
@@ -136,6 +146,36 @@
       x: location.x * 1000 + offset - (sharesLocationWithDetective ? 28 : 0),
       y: location.y * 636 + (sharesLocationWithDetective ? 42 : 24),
     }
+  }
+
+  function specialActorPlacement(actor) {
+    const location = locations.find((candidate) => candidate.id === actor.location_id)
+    if (!location) return null
+
+    const colocated = specialActors.filter(
+      (candidate) => candidate.location_id === actor.location_id,
+    )
+    const index = colocated.findIndex((candidate) => candidate.id === actor.id)
+    const offset = (index - (colocated.length - 1) / 2) * 24
+
+    return {
+      location,
+      x: location.x * 1000 + 34 + offset,
+      y: location.y * 636 - 42,
+    }
+  }
+
+  function specialActorLabel(actor, location, actionable) {
+    const status = actor.active ? "active" : "neutralized"
+    const action = actionable ? " Select to review special interactions." : ""
+    return `${actor.name}, ${actor.role}, at ${location.name}. ${status}.${action}`
+  }
+
+  function selectSpecialActor(event, actor, actionable) {
+    if (!actionable) return
+    if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return
+    if (event.type === "keydown") event.preventDefault()
+    onSelectSpecialActor(actor)
   }
 </script>
 
@@ -306,6 +346,43 @@
               class="map-suspect-base"
               vector-effect="non-scaling-stroke"
             />
+          </g>
+        {/if}
+      {/each}
+    </g>
+
+    <g id="special-actor-tokens" aria-label="Case-specific people and contacts">
+      {#each specialActors as actor (actor.id)}
+        {@const placement = specialActorPlacement(actor)}
+        {#if placement}
+          {@const actionable = actor.active && interactableActorIds.has(actor.id)}
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+          <g
+            id={`special-actor-token-${actor.id}`}
+            data-testid={`special-actor-${actor.id}`}
+            data-location-id={placement.location.id}
+            data-kind={actor.kind}
+            data-active={actor.active}
+            data-actionable={actionable}
+            data-selected={selectedSpecialActorId === actor.id}
+            class={`map-special-actor ${actor.active ? "" : "map-special-actor-disabled"} ${actionable ? "map-special-actor-actionable" : ""} ${selectedSpecialActorId === actor.id ? "map-special-actor-selected" : ""}`}
+            style={`transform: translate(${placement.x}px, ${placement.y}px);`}
+            role={actionable ? "button" : "img"}
+            tabindex={actionable ? "0" : undefined}
+            focusable={actionable ? "true" : "false"}
+            aria-pressed={actionable ? selectedSpecialActorId === actor.id : undefined}
+            aria-label={specialActorLabel(actor, placement.location, actionable)}
+            onclick={(event) => selectSpecialActor(event, actor, actionable)}
+            onkeydown={(event) => selectSpecialActor(event, actor, actionable)}
+          >
+            <title>{specialActorLabel(actor, placement.location, actionable)}</title>
+            <circle r="25" class="map-special-actor-ring" vector-effect="non-scaling-stroke" />
+            <path d="M-15-17H15L19 12 0 21-19 12Z" class="map-special-actor-badge" />
+            <path d="M-8-8 0-14 8-8V2L0 8-8 2Z" class="map-special-actor-eye" />
+            <path d="M-11 13H11" class="map-special-actor-mark" vector-effect="non-scaling-stroke" />
+            {#if !actor.active}
+              <path d="M-17-17 17 17" class="map-special-actor-strike" vector-effect="non-scaling-stroke" />
+            {/if}
           </g>
         {/if}
       {/each}

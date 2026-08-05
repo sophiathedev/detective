@@ -12,14 +12,15 @@ defmodule Detective.Games.SnapshotCodec do
   end
 
   def load(%{"schema_version" => schema_version} = data)
-      when schema_version in [1, 2, 3, @schema_version] do
+      when schema_version in [1, 2, 3, 4, @schema_version] do
     with {:ok, status} <- status(data["status"]),
          {:ok, phase} <- phase(data["phase"]),
          {:ok, paused_from_phase} <- optional_phase(data["paused_from_phase"]),
          {:ok, pause_reason} <- optional_reason(data["pause_reason"]),
          {:ok, players} <- load_players(data["players"]),
          {:ok, locations} <- load_locations(data["locations"]),
-         {:ok, suspects} <- load_suspects(data["suspects"]) do
+         {:ok, suspects} <- load_suspects(data["suspects"]),
+         {:ok, special_actors} <- load_special_actors(data["special_actors"] || %{}) do
       {:ok,
        %State{
          schema_version: @schema_version,
@@ -39,6 +40,7 @@ defmodule Detective.Games.SnapshotCodec do
          players: players,
          locations: locations,
          suspects: suspects,
+         special_actors: special_actors,
          case_definition: data["case_definition"],
          public_case_card_ids: data["public_case_card_ids"] || [],
          archived_searches: data["archived_searches"] || [],
@@ -153,6 +155,57 @@ defmodule Detective.Games.SnapshotCodec do
   end
 
   defp load_suspects(_suspects), do: {:error, :invalid_snapshot_suspects}
+
+  defp load_special_actors(actors) when is_map(actors) do
+    Enum.reduce_while(actors, {:ok, %{}}, fn {actor_id, actor}, {:ok, acc} ->
+      case load_special_actor(actor) do
+        {:ok, loaded_actor} -> {:cont, {:ok, Map.put(acc, actor_id, loaded_actor)}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp load_special_actors(_actors), do: {:error, :invalid_snapshot_special_actors}
+
+  defp load_special_actor(actor) when is_map(actor) do
+    with id when is_binary(id) <- actor["id"],
+         name when is_binary(name) <- actor["name"],
+         role when is_binary(role) <- actor["role"],
+         kind when is_binary(kind) <- actor["kind"],
+         location_id when is_binary(location_id) <- actor["location_id"],
+         active when is_boolean(active) <- actor["active"],
+         blocks when is_list(blocks) <- actor["blocks"],
+         options when is_list(options) <- actor["options"],
+         used_option_ids when is_list(used_option_ids) <- actor["used_option_ids"] do
+      {:ok,
+       %{
+         id: id,
+         name: name,
+         role: role,
+         kind: kind,
+         location_id: location_id,
+         active: active,
+         blocks: blocks,
+         options: Enum.map(options, &load_special_option/1),
+         used_option_ids: used_option_ids
+       }}
+    else
+      _invalid -> {:error, :invalid_snapshot_special_actors}
+    end
+  end
+
+  defp load_special_actor(_actor), do: {:error, :invalid_snapshot_special_actors}
+
+  defp load_special_option(option) do
+    %{
+      id: option["id"],
+      label: option["label"],
+      action_cost: option["action_cost"],
+      scratch_cost: option["scratch_cost"],
+      once: option["once"],
+      effects: option["effects"] || []
+    }
+  end
 
   defp status("active"), do: {:ok, :active}
   defp status("finished"), do: {:ok, :finished}

@@ -1,6 +1,7 @@
 defmodule Detective.Games.ProjectionsTest do
   use ExUnit.Case, async: true
 
+  alias Detective.Cases.SpecialActors
   alias Detective.Games.{Command, Engine, Projections, Rules}
   alias Detective.Games.Projections.Public
   alias Detective.Games.State
@@ -96,6 +97,95 @@ defmodule Detective.Games.ProjectionsTest do
              "public-clock",
              "hidden-arrival"
            ]
+  end
+
+  test "special actor effects stay private while legal interaction costs reach the Detective" do
+    actor_definition = %{
+      "id" => "station-tail",
+      "name" => "Station Tail",
+      "role" => "counter-surveillance lookout",
+      "kind" => "counter_surveillance",
+      "location_id" => "51",
+      "blocks" => ["search_location"],
+      "options" => [
+        %{
+          "id" => "buy-off",
+          "label" => "Buy off the lookout",
+          "action_cost" => 1,
+          "scratch_cost" => 2,
+          "once" => true,
+          "effects" => [
+            %{"type" => "disable_actor"},
+            %{"type" => "private_case_cards", "case_card_ids" => ["sealed-file"]}
+          ]
+        }
+      ]
+    }
+
+    base = state_fixture()
+
+    case_definition =
+      base.case_definition
+      |> Map.update!("case_cards", fn cards ->
+        cards ++
+          [
+            %{
+              "id" => "sealed-file",
+              "code" => "B",
+              "title" => "Sealed File",
+              "type" => "information",
+              "description" => "Private contents.",
+              "initially_known" => false
+            }
+          ]
+      end)
+      |> Map.put("special_actors", [actor_definition])
+
+    state = %{
+      base
+      | case_definition: case_definition,
+        special_actors: SpecialActors.initialize(case_definition),
+        players: Map.update!(base.players, base.current_detective_id, &%{&1 | location_id: "51"})
+    }
+
+    public = Public.render(state)
+    {:ok, detective} = Projections.for_user(state, detective_user_id())
+    {:ok, chisel} = Projections.for_user(state, chisel_user_id())
+
+    assert public.special_actors == [
+             %{
+               id: "station-tail",
+               name: "Station Tail",
+               role: "counter-surveillance lookout",
+               kind: "counter_surveillance",
+               location_id: "51",
+               active: true,
+               blocks: ["search_location"]
+             }
+           ]
+
+    assert detective.private.special_actor_interactions == [
+             %{
+               actor_id: "station-tail",
+               name: "Station Tail",
+               role: "counter-surveillance lookout",
+               kind: "counter_surveillance",
+               location_id: "51",
+               options: [
+                 %{
+                   id: "buy-off",
+                   label: "Buy off the lookout",
+                   action_cost: 1,
+                   scratch_cost: 2
+                 }
+               ]
+             }
+           ]
+
+    refute Jason.encode!(public) =~ "sealed-file"
+    refute Jason.encode!(detective) =~ "private_case_cards"
+    refute Jason.encode!(detective.private.special_actor_interactions) =~ "sealed-file"
+    assert get_in(chisel.private.casebook, [:special_actors, Access.at(0), "options"])
   end
 
   test "pending response options and truth metadata remain role-private" do

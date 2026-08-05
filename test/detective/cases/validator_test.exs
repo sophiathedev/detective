@@ -288,6 +288,65 @@ defmodule Detective.Cases.ValidatorTest do
     assert {:error, :invalid_special_rules} = Validator.validate(duplicate_setup)
   end
 
+  test "validates finite special actors, blockers, and private interaction effects" do
+    valid =
+      valid_case()
+      |> Map.put("case_cards", [
+        %{
+          "id" => "sealed-file",
+          "code" => "A",
+          "title" => "Sealed File",
+          "type" => "information",
+          "initially_known" => false
+        }
+      ])
+      |> Map.put("special_actors", [special_actor()])
+
+    assert :ok = Validator.validate(valid)
+
+    invalid_location = put_in(valid, ["special_actors", Access.at(0), "location_id"], "404")
+    assert {:error, :invalid_special_actors} = Validator.validate(invalid_location)
+
+    invalid_card =
+      put_in(
+        valid,
+        [
+          "special_actors",
+          Access.at(0),
+          "options",
+          Access.at(0),
+          "effects",
+          Access.at(1),
+          "case_card_ids"
+        ],
+        ["missing"]
+      )
+
+    assert {:error, :invalid_special_actors} = Validator.validate(invalid_card)
+
+    unknown_block =
+      put_in(valid, ["special_actors", Access.at(0), "blocks"], ["steal_solution"])
+
+    assert {:error, :invalid_special_actors} = Validator.validate(unknown_block)
+
+    unknown_effect =
+      put_in(
+        valid,
+        [
+          "special_actors",
+          Access.at(0),
+          "options",
+          Access.at(0),
+          "effects",
+          Access.at(0),
+          "type"
+        ],
+        "run_case_script"
+      )
+
+    assert {:error, :invalid_special_actors} = Validator.validate(unknown_effect)
+  end
+
   defp valid_case do
     %{
       "board_id" => "dcoa_classic",
@@ -316,6 +375,30 @@ defmodule Detective.Cases.ValidatorTest do
         "type" => "starting_days",
         "days_by_detective_count" => %{"2" => 6, "3" => 5, "4" => 4}
       }
+    }
+  end
+
+  defp special_actor do
+    %{
+      "id" => "station-tail",
+      "name" => "Station Tail",
+      "role" => "counter-surveillance lookout",
+      "kind" => "counter_surveillance",
+      "location_id" => "51",
+      "blocks" => ["search_location", "search_suspect", "interrogate"],
+      "options" => [
+        %{
+          "id" => "buy-off",
+          "label" => "Buy off the lookout",
+          "action_cost" => 1,
+          "scratch_cost" => 2,
+          "once" => true,
+          "effects" => [
+            %{"type" => "disable_actor"},
+            %{"type" => "private_case_cards", "case_card_ids" => ["sealed-file"]}
+          ]
+        }
+      ]
     }
   end
 

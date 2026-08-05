@@ -1,7 +1,7 @@
 defmodule Detective.Games.Projections.Detective do
   @moduledoc false
 
-  alias Detective.Cases.SearchDeck
+  alias Detective.Cases.{SearchDeck, SpecialActors}
   alias Detective.Games.{Rules, State}
 
   def render_private(%State{} = state, actor_user_id) do
@@ -32,6 +32,8 @@ defmodule Detective.Games.Projections.Detective do
             |> Rules.searchable_suspects(player)
             |> Enum.map(& &1.id),
           interrogation_options: Rules.interrogation_options(state, player),
+          special_actor_interactions:
+            SpecialActors.available_interactions(state.special_actors, player),
           pending_interrogation: pending_interrogation(state, player),
           valid_move_location_ids:
             if("move" in available_actions,

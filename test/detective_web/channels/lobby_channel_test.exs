@@ -127,7 +127,7 @@ defmodule DetectiveWeb.LobbyChannelTest do
       })
 
     started_version = ready_lobby.current_version + 1
-    assert_reply ref, :ok, %{path: path, version: ^started_version}
+    assert_reply ref, :ok, %{path: path, version: ^started_version}, 500
     assert path == "/games/#{game.id}"
 
     assert_broadcast "game_started", %{

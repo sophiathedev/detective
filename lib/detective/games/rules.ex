@@ -3,7 +3,7 @@ defmodule Detective.Games.Rules do
   Pure queries for turn actions and district-based movement.
   """
 
-  alias Detective.Cases.{AccusationSheet, ResponseMatrix, SearchDeck}
+  alias Detective.Cases.{AccusationSheet, ResponseMatrix, SearchDeck, SpecialActors}
   alias Detective.Games.State
 
   def available_actions(%State{} = state, actor_user_id) do
@@ -43,7 +43,8 @@ defmodule Detective.Games.Rules do
     free_question_suspect_id = Map.get(player, :free_question_suspect_id)
     can_question? = player.actions_remaining > 0 or is_binary(free_question_suspect_id)
 
-    if player.location_id && can_question? do
+    if player.location_id && can_question? &&
+         not SpecialActors.blocks_action?(state.special_actors, player.location_id, "interrogate") do
       known_topics = ResponseMatrix.known_topics(state.case_definition, player.knowledge)
 
       state.suspects
@@ -102,6 +103,11 @@ defmodule Detective.Games.Rules do
 
   def searchable_suspects(%State{} = state, %{role: "detective"} = player) do
     if player.location_id && player.actions_remaining > 0 &&
+         not SpecialActors.blocks_action?(
+           state.special_actors,
+           player.location_id,
+           "search_suspect"
+         ) &&
          SearchDeck.configured?(state.case_definition) do
       state.suspects
       |> Map.values()
@@ -219,6 +225,11 @@ defmodule Detective.Games.Rules do
 
     actions =
       if player.actions_remaining > 0 and SearchDeck.configured?(state.case_definition) and
+           not SpecialActors.blocks_action?(
+             state.special_actors,
+             player.location_id,
+             "search_location"
+           ) and
            "location:#{player.location_id}" not in state.archived_searches do
         ["search_location" | actions]
       else
@@ -255,6 +266,13 @@ defmodule Detective.Games.Rules do
       if player.scratch >= 3 and current_location.type == "police_station" and
            bribe_options.officer_case_cards != [] do
         ["bribe_officer" | actions]
+      else
+        actions
+      end
+
+    actions =
+      if SpecialActors.available_interactions(state.special_actors, player) != [] do
+        ["interact_special_actor" | actions]
       else
         actions
       end

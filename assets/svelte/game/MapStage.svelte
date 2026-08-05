@@ -13,6 +13,10 @@
     interrogatableSuspectIds = [],
     selectedSuspectId = null,
     suspectInteractionsDisabled = false,
+    specialActors = [],
+    interactableSpecialActorIds = [],
+    selectedSpecialActorId = null,
+    specialActorInteractionsDisabled = false,
     caseCardSlots = [],
     inspectableCaseCardCodes = [],
     selectedCaseCardCode = null,
@@ -25,6 +29,7 @@
     onSelect = () => {},
     onSelectDetective = () => {},
     onSelectSuspect = () => {},
+    onSelectSpecialActor = () => {},
     onSelectCaseCard = () => {},
   } = $props()
 
@@ -75,6 +80,10 @@
         {interrogatableSuspectIds}
         {selectedSuspectId}
         {suspectInteractionsDisabled}
+        {specialActors}
+        {interactableSpecialActorIds}
+        {selectedSpecialActorId}
+        {specialActorInteractionsDisabled}
         {caseCardSlots}
         {inspectableCaseCardCodes}
         {selectedCaseCardCode}
@@ -86,6 +95,7 @@
         {onSelect}
         {onSelectDetective}
         {onSelectSuspect}
+        {onSelectSpecialActor}
         {onSelectCaseCard}
       />
     </div>

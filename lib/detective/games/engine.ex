@@ -13,6 +13,7 @@ defmodule Detective.Games.Engine do
     LegacyBoardAdapter,
     ResponseMatrix,
     SearchDeck,
+    SpecialActors,
     SpecialRules,
     Validator
   }
@@ -97,6 +98,7 @@ defmodule Detective.Games.Engine do
          players: Map.put(detective_players, chisel.id, chisel_player),
          locations: locations,
          suspects: normalize_suspects(case_definition["suspects"]),
+         special_actors: SpecialActors.initialize(case_definition),
          case_definition: case_definition,
          public_case_card_ids: initial_knowledge
        }}
@@ -460,6 +462,7 @@ defmodule Detective.Games.Engine do
   defp execute(state, actor, %Command{type: :search_location}) do
     with :ok <- validate_placed(actor),
          :ok <- validate_action_point(actor),
+         :ok <- validate_special_actor_block(state, actor, :search_location),
          {:ok, result} <- SearchDeck.location_result(state.case_definition, actor.location_id),
          :ok <- validate_search_target_available(state, result),
          :ok <- validate_evidence_available(state, result) do
@@ -474,10 +477,82 @@ defmodule Detective.Games.Engine do
          :ok <- validate_action_point(actor),
          {:ok, suspect} <- fetch_suspect(state, suspect_id),
          :ok <- validate_suspect_location(actor, suspect),
+         :ok <- validate_special_actor_block(state, actor, :search_suspect),
          {:ok, result} <- SearchDeck.suspect_result(state.case_definition, suspect.id),
          :ok <- validate_search_target_available(state, result),
          :ok <- validate_evidence_available(state, result) do
       resolve_search(state, actor, result, :suspect_searched)
+    end
+  end
+
+  defp execute(state, actor, %Command{type: :interact_special_actor, payload: payload}) do
+    actor_id = payload_value(payload, "actor_id")
+    option_id = payload_value(payload, "option_id")
+
+    with :ok <- validate_placed(actor),
+         {:ok, special_actor, option} <-
+           SpecialActors.fetch_option(state.special_actors, actor_id, option_id),
+         :ok <- validate_special_actor_location(actor, special_actor),
+         :ok <- validate_special_actor_option(actor, special_actor, option),
+         case_card_ids <- SpecialActors.private_case_card_ids(option),
+         {:ok, case_cards} <- SearchDeck.case_cards(state.case_definition, case_card_ids) do
+      next_actor = %{
+        actor
+        | actions_remaining: actor.actions_remaining - option.action_cost,
+          scratch: actor.scratch - option.scratch_cost,
+          knowledge: Enum.uniq(actor.knowledge ++ case_card_ids)
+      }
+
+      next_state = %{
+        state
+        | special_actors: SpecialActors.mark_used(state.special_actors, special_actor.id, option)
+      }
+
+      {next_state, newly_public_ids} =
+        next_state
+        |> put_player(next_actor)
+        |> promote_shared_knowledge()
+
+      next_actor = Map.fetch!(next_state.players, actor.id)
+      next_special_actor = Map.fetch!(next_state.special_actors, special_actor.id)
+
+      next_state =
+        next_state
+        |> advance_version()
+        |> append_history(%{
+          type: "special_actor_interacted",
+          player_id: actor.id,
+          special_actor_id: special_actor.id,
+          option_id: option.id
+        })
+
+      event = %Event{
+        type: :special_actor_interacted,
+        public_payload: %{
+          player_id: actor.id,
+          special_actor_id: special_actor.id,
+          option_id: option.id,
+          option_label: option.label,
+          actions_remaining: next_actor.actions_remaining,
+          actor_active: next_special_actor.active,
+          revealed_case_card_codes: case_card_codes(next_state, newly_public_ids)
+        },
+        private_payloads: %{
+          actor.user_id => %{
+            type: "special_actor_result",
+            special_actor_id: special_actor.id,
+            option_id: option.id,
+            scratch: next_actor.scratch,
+            case_cards:
+              Enum.map(
+                case_cards,
+                &Map.take(&1, [:id, :code, :title, :type, :description])
+              )
+          }
+        }
+      }
+
+      {:ok, next_state, [event]}
     end
   end
 
@@ -494,6 +569,7 @@ defmodule Detective.Games.Engine do
     with :ok <- validate_placed(actor),
          {:ok, suspect} <- fetch_suspect(state, suspect_id),
          :ok <- validate_suspect_location(actor, suspect),
+         :ok <- validate_special_actor_block(state, actor, :interrogate),
          :ok <- validate_free_question_target(actor, suspect),
          :ok <- validate_interrogation_action(actor, free_question?),
          {:ok, topic} <- ResponseMatrix.topic(state.case_definition, topic_id),
@@ -1744,6 +1820,44 @@ defmodule Detective.Games.Engine do
 
   defp validate_action_point(%{actions_remaining: actions}) when actions > 0, do: :ok
   defp validate_action_point(_actor), do: {:error, :no_actions_remaining}
+
+  defp validate_special_actor_location(actor, special_actor) do
+    if actor.location_id == special_actor.location_id,
+      do: :ok,
+      else: {:error, :special_actor_not_at_location}
+  end
+
+  defp validate_special_actor_option(actor, special_actor, option) do
+    if SpecialActors.option_available?(option, special_actor, actor) do
+      :ok
+    else
+      cond do
+        option.once and option.id in special_actor.used_option_ids ->
+          {:error, :special_interaction_used}
+
+        actor.actions_remaining < option.action_cost ->
+          {:error, :no_actions_remaining}
+
+        actor.scratch < option.scratch_cost ->
+          {:error, :insufficient_scratch}
+
+        true ->
+          {:error, :invalid_special_interaction}
+      end
+    end
+  end
+
+  defp validate_special_actor_block(state, actor, action) do
+    if SpecialActors.blocks_action?(
+         state.special_actors,
+         actor.location_id,
+         Atom.to_string(action)
+       ) do
+      {:error, :special_actor_blocks_action}
+    else
+      :ok
+    end
+  end
 
   defp validate_accusation_start(state, actor) do
     cond do

@@ -19,6 +19,7 @@ defmodule Detective.Games.Projections.Chisel do
             response_matrix: state.case_definition["response_matrix"],
             search_results: state.case_definition["search_results"],
             case_cards: state.case_definition["case_cards"],
+            special_actors: state.case_definition["special_actors"] || [],
             special_rules: SpecialRules.chisel_rules(state.case_definition),
             accusation_options: state.case_definition["accusation_options"],
             epilogue: state.case_definition["epilogue"]

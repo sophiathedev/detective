@@ -204,6 +204,30 @@ solution = %{
   "motive_id" => "relay-code-cover-up"
 }
 
+suspects = [
+  %{
+    "id" => "iona-pike",
+    "name" => "Iona Pike",
+    "occupation" => "array engineer",
+    "location_id" => "29",
+    "initially_known" => true
+  },
+  %{
+    "id" => "tomas-vale",
+    "name" => "Tomas Vale",
+    "occupation" => "harbor pilot",
+    "location_id" => "99",
+    "initially_known" => true
+  },
+  %{
+    "id" => "celeste-rook",
+    "name" => "Celeste Rook",
+    "occupation" => "investigative journalist",
+    "location_id" => "38",
+    "initially_known" => true
+  }
+]
+
 special_rules = [
   %{
     "id" => "closing-signal-window",
@@ -233,6 +257,30 @@ special_rules = [
   }
 ]
 
+special_actors = [
+  %{
+    "id" => "harbor-tail",
+    "name" => "The Harbor Tail",
+    "role" => "counter-surveillance lookout",
+    "kind" => "counter_surveillance",
+    "location_id" => "99",
+    "blocks" => ["search_location", "search_suspect", "interrogate"],
+    "options" => [
+      %{
+        "id" => "buy-off-tail",
+        "label" => "Buy off the lookout",
+        "action_cost" => 1,
+        "scratch_cost" => 2,
+        "once" => true,
+        "effects" => [
+          %{"type" => "disable_actor"},
+          %{"type" => "private_case_cards", "case_card_ids" => ["receiver-cable"]}
+        ]
+      }
+    ]
+  }
+]
+
 {:ok, _result} =
   Repo.transaction(fn ->
     case Repo.get_by(CaseFile, slug: slug) do
@@ -253,6 +301,7 @@ special_rules = [
           "briefing" =>
             "At 00:17, Dr. Mara Venn sent a broken distress call from Meridian Array. By sunrise she was dead, the station log had been altered, and an unknown ship had vanished beyond the breakwater. Determine who killed her, what was used, and why the midnight signal had to be silenced.",
           "special_rules" => special_rules,
+          "special_actors" => special_actors,
           "case_cards" => [
             %{
               "id" => "mara-venn",
@@ -281,29 +330,7 @@ special_rules = [
             }
             | additional_case_cards
           ],
-          "suspects" => [
-            %{
-              "id" => "iona-pike",
-              "name" => "Iona Pike",
-              "occupation" => "array engineer",
-              "location_id" => "29",
-              "initially_known" => true
-            },
-            %{
-              "id" => "tomas-vale",
-              "name" => "Tomas Vale",
-              "occupation" => "harbor pilot",
-              "location_id" => "99",
-              "initially_known" => true
-            },
-            %{
-              "id" => "celeste-rook",
-              "name" => "Celeste Rook",
-              "occupation" => "investigative journalist",
-              "location_id" => "38",
-              "initially_known" => true
-            }
-          ],
+          "suspects" => suspects,
           "response_matrix" => %{
             "iona-pike" => %{
               "mara-venn" => %{
@@ -401,10 +428,12 @@ special_rules = [
         version
 
       case_file ->
-        case Repo.get_by(CaseVersion, case_id: case_file.id, version: 7) do
+        case Repo.get_by(CaseVersion, case_id: case_file.id, version: 9) do
           nil ->
             legacy_version =
-              Repo.get_by(CaseVersion, case_id: case_file.id, version: 6) ||
+              Repo.get_by(CaseVersion, case_id: case_file.id, version: 8) ||
+                Repo.get_by(CaseVersion, case_id: case_file.id, version: 7) ||
+                Repo.get_by(CaseVersion, case_id: case_file.id, version: 6) ||
                 Repo.get_by(CaseVersion, case_id: case_file.id, version: 5) ||
                 Repo.get_by(CaseVersion, case_id: case_file.id, version: 4) ||
                 Repo.get_by(CaseVersion, case_id: case_file.id, version: 3) ||
@@ -416,6 +445,7 @@ special_rules = [
               |> Map.put("max_days", 6)
               |> Map.delete("locations")
               |> Map.put("board_id", "dcoa_classic")
+              |> Map.put("suspects", suspects)
               |> Map.update!("case_cards", upgrade_case_cards)
               |> Map.update!("response_matrix", fn response_matrix ->
                 response_matrix
@@ -426,10 +456,11 @@ special_rules = [
               |> Map.put("accusation_options", accusation_options)
               |> Map.put("solution", solution)
               |> Map.put("special_rules", special_rules)
+              |> Map.put("special_actors", special_actors)
 
             {:ok, version} =
               Cases.create_version(case_file, %{
-                version: 7,
+                version: 9,
                 content: upgraded_content,
                 published_at: DateTime.utc_now() |> DateTime.truncate(:second)
               })

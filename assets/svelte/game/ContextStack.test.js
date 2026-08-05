@@ -120,6 +120,53 @@ describe("ContextStack", () => {
     expect(onCancelSuspect).toHaveBeenCalledWith(suspectSelection)
   })
 
+  it("submits only a server-projected special actor option", async () => {
+    const specialActorSelection = {
+      actor: {
+        id: "station-tail",
+        name: "Station Tail",
+        role: "counter-surveillance lookout",
+      },
+      location: { id: "51", name: "LAPD Headquarters" },
+      options: [
+        {
+          id: "buy-off",
+          label: "Buy off the lookout",
+          action_cost: 1,
+          scratch_cost: 2,
+        },
+      ],
+    }
+    const onInteractSpecialActor = vi.fn()
+    const onCancelSpecialActor = vi.fn()
+
+    render(ContextStack, {
+      specialActorSelection,
+      commandPending: false,
+      commandError: null,
+      commandStatus: false,
+      connectionOnline: true,
+      onInteractSpecialActor,
+      onCancelSpecialActor,
+    })
+
+    expect(document.querySelector("#special-actor-slip")).toHaveTextContent(
+      "counter-surveillance lookout · LAPD Headquarters",
+    )
+    expect(document.querySelector("#special-actor-slip")).not.toHaveTextContent(
+      "private_case_cards",
+    )
+
+    await fireEvent.click(screen.getByRole("button", { name: /Buy off the lookout/ }))
+    await fireEvent.click(screen.getByRole("button", { name: "Close contact" }))
+
+    expect(onInteractSpecialActor).toHaveBeenCalledWith(
+      specialActorSelection,
+      specialActorSelection.options[0],
+    )
+    expect(onCancelSpecialActor).toHaveBeenCalledWith(specialActorSelection)
+  })
+
   it("routes the own Detective token through authorized field actions", async () => {
     const fieldSelection = {
       detective: {

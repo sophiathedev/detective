@@ -10,6 +10,7 @@ defmodule Detective.Cases.Validator do
     LegacyBoardAdapter,
     ResponseMatrix,
     SearchDeck,
+    SpecialActors,
     SpecialRules
   }
 
@@ -20,6 +21,7 @@ defmodule Detective.Cases.Validator do
          :ok <- validate_suspect_locations(case_definition["suspects"], locations),
          :ok <- ResponseMatrix.validate(case_definition),
          :ok <- SearchDeck.validate(case_definition, locations),
+         :ok <- SpecialActors.validate(case_definition, locations),
          :ok <- SpecialRules.validate(case_definition),
          :ok <- AccusationSheet.validate(case_definition) do
       :ok

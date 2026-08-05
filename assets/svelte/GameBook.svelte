@@ -26,6 +26,7 @@
   let mapSelection = $state(null)
   let mapFieldSelectionPlayerId = $state(null)
   let mapSuspectSelectionId = $state(null)
+  let mapSpecialActorSelectionId = $state(null)
   let actionPrompt = $state(null)
   let selectedSuspectId = $state(null)
   let selectedTopicId = $state(null)
@@ -122,6 +123,10 @@
   let interrogatableSuspectIds = $derived(
     new Set(interrogationOptions.map((option) => option.suspect_id)),
   )
+  let specialActorInteractions = $derived(privateState.special_actor_interactions ?? [])
+  let interactableSpecialActorIds = $derived(
+    new Set(specialActorInteractions.map((interaction) => interaction.actor_id)),
+  )
   let mapSuspectSelection = $derived.by(() => {
     if (!mapSuspectSelectionId) return null
 
@@ -153,6 +158,23 @@
       location: ownLocation,
       actionTypes: availableFieldActionTypes,
     }
+  })
+  let mapSpecialActorSelection = $derived.by(() => {
+    if (!mapSpecialActorSelectionId) return null
+
+    const actor = (publicState.special_actors ?? []).find(
+      (candidate) => candidate.id === mapSpecialActorSelectionId,
+    )
+    const interaction = specialActorInteractions.find(
+      (candidate) => candidate.actor_id === mapSpecialActorSelectionId,
+    )
+    const location = publicState.locations.find(
+      (candidate) => candidate.id === actor?.location_id,
+    )
+
+    return actor && actor.active && interaction?.options?.length > 0 && location
+      ? { actor, location, options: interaction.options }
+      : null
   })
   let selectedInterrogation = $derived(
     interrogationOptions.find((option) => option.suspect_id === selectedSuspectId),
@@ -235,7 +257,9 @@
       ? `${mapIntent.type === "place" ? "Placing" : "Moving to"} ${locationName(mapIntent.locationId)}…`
       : mapSelection
         ? `${mapSelection.location.name} selected · confirm on the dispatch slip.`
-      : activeAction === "place"
+        : mapSpecialActorSelection
+          ? `${mapSpecialActorSelection.actor.name} selected · choose a case-specific interaction.`
+        : activeAction === "place"
         ? "Placement mode · choose one highlighted Police Station."
         : activeAction === "move"
           ? "Move mode · choose one highlighted location in the current district."
@@ -377,6 +401,15 @@
     }
 
     if (
+      mapSpecialActorSelectionId &&
+      !(nextState.special_actors ?? []).some(
+        (actor) => actor.id === mapSpecialActorSelectionId && actor.active,
+      )
+    ) {
+      mapSpecialActorSelectionId = null
+    }
+
+    if (
       mapFieldSelectionPlayerId &&
       !(nextState.players ?? []).some(
         (player) => player.id === mapFieldSelectionPlayerId && player.location_id,
@@ -410,6 +443,13 @@
 
     if (mapSuspectSelectionId && !mapSuspectSelectableIn(mapSuspectSelectionId, nextState)) {
       mapSuspectSelectionId = null
+    }
+
+    if (
+      mapSpecialActorSelectionId &&
+      !mapSpecialActorSelectableIn(mapSpecialActorSelectionId, nextState)
+    ) {
+      mapSpecialActorSelectionId = null
     }
 
     if (mapFieldSelectionPlayerId && fieldActionTypesIn(nextState).length === 0) {
@@ -486,6 +526,18 @@
     )
   }
 
+  function mapSpecialActorSelectableIn(actorId, state) {
+    const actions = new Set(state.available_actions ?? [])
+    const interactions = state.special_actor_interactions ?? []
+
+    return (
+      actions.has("interact_special_actor") &&
+      interactions.some(
+        (interaction) => interaction.actor_id === actorId && interaction.options?.length > 0,
+      )
+    )
+  }
+
   function fieldActionTypesIn(state) {
     const actions = new Set(state.available_actions ?? [])
     return fieldActionTypes.filter((action) => actions.has(action))
@@ -502,6 +554,7 @@
       mapSelection = { type: "place", location }
       mapFieldSelectionPlayerId = null
       mapSuspectSelectionId = null
+      mapSpecialActorSelectionId = null
     } else if (
       activeAction === "move" &&
       moveLocationIds.has(location.id) &&
@@ -510,6 +563,7 @@
       mapSelection = { type: "move", location }
       mapFieldSelectionPlayerId = null
       mapSuspectSelectionId = null
+      mapSpecialActorSelectionId = null
     }
   }
 
@@ -520,6 +574,7 @@
     selectSuspect(suspect.id)
     mapSuspectSelectionId = suspect.id
     mapFieldSelectionPlayerId = null
+    mapSpecialActorSelectionId = null
     mapSelection = null
     actionPrompt = null
   }
@@ -548,12 +603,46 @@
     mapSuspectSelectionId = null
   }
 
+  function selectMapSpecialActor(actor) {
+    if (commandPending || !controlsReady || activeAction) return
+    if (!mapSpecialActorSelectableIn(actor.id, privateState)) return
+
+    mapSpecialActorSelectionId = actor.id
+    mapSuspectSelectionId = null
+    mapFieldSelectionPlayerId = null
+    mapSelection = null
+    actionPrompt = null
+  }
+
+  function interactWithSpecialActor(selection, option) {
+    if (
+      !selection ||
+      selection.actor.id !== mapSpecialActorSelectionId ||
+      !selection.options.some((candidate) => candidate.id === option.id) ||
+      commandPending ||
+      !controlsReady
+    )
+      return
+
+    mapSpecialActorSelectionId = null
+    sendCommand("interact_special_actor", {
+      actor_id: selection.actor.id,
+      option_id: option.id,
+    })
+  }
+
+  function cancelMapSpecialActor() {
+    if (commandPending) return
+    mapSpecialActorSelectionId = null
+  }
+
   function selectMapDetective(detective) {
     if (commandPending || !controlsReady || activeAction) return
     if (detective.id !== ownPlayer?.id || fieldActionTypesIn(privateState).length === 0) return
 
     mapFieldSelectionPlayerId = detective.id
     mapSuspectSelectionId = null
+    mapSpecialActorSelectionId = null
     mapSelection = null
     actionPrompt = null
   }
@@ -597,6 +686,7 @@
     mapSelection = null
     mapFieldSelectionPlayerId = null
     mapSuspectSelectionId = null
+    mapSpecialActorSelectionId = null
     actionPrompt = null
   }
 
@@ -700,6 +790,7 @@
     const prompt = immediateActionPrompt(action)
     mapFieldSelectionPlayerId = null
     mapSuspectSelectionId = null
+    mapSpecialActorSelectionId = null
 
     if (action === "search_location" || action === "search_suspect") {
       openDrawer("search")
@@ -753,6 +844,10 @@
       evidence_unavailable: "That evidence is already held or faceup.",
       free_question_pending: "Ask the newly discovered suspect now, or decline the free question.",
       free_question_not_available: "No immediate free question is waiting.",
+      invalid_special_interaction: "That case-specific interaction is not available.",
+      special_actor_not_at_location: "Move to the special contact's location first.",
+      special_interaction_used: "That case-specific interaction has already been resolved.",
+      special_actor_blocks_action: "Counter-surveillance is blocking that action at this location.",
       question_block_unavailable: "No matching Chisel leverage remains to block this question.",
       question_not_blocked: "This question is not waiting on a goon decision.",
       insufficient_scratch: "You do not have enough Scratch for that bribe.",
@@ -965,6 +1060,7 @@
     mapSelection = null
     mapFieldSelectionPlayerId = null
     mapSuspectSelectionId = null
+    mapSpecialActorSelectionId = null
     mapIntent = null
     activeAction = null
     actionPrompt = null
@@ -981,6 +1077,7 @@
     mapSelection = null
     mapFieldSelectionPlayerId = null
     mapSuspectSelectionId = null
+    mapSpecialActorSelectionId = null
     mapIntent = null
     activeAction = null
     actionPrompt = null
@@ -1081,6 +1178,9 @@
     )
     gameChannel.on("suspect_searched", (message) =>
       recordPublicEvent(message, "A Detective searched a suspect."),
+    )
+    gameChannel.on("special_actor_interacted", (message) =>
+      recordPublicEvent(message, "A case-specific contact changed the investigation."),
     )
     gameChannel.on("evidence_submitted", (message) =>
       recordPublicEvent(message, "Held evidence returned to the public casefile."),
@@ -1194,6 +1294,12 @@
       } else if (payload.type === "bribe_result") {
         lastEvent = `Case ${payload.case_card.code} entered your private evidence folio.`
         openDrawer("evidence")
+      } else if (payload.type === "special_actor_result") {
+        lastEvent =
+          payload.case_cards?.length > 0
+            ? "The special interaction added private evidence to your casebook."
+            : "The special interaction was resolved."
+        if (payload.case_cards?.length > 0) openDrawer("evidence")
       } else if (payload.type === "scratch_updated" && payload.received) {
         lastEvent = `You received $${payload.received} Scratch from another Detective.`
       } else if (payload.type === "snitch_choice_recorded") {
@@ -1297,6 +1403,10 @@
         interrogatableSuspectIds={[...interrogatableSuspectIds]}
         selectedSuspectId={mapSuspectSelectionId}
         suspectInteractionsDisabled={activeAction !== null}
+        specialActors={publicState.special_actors ?? []}
+        interactableSpecialActorIds={[...interactableSpecialActorIds]}
+        selectedSpecialActorId={mapSpecialActorSelectionId}
+        specialActorInteractionsDisabled={activeAction !== null}
         caseCardSlots={publicState.case_card_slots ?? []}
         {inspectableCaseCardCodes}
         selectedCaseCardCode={drawerOpen && drawerPage === "evidence"
@@ -1311,6 +1421,7 @@
         onSelect={selectMapLocation}
         onSelectDetective={selectMapDetective}
         onSelectSuspect={selectMapSuspect}
+        onSelectSpecialActor={selectMapSpecialActor}
         onSelectCaseCard={selectBoardCaseCard}
       />
     {/snippet}
@@ -1320,6 +1431,7 @@
         selection={mapSelection}
         fieldSelection={mapFieldSelection}
         suspectSelection={mapSuspectSelection}
+        specialActorSelection={mapSpecialActorSelection}
         {actionPrompt}
         origin={ownLocation}
         {commandPending}
@@ -1332,6 +1444,8 @@
         onCancelField={cancelMapField}
         onOpenSuspectAction={openMapSuspectAction}
         onCancelSuspect={cancelMapSuspect}
+        onInteractSpecialActor={interactWithSpecialActor}
+        onCancelSpecialActor={cancelMapSpecialActor}
         onConfirmAction={confirmImmediateAction}
         onCancelAction={cancelImmediateAction}
       />

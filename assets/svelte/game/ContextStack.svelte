@@ -3,6 +3,7 @@
     selection = null,
     fieldSelection = null,
     suspectSelection = null,
+    specialActorSelection = null,
     actionPrompt = null,
     origin = null,
     commandPending = false,
@@ -15,6 +16,8 @@
     onCancelField = () => {},
     onOpenSuspectAction = () => {},
     onCancelSuspect = () => {},
+    onInteractSpecialActor = () => {},
+    onCancelSpecialActor = () => {},
     onConfirmAction = () => {},
     onCancelAction = () => {},
   } = $props()
@@ -38,7 +41,7 @@
   }
 </script>
 
-{#if selection || fieldSelection || suspectSelection || actionPrompt || commandError}
+{#if selection || fieldSelection || suspectSelection || specialActorSelection || actionPrompt || commandError}
   <div id="context-stack" class="noir-context-stack">
     {#if commandPending && (selection || actionPrompt)}
       <p class="sr-only" role="status" aria-live="polite">Dispatching action</p>
@@ -115,6 +118,42 @@
             disabled={commandPending}
             onclick={() => onCancelSuspect(suspectSelection)}
           >Close file</button>
+        </div>
+      </article>
+    {/if}
+
+    {#if specialActorSelection}
+      <article id="special-actor-slip" class="noir-movement-slip noir-paper-sheet" aria-live="polite">
+        <div class="noir-movement-slip-stamp" aria-hidden="true">SPECIAL</div>
+        <p class="noir-movement-slip-kicker">Case-specific interaction</p>
+        <h3 class="noir-action-slip-title">{specialActorSelection.actor.name}</h3>
+        <p class="noir-action-slip-description">
+          {specialActorSelection.actor.role} · {specialActorSelection.location.name}
+        </p>
+        <p class="noir-movement-slip-districts">
+          The server will resolve the selected cost and any private result.
+        </p>
+
+        <div class="noir-special-actor-options">
+          {#each specialActorSelection.options as option}
+            <button
+              id={`action-special-actor-${option.id}`}
+              type="button"
+              class="noir-context-button noir-context-button-confirm"
+              disabled={commandPending || !connectionOnline}
+              onclick={() => onInteractSpecialActor(specialActorSelection, option)}
+            >
+              <span>{option.label}</span>
+              <small>{option.action_cost} AP · ${option.scratch_cost}</small>
+            </button>
+          {/each}
+          <button
+            id="action-cancel-special-actor"
+            type="button"
+            class="noir-context-button noir-context-button-dismiss"
+            disabled={commandPending}
+            onclick={() => onCancelSpecialActor(specialActorSelection)}
+          >Close contact</button>
         </div>
       </article>
     {/if}

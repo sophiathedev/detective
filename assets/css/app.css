@@ -890,11 +890,29 @@
 }
 
 .noir-suspect-slip-controls,
-.noir-field-slip-controls {
+.noir-field-slip-controls,
+.noir-special-actor-options {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
   gap: 0.45rem;
   margin-top: 0.75rem;
+}
+
+.noir-special-actor-options .noir-context-button-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+}
+
+.noir-special-actor-options small {
+  flex: none;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  opacity: 0.82;
 }
 
 .noir-context-button-dismiss {
@@ -1649,6 +1667,84 @@
   fill: #32261e;
   stroke: #d8c59e;
   stroke-width: 1.5;
+}
+
+#special-actor-tokens {
+  pointer-events: none;
+}
+
+.map-special-actor {
+  transform-box: fill-box;
+  transform-origin: center;
+  filter: drop-shadow(0 4px 3px rgb(28 18 13 / 0.66));
+  transition:
+    transform 480ms cubic-bezier(0.22, 0.72, 0.24, 1),
+    scale 160ms ease-out,
+    opacity 180ms ease-out;
+}
+
+.map-special-actor-actionable {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.map-special-actor-actionable:hover,
+.map-special-actor-actionable:focus-visible {
+  scale: 1.08;
+  outline: none;
+}
+
+.map-special-actor-ring {
+  fill: rgb(158 48 42 / 0.14);
+  stroke: #d4a74f;
+  stroke-dasharray: 3 3;
+  stroke-width: 2;
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+
+.map-special-actor-actionable .map-special-actor-ring {
+  opacity: 0.7;
+  animation: map-location-breathe 2.2s ease-in-out infinite;
+}
+
+.map-special-actor-selected .map-special-actor-ring,
+.map-special-actor-actionable:hover .map-special-actor-ring,
+.map-special-actor-actionable:focus-visible .map-special-actor-ring {
+  opacity: 1;
+  stroke: #fff0c5;
+}
+
+.map-special-actor-badge {
+  fill: #6f2927;
+  stroke: #ead9b5;
+  stroke-width: 2;
+}
+
+.map-special-actor-eye {
+  fill: #d8bd7b;
+  stroke: #2d2119;
+  stroke-width: 1.4;
+}
+
+.map-special-actor-mark {
+  fill: none;
+  stroke: #f0dfbc;
+  stroke-width: 2;
+}
+
+.map-special-actor-disabled {
+  opacity: 0.48;
+}
+
+.map-special-actor-disabled .map-special-actor-badge {
+  fill: #50483d;
+}
+
+.map-special-actor-strike {
+  fill: none;
+  stroke: #f0dfbc;
+  stroke-width: 3;
 }
 
 .map-travel-trace {

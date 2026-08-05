@@ -33,6 +33,10 @@ const baseProps = {
   interrogatableSuspectIds: [],
   selectedSuspectId: null,
   suspectInteractionsDisabled: false,
+  specialActors: [],
+  interactableSpecialActorIds: [],
+  selectedSpecialActorId: null,
+  specialActorInteractionsDisabled: false,
   inspectableCaseCardCodes: [],
   selectedCaseCardCode: null,
   legalLocationIds: ["51"],
@@ -42,6 +46,7 @@ const baseProps = {
   disabled: false,
   onSelectDetective: vi.fn(),
   onSelectSuspect: vi.fn(),
+  onSelectSpecialActor: vi.fn(),
   onSelectCaseCard: vi.fn(),
 }
 
@@ -350,5 +355,61 @@ describe("GameBoard", () => {
     const standee = screen.getByTestId("suspect-standee-iona-pike")
     expect(standee).toHaveAttribute("role", "img")
     expect(standee).toHaveAttribute("data-actionable", "false")
+  })
+
+  it("renders case-specific actors as graphic map tokens and authorizes only legal interaction", async () => {
+    const onSelectSpecialActor = vi.fn()
+    const specialActors = [
+      {
+        id: "station-tail",
+        name: "Station Tail",
+        role: "counter-surveillance lookout",
+        kind: "counter_surveillance",
+        location_id: "51",
+        active: true,
+      },
+      {
+        id: "retired-contact",
+        name: "Retired Contact",
+        role: "former informant",
+        kind: "contact",
+        location_id: "48",
+        active: false,
+      },
+    ]
+
+    const { rerender } = render(GameBoard, {
+      ...baseProps,
+      specialActors,
+      interactableSpecialActorIds: ["station-tail"],
+      selectedSpecialActorId: "station-tail",
+      onSelectSpecialActor,
+    })
+
+    const tail = screen.getByTestId("special-actor-station-tail")
+    const retired = screen.getByTestId("special-actor-retired-contact")
+
+    expect(tail).toHaveAttribute("role", "button")
+    expect(tail).toHaveAttribute("aria-pressed", "true")
+    expect(tail).toHaveAttribute("data-kind", "counter_surveillance")
+    expect(tail).toHaveAccessibleName(
+      "Station Tail, counter-surveillance lookout, at L.A. Police Department Headquarters. active. Select to review special interactions.",
+    )
+    expect(retired).toHaveAttribute("role", "img")
+    expect(retired).toHaveAttribute("data-active", "false")
+
+    await fireEvent.keyDown(tail, { key: "Enter" })
+    await fireEvent.click(tail)
+    expect(onSelectSpecialActor).toHaveBeenCalledTimes(2)
+
+    await rerender({
+      ...baseProps,
+      specialActors,
+      interactableSpecialActorIds: ["station-tail"],
+      specialActorInteractionsDisabled: true,
+      onSelectSpecialActor,
+    })
+
+    expect(screen.getByTestId("special-actor-station-tail")).toHaveAttribute("role", "img")
   })
 })

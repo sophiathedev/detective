@@ -10,7 +10,7 @@ defmodule Detective.Games.CommandTest do
              Command.build(command_id, "move", 3, %{"location_id" => "archive"})
 
     for type <-
-          ~w(search_location search_suspect skip_free_question interrogate allow_question block_question accept_question_block bribe_goon bribe_detective bribe_officer choose_snitch decline_snitch resolve_snitches select_response accept_response challenge_response accuse submit_final_guess resume_game) do
+          ~w(search_location search_suspect interact_special_actor skip_free_question interrogate allow_question block_question accept_question_block bribe_goon bribe_detective bribe_officer choose_snitch decline_snitch resolve_snitches select_response accept_response challenge_response accuse submit_final_guess resume_game) do
       assert {:ok, %Command{}} = Command.build(command_id, type, 3, %{})
     end
 

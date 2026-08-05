@@ -58,6 +58,28 @@ defmodule Detective.Games.SnapshotCodecTest do
           y: 0.5527
         }
       },
+      special_actors: %{
+        "station-tail" => %{
+          id: "station-tail",
+          name: "Station Tail",
+          role: "counter-surveillance lookout",
+          kind: "counter_surveillance",
+          location_id: "51",
+          active: false,
+          blocks: ["search_location"],
+          options: [
+            %{
+              id: "buy-off",
+              label: "Buy off the lookout",
+              action_cost: 1,
+              scratch_cost: 2,
+              once: true,
+              effects: [%{"type" => "disable_actor"}]
+            }
+          ],
+          used_option_ids: ["buy-off"]
+        }
+      },
       case_definition: %{
         "solution" => %{"suspect_id" => "secret"},
         "published" => true
@@ -88,6 +110,8 @@ defmodule Detective.Games.SnapshotCodecTest do
     assert restored.players[player_id].free_question_suspect_id == "witness"
     refute restored.players[player_id].solve_token_available
     assert restored.locations["51"].district_ids == ["central_la"]
+    refute restored.special_actors["station-tail"].active
+    assert restored.special_actors["station-tail"].used_option_ids == ["buy-off"]
     assert restored.case_definition["solution"]["suspect_id"] == "secret"
     assert restored.public_case_card_ids == ["public-log"]
     assert restored.archived_searches == ["location:51"]
@@ -106,6 +130,19 @@ defmodule Detective.Games.SnapshotCodecTest do
 
     assert {:ok, restored} = SnapshotCodec.load(dumped)
     assert restored.triggered_special_rule_ids == []
+  end
+
+  test "migrates schema version 4 snapshots without special actors" do
+    state = %State{players: %{}, locations: %{}, suspects: %{}}
+
+    dumped =
+      state
+      |> SnapshotCodec.dump()
+      |> Map.put("schema_version", 4)
+      |> Map.delete("special_actors")
+
+    assert {:ok, restored} = SnapshotCodec.load(dumped)
+    assert restored.special_actors == %{}
   end
 
   test "round-trips a pending interrogation with string keys" do

@@ -327,6 +327,50 @@ defmodule Detective.Games.EngineTest do
     refute Jason.encode!(officer_event.public_payload) =~ "sealed-ledger"
   end
 
+  test "special actors block field actions until a co-located interaction resolves them" do
+    assert {:ok, state} = Engine.new(game(), players(), special_actor_case_definition())
+
+    assert {:ok, placed, _events} =
+             apply_command(state, "detective-1", :place, %{"location_id" => "51"})
+
+    actions = Rules.available_actions(placed, user_id("detective-1"))
+    assert "interact_special_actor" in actions
+    refute "search_location" in actions
+    refute "search_suspect" in actions
+    refute "interrogate" in actions
+
+    assert {:error, :special_actor_blocks_action} =
+             apply_command(placed, "detective-1", :search_location)
+
+    assert {:ok, resolved, [event]} =
+             apply_command(placed, "detective-1", :interact_special_actor, %{
+               "actor_id" => "station-tail",
+               "option_id" => "buy-off"
+             })
+
+    detective = player(resolved, "detective-1")
+    refute resolved.special_actors["station-tail"].active
+    assert detective.actions_remaining == 3
+    assert detective.scratch == 2
+    assert "sealed-ledger" in detective.knowledge
+    assert event.type == :special_actor_interacted
+    assert event.public_payload.actor_active == false
+    refute Jason.encode!(event.public_payload) =~ "sealed-ledger"
+    assert hd(event.private_payloads[detective.user_id].case_cards).id == "sealed-ledger"
+
+    restored_actions = Rules.available_actions(resolved, user_id("detective-1"))
+    assert "search_location" in restored_actions
+    assert "search_suspect" in restored_actions
+    assert "interrogate" in restored_actions
+    refute "interact_special_actor" in restored_actions
+
+    assert {:error, :invalid_special_interaction} =
+             apply_command(resolved, "detective-1", :interact_special_actor, %{
+               "actor_id" => "station-tail",
+               "option_id" => "buy-off"
+             })
+  end
+
   test "Detective bribes require Scratch, a co-located target, and their knowledge" do
     state = placed_state() |> put_known_weapon("detective-2")
     detective_one_id = player_id("detective-1")
@@ -1449,6 +1493,32 @@ defmodule Detective.Games.EngineTest do
     |> update_in(["search_results", "locations"], fn %{"51" => result} ->
       %{"central-precinct" => result}
     end)
+  end
+
+  defp special_actor_case_definition do
+    Map.put(case_definition(), "special_actors", [
+      %{
+        "id" => "station-tail",
+        "name" => "Station Tail",
+        "role" => "counter-surveillance lookout",
+        "kind" => "counter_surveillance",
+        "location_id" => "51",
+        "blocks" => ["search_location", "search_suspect", "interrogate"],
+        "options" => [
+          %{
+            "id" => "buy-off",
+            "label" => "Buy off the lookout",
+            "action_cost" => 1,
+            "scratch_cost" => 2,
+            "once" => true,
+            "effects" => [
+              %{"type" => "disable_actor"},
+              %{"type" => "private_case_cards", "case_card_ids" => ["sealed-ledger"]}
+            ]
+          }
+        ]
+      }
+    ])
   end
 
   defp legacy_location(id, name, type, district_ids, x, y) do
