@@ -22,6 +22,11 @@
     else selected.delete(playerId)
     actions.setBlockedSnitchPlayers?.([...selected])
   }
+
+  function caseCardLabel(cardId) {
+    const card = (evidence.knownCaseCards ?? []).find((candidate) => candidate.id === cardId)
+    return card ? `${card.code} ${card.title}` : cardId
+  }
 </script>
 
 {#if page === "search"}
@@ -45,6 +50,48 @@
         </dl>
       {/if}
     </div>
+
+    {#if view.role === "detective"}
+      <section
+        id="current-location-search"
+        class="mt-5 border-l-4 border-[#71372f] bg-[#eadbbc] p-4"
+        aria-labelledby="current-location-search-heading"
+      >
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">
+              Current location
+            </p>
+            <h3
+              id="current-location-search-heading"
+              class="mt-1 font-serif text-lg font-semibold text-[#2e241c]"
+            >
+              {search.currentLocation?.name ?? "Placement required"}
+            </h3>
+            <p class="mt-1 max-w-xl text-xs leading-5 text-[#695642]">
+              Search card text remains private. Revealed Case cards enter your casebook; taken
+              evidence returns faceup after three Day advances.
+            </p>
+          </div>
+          <span class="border border-[#806749] px-2 py-1 font-mono text-[9px] uppercase text-[#725e48]">
+            1 AP
+          </span>
+        </div>
+
+        <button
+          id="casebook-submit-location-search"
+          type="button"
+          disabled={!availableActions.has("search_location") || !search.currentLocation}
+          onclick={() => actions.submitLocationSearch?.()}
+          class="mt-3 min-h-11 w-full cursor-pointer bg-[#30261f] px-4 text-left text-sm font-semibold text-[#f5e7c9] transition hover:bg-[#49372a] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Search {search.currentLocation?.name ?? "current location"}
+          <span class="float-right font-mono text-[10px]">
+            {availableActions.has("search_location") ? "CONFIRM" : "UNAVAILABLE"}
+          </span>
+        </button>
+      </section>
+    {/if}
 
     <fieldset id="casebook-search-subjects" class="mt-5">
       <legend class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#80694f]">Known persons</legend>
@@ -263,9 +310,47 @@
         <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#705b45]">{evidence.heldEvidence?.length ?? 0} held / {evidence.knownCaseCards?.length ?? 0} known</p>
       </div>
       <div class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1.1fr)_minmax(12rem,0.9fr)]">
-        <article id="latest-search-note" class="min-h-28 border-l-4 border-[#71372f] bg-[#eadbbc] p-3">
-          {#if evidence.latestSearch}<p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">Day {evidence.latestSearch.day} / {evidence.latestSearch.target_type.replaceAll("_", " ")}</p><p class="mt-2 font-serif text-sm italic leading-6">“{evidence.latestSearch.text}”</p>{:else}<p class="font-serif text-sm italic leading-6 text-[#725e48]">No private Search card has been filed.</p>{/if}
-        </article>
+        <div id="search-note-ledger" class="grid content-start gap-3">
+          {#each evidence.searchNotes ?? [] as note, index}
+            <article
+              id={`search-note-${index}`}
+              data-search-note={index}
+              class="border-l-4 border-[#71372f] bg-[#eadbbc] p-3"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">
+                  Day {note.day} / {note.target_type.replaceAll("_", " ")}
+                </p>
+                <span class="font-mono text-[8px] uppercase tracking-[0.1em] text-[#8c3f33]">
+                  {index === 0 ? "latest filing" : "archived"}
+                </span>
+              </div>
+              <p class="mt-2 font-serif text-sm italic leading-6">“{note.text}”</p>
+
+              {#if (note.case_card_ids?.length ?? 0) > 0}
+                <ul class="mt-3 grid gap-1 border-t border-[#b19b7b] pt-2">
+                  {#each note.case_card_ids as cardId}
+                    <li class="font-mono text-[9px] uppercase tracking-[0.08em] text-[#6b5844]">
+                      Revealed: {caseCardLabel(cardId)}
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+
+              {#if (note.taken_case_card_ids?.length ?? 0) > 0}
+                <ul class="mt-2 grid gap-1">
+                  {#each note.taken_case_card_ids as cardId}
+                    <li class="font-mono text-[9px] uppercase tracking-[0.08em] text-[#8c3f33]">
+                      Evidence held: {caseCardLabel(cardId)}
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+            </article>
+          {:else}
+            <p class="casebook-empty-page">No private Search card has been filed.</p>
+          {/each}
+        </div>
         <div id="held-evidence-list" class="grid content-start gap-2">
           {#each evidence.heldEvidence ?? [] as card}
             <article id={`held-evidence-${card.id}`} class="border border-[#8b7257] bg-[#efe0c0] px-3 py-2"><div class="flex items-center justify-between gap-3"><span class="font-mono text-[10px] font-semibold text-[#8c3f33]">{card.code}</span><span class="font-mono text-[8px] uppercase tracking-[0.1em] text-[#725e48]">held evidence</span></div><h4 class="mt-1 font-serif text-sm font-semibold">{card.title}</h4>{#if card.description}<p class="mt-1 text-[11px] leading-4 text-[#695642]">{card.description}</p>{/if}</article>

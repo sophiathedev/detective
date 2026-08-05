@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/svelte"
-import { describe, expect, it } from "vitest"
+import { fireEvent, render, screen } from "@testing-library/svelte"
+import { describe, expect, it, vi } from "vitest"
 
 import CasebookWorkspace from "./CasebookWorkspace.svelte"
 
@@ -8,6 +8,7 @@ const noActions = {
   selectTopic: () => {},
   setSpendLeverage: () => {},
   submitSuspectSearch: () => {},
+  submitLocationSearch: () => {},
   submitInterrogation: () => {},
   allowQuestion: () => {},
   blockQuestion: () => {},
@@ -36,6 +37,7 @@ const baseView = {
   ownPlayer: { id: "d1", actions_remaining: 3 },
   availableActions: ["interrogate"],
   search: {
+    currentLocation: { id: "48", name: "Bradbury Building" },
     suspects: [],
     selectedSuspectId: null,
     searchableSuspectIds: [],
@@ -53,7 +55,7 @@ const baseView = {
     selectedResponseId: null,
     blockedSnitchPlayerIds: [],
   },
-  evidence: { heldEvidence: [], knownCaseCards: [], latestSearch: null },
+  evidence: { heldEvidence: [], knownCaseCards: [], searchNotes: [] },
   accusation: {
     options: { suspects: [], weapons: [], motives: [] },
     selectedSuspectId: null,
@@ -73,6 +75,48 @@ const baseView = {
 }
 
 describe("CasebookWorkspace", () => {
+  it("requires confirmation before searching the current location", async () => {
+    const submitLocationSearch = vi.fn()
+    const view = {
+      ...baseView,
+      availableActions: ["search_location"],
+    }
+
+    render(CasebookWorkspace, {
+      page: "search",
+      view,
+      actions: { ...noActions, submitLocationSearch },
+    })
+
+    const button = document.querySelector("#casebook-submit-location-search")
+    expect(button).toHaveTextContent("Search Bradbury Building")
+    expect(button).toBeEnabled()
+
+    await fireEvent.click(button)
+    expect(submitLocationSearch).toHaveBeenCalledOnce()
+  })
+
+  it("files every private Search note in newest-first order", () => {
+    const view = {
+      ...baseView,
+      evidence: {
+        heldEvidence: [],
+        knownCaseCards: [],
+        searchNotes: [
+          { id: "note-2", day: 2, target_type: "suspect", text: "Second filed result." },
+          { id: "note-1", day: 1, target_type: "location", text: "First filed result." },
+        ],
+      },
+    }
+
+    render(CasebookWorkspace, { page: "evidence", view, actions: noActions })
+
+    const notes = document.querySelectorAll("#search-note-ledger [data-search-note]")
+    expect(notes).toHaveLength(2)
+    expect(notes[0]).toHaveTextContent("Second filed result.")
+    expect(notes[1]).toHaveTextContent("First filed result.")
+  })
+
   it("routes the selected public history page", () => {
     render(CasebookWorkspace, { page: "history", view: baseView, actions: noActions })
 

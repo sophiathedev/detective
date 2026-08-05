@@ -117,7 +117,6 @@
   let pendingPublic = $derived(publicState.pending_interrogation)
   let pendingPrivate = $derived(privateState.pending_interrogation)
   let latestStatement = $derived(privateState.statements?.[0])
-  let latestSearch = $derived(privateState.search_notes?.[0])
   let heldEvidence = $derived(privateState.evidence ?? [])
   let knownCaseCards = $derived(privateState.known_case_cards ?? [])
   let accusationOptions = $derived(
@@ -179,6 +178,7 @@
     ownPlayer,
     availableActions: [...availableActions],
     search: {
+      currentLocation: ownLocation,
       suspects: publicState.suspects.map((suspect) => ({
         ...suspect,
         location_name: locationName(suspect.location_id),
@@ -199,7 +199,11 @@
       selectedResponseId,
       blockedSnitchPlayerIds,
     },
-    evidence: { heldEvidence, knownCaseCards, latestSearch },
+    evidence: {
+      heldEvidence,
+      knownCaseCards,
+      searchNotes: privateState.search_notes ?? [],
+    },
     accusation: {
       options: accusationOptions,
       selectedSuspectId: accusationSuspectId,
@@ -237,6 +241,7 @@
     selectSuspect,
     selectTopic: (topicId) => (selectedTopicId = topicId),
     setSpendLeverage: (value) => (spendLeverage = value),
+    submitLocationSearch: () => sendCommand("search_location", {}),
     submitSuspectSearch,
     submitInterrogation,
     allowQuestion: () => sendCommand("allow_question", {}),
@@ -425,8 +430,8 @@
   }
 
   function handleDockAction(action) {
-    if (action === "search_suspect") {
-      submitSuspectSearch()
+    if (action === "search_location" || action === "search_suspect") {
+      openDrawer("search")
     } else if (action === "interrogate") {
       openDrawer("question")
     } else if (action === "accuse" || action === "submit_final_guess") {
@@ -796,6 +801,7 @@
         lastEvent = payload.free_question_suspect_id
           ? "Search complete. A newly discovered suspect may be questioned for free."
           : "Search complete. The private result is filed in your notebook."
+        openDrawer(payload.free_question_suspect_id ? "question" : "evidence")
       } else if (payload.type === "snitch_choice_recorded") {
         lastEvent = payload.snitch
           ? "Your Snitch marker is facedown. Other players cannot see the choice yet."
@@ -950,4 +956,3 @@
     {/snippet}
   </GameTableShell>
 </div>
-
