@@ -1703,3 +1703,231 @@
     transition: none !important;
   }
 }
+
+/* Casebook overlay: a private dossier laid across the shared table. */
+.noir-casebook-backdrop {
+  position: absolute;
+  z-index: 60;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: clamp(1rem, 3vw, 3rem);
+  background:
+    radial-gradient(circle at 52% 45%, rgb(22 18 14 / 0.42), rgb(5 6 6 / 0.88) 72%),
+    rgb(5 6 6 / 0.72);
+  backdrop-filter: blur(4px) saturate(0.72);
+  animation: noir-casebook-backdrop-in 180ms ease-out both;
+}
+
+.noir-casebook-dialog {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  width: min(72rem, 94vw);
+  height: min(48rem, 86vh);
+  overflow: hidden;
+  border: 1px solid #745f46;
+  border-radius: 0.3rem 0.7rem 0.42rem 0.55rem;
+  background:
+    linear-gradient(90deg, transparent 49.7%, rgb(90 63 39 / 0.2) 50%, transparent 50.3%),
+    url("/images/ui/noir/paper-fiber.svg"),
+    #e4d3ad;
+  box-shadow:
+    0 2.5rem 5rem rgb(0 0 0 / 0.66),
+    inset 0 0 3rem rgb(85 57 31 / 0.2);
+  color: #33261d;
+  transform-origin: 50% 82%;
+  animation: noir-casebook-dialog-in 260ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.noir-casebook-dialog::before,
+.noir-casebook-dialog::after {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  content: "";
+  pointer-events: none;
+}
+
+.noir-casebook-dialog::before {
+  box-shadow: -0.5rem 0 1.2rem rgb(43 28 17 / 0.24);
+}
+
+.noir-casebook-dialog::after {
+  background: rgb(255 248 222 / 0.38);
+  transform: translateX(1px);
+}
+
+.noir-casebook-header {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid rgb(90 68 46 / 0.35);
+  padding: 1rem 1.25rem 0.85rem;
+}
+
+.noir-casebook-header p {
+  margin: 0 0 0.18rem;
+  color: #765d42;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.625rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.noir-casebook-header h2 {
+  margin: 0;
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-size: clamp(1.35rem, 2.7vw, 2.35rem);
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+
+.noir-casebook-close {
+  display: grid;
+  width: 2.7rem;
+  height: 2.7rem;
+  flex: none;
+  place-items: center;
+  cursor: pointer;
+  border: 1px solid #6f563e;
+  border-radius: 50%;
+  background: #38271c;
+  box-shadow: inset 0 0 0 3px #b28a55, 0 0.35rem 0.8rem rgb(52 35 22 / 0.3);
+  color: #f1ddb5;
+  font-family: Georgia, serif;
+  font-size: 1.65rem;
+  line-height: 1;
+  transition: color 140ms ease, transform 140ms ease;
+}
+
+.noir-casebook-close:hover {
+  color: #fff5dd;
+  transform: rotate(4deg) scale(1.04);
+}
+
+.noir-casebook-close:focus-visible,
+.noir-casebook-page-tab:focus-visible {
+  outline: 3px solid #9a382f;
+  outline-offset: 3px;
+}
+
+.noir-casebook-page-tabs {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  border-bottom: 1px solid rgb(90 68 46 / 0.26);
+  padding: 0.65rem 1.25rem 0;
+  scrollbar-width: thin;
+}
+
+.noir-casebook-page-tab {
+  min-height: 2.45rem;
+  flex: none;
+  cursor: pointer;
+  border: 1px solid #81694f;
+  border-bottom: 0;
+  border-radius: 0.28rem 0.28rem 0 0;
+  background: #cdbb96;
+  padding: 0.55rem 0.9rem;
+  color: #493526;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.noir-casebook-page-tab:hover,
+.noir-casebook-page-tab-active {
+  background: #f0e2c3;
+  transform: translateY(-2px);
+}
+
+.noir-casebook-content {
+  position: relative;
+  z-index: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: clamp(1rem, 2.4vw, 2rem);
+  scrollbar-color: #7b6044 transparent;
+  scrollbar-width: thin;
+}
+
+@keyframes noir-casebook-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes noir-casebook-dialog-in {
+  from {
+    opacity: 0;
+    transform: perspective(1200px) rotateX(3deg) translateY(1.5rem) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(1200px) rotateX(0) translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 63.999rem) {
+  .noir-casebook-backdrop {
+    place-items: end stretch;
+    padding: 0;
+  }
+
+  .noir-casebook-dialog {
+    width: 100%;
+    height: min(80vh, 46rem);
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 1rem 1rem 0 0;
+    background: url("/images/ui/noir/paper-fiber.svg"), #e4d3ad;
+    transform-origin: 50% 100%;
+  }
+
+  .noir-casebook-dialog::before,
+  .noir-casebook-dialog::after {
+    display: none;
+  }
+}
+
+@media (max-width: 39.999rem) {
+  .noir-casebook-dialog {
+    height: min(86vh, 44rem);
+  }
+
+  .noir-casebook-header {
+    padding: 0.8rem 0.85rem 0.7rem;
+  }
+
+  .noir-casebook-page-tabs {
+    padding-inline: 0.85rem;
+  }
+
+  .noir-casebook-content {
+    padding: 0.85rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .noir-casebook-backdrop,
+  .noir-casebook-dialog,
+  .noir-casebook-close,
+  .noir-casebook-page-tab {
+    animation: none !important;
+    transition: none !important;
+  }
+}
