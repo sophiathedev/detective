@@ -23,6 +23,7 @@
   let drawerPage = $state(initialPrivate().role === "chisel" ? "chisel" : "search")
   let activeAction = $state(null)
   let mapSelection = $state(null)
+  let mapFieldSelectionPlayerId = $state(null)
   let mapSuspectSelectionId = $state(null)
   let actionPrompt = $state(null)
   let selectedSuspectId = $state(null)
@@ -70,6 +71,7 @@
     { id: "chisel", label: "Private Case" },
     { id: "history", label: "History" },
   ]
+  const fieldActionTypes = ["search_location", "analyze", "kickback", "bribe_officer"]
 
   let detectives = $derived(publicState.players.filter((player) => player.role === "detective"))
   let chisel = $derived(publicState.players.find((player) => player.role === "chisel"))
@@ -91,6 +93,9 @@
         : [],
   )
   let availableActions = $derived(new Set(privateState.available_actions ?? []))
+  let availableFieldActionTypes = $derived(
+    fieldActionTypes.filter((action) => availableActions.has(action)),
+  )
   let drawerPages = $derived(
     privateState.role === "chisel" ? chiselDrawerPages : detectiveDrawerPages,
   )
@@ -132,6 +137,20 @@
     return suspect && location && (canSearch || canInterrogate)
       ? { suspect, location, canSearch, canInterrogate }
       : null
+  })
+  let mapFieldSelection = $derived.by(() => {
+    if (
+      mapFieldSelectionPlayerId !== ownPlayer?.id ||
+      !ownLocation ||
+      availableFieldActionTypes.length === 0
+    )
+      return null
+
+    return {
+      detective: ownPlayer,
+      location: ownLocation,
+      actionTypes: availableFieldActionTypes,
+    }
   })
   let selectedInterrogation = $derived(
     interrogationOptions.find((option) => option.suspect_id === selectedSuspectId),
@@ -314,6 +333,7 @@
     if (mapIntent && nextOwnPlayer?.location_id === mapIntent.locationId) {
       mapIntent = null
       mapSelection = null
+      mapFieldSelectionPlayerId = null
       activeAction = null
     }
 
@@ -322,6 +342,15 @@
       !(nextState.suspects ?? []).some((suspect) => suspect.id === mapSuspectSelectionId)
     ) {
       mapSuspectSelectionId = null
+    }
+
+    if (
+      mapFieldSelectionPlayerId &&
+      !(nextState.players ?? []).some(
+        (player) => player.id === mapFieldSelectionPlayerId && player.location_id,
+      )
+    ) {
+      mapFieldSelectionPlayerId = null
     }
 
     publicState = nextState
@@ -349,6 +378,10 @@
 
     if (mapSuspectSelectionId && !mapSuspectSelectableIn(mapSuspectSelectionId, nextState)) {
       mapSuspectSelectionId = null
+    }
+
+    if (mapFieldSelectionPlayerId && fieldActionTypesIn(nextState).length === 0) {
+      mapFieldSelectionPlayerId = null
     }
 
     if (actionPrompt && !nextActions.has(actionPrompt.type)) {
@@ -421,6 +454,11 @@
     )
   }
 
+  function fieldActionTypesIn(state) {
+    const actions = new Set(state.available_actions ?? [])
+    return fieldActionTypes.filter((action) => actions.has(action))
+  }
+
   function selectMapLocation(location) {
     if (commandPending || !controlsReady) return
 
@@ -430,6 +468,7 @@
       availableActions.has("place")
     ) {
       mapSelection = { type: "place", location }
+      mapFieldSelectionPlayerId = null
       mapSuspectSelectionId = null
     } else if (
       activeAction === "move" &&
@@ -437,6 +476,7 @@
       availableActions.has("move")
     ) {
       mapSelection = { type: "move", location }
+      mapFieldSelectionPlayerId = null
       mapSuspectSelectionId = null
     }
   }
@@ -447,6 +487,7 @@
 
     selectSuspect(suspect.id)
     mapSuspectSelectionId = suspect.id
+    mapFieldSelectionPlayerId = null
     mapSelection = null
     actionPrompt = null
   }
@@ -475,11 +516,41 @@
     mapSuspectSelectionId = null
   }
 
+  function selectMapDetective(detective) {
+    if (commandPending || !controlsReady || activeAction) return
+    if (detective.id !== ownPlayer?.id || fieldActionTypesIn(privateState).length === 0) return
+
+    mapFieldSelectionPlayerId = detective.id
+    mapSuspectSelectionId = null
+    mapSelection = null
+    actionPrompt = null
+  }
+
+  function openMapFieldAction(selection, action) {
+    if (
+      !selection ||
+      selection.detective.id !== mapFieldSelectionPlayerId ||
+      commandPending ||
+      !controlsReady ||
+      !fieldActionTypesIn(privateState).includes(action)
+    )
+      return
+
+    mapFieldSelectionPlayerId = null
+    handleDockAction(action)
+  }
+
+  function cancelMapField() {
+    if (commandPending) return
+    mapFieldSelectionPlayerId = null
+  }
+
   function chooseActionMode(action) {
     if (commandPending || !controlsReady || !availableActions.has(action)) return
 
     activeAction = activeAction === action ? null : action
     mapSelection = null
+    mapFieldSelectionPlayerId = null
     mapSuspectSelectionId = null
     actionPrompt = null
   }
@@ -582,6 +653,7 @@
 
   function handleDockAction(action) {
     const prompt = immediateActionPrompt(action)
+    mapFieldSelectionPlayerId = null
     mapSuspectSelectionId = null
 
     if (action === "search_location" || action === "search_suspect") {
@@ -846,6 +918,7 @@
     offlineDeadlines = {}
     allPlayersOnline = false
     mapSelection = null
+    mapFieldSelectionPlayerId = null
     mapSuspectSelectionId = null
     mapIntent = null
     activeAction = null
@@ -861,6 +934,7 @@
 
   function requestProjectionResync() {
     mapSelection = null
+    mapFieldSelectionPlayerId = null
     mapSuspectSelectionId = null
     mapIntent = null
     activeAction = null
@@ -1166,6 +1240,10 @@
       <MapStage
         locations={publicState.locations}
         {detectives}
+        actionableDetectiveId={availableFieldActionTypes.length > 0 ? ownPlayer?.id ?? null : null}
+        detectiveActionTypes={availableFieldActionTypes}
+        selectedDetectiveId={mapFieldSelectionPlayerId}
+        detectiveInteractionsDisabled={activeAction !== null}
         suspects={publicState.suspects ?? []}
         searchableSuspectIds={[...searchableSuspectIds]}
         interrogatableSuspectIds={[...interrogatableSuspectIds]}
@@ -1179,6 +1257,7 @@
         disabled={!controlsReady || commandPending}
         status={mapStatus}
         onSelect={selectMapLocation}
+        onSelectDetective={selectMapDetective}
         onSelectSuspect={selectMapSuspect}
       />
     {/snippet}
@@ -1186,6 +1265,7 @@
     {#snippet contextStack()}
       <ContextStack
         selection={mapSelection}
+        fieldSelection={mapFieldSelection}
         suspectSelection={mapSuspectSelection}
         {actionPrompt}
         origin={ownLocation}
@@ -1195,6 +1275,8 @@
         connectionOnline={controlsReady}
         onConfirmMove={confirmMapMovement}
         onCancelMove={cancelMapMovement}
+        onOpenFieldAction={openMapFieldAction}
+        onCancelField={cancelMapField}
         onOpenSuspectAction={openMapSuspectAction}
         onCancelSuspect={cancelMapSuspect}
         onConfirmAction={confirmImmediateAction}

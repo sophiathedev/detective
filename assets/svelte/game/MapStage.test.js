@@ -15,6 +15,10 @@ const location = {
 const baseProps = {
   locations: [location],
   detectives: [],
+  actionableDetectiveId: null,
+  detectiveActionTypes: [],
+  selectedDetectiveId: null,
+  detectiveInteractionsDisabled: false,
   suspects: [],
   searchableSuspectIds: [],
   interrogatableSuspectIds: [],
@@ -27,6 +31,7 @@ const baseProps = {
   disabled: false,
   status: "Observing",
   onSelect: vi.fn(),
+  onSelectDetective: vi.fn(),
   onSelectSuspect: vi.fn(),
 }
 
@@ -81,6 +86,31 @@ describe("MapStage", () => {
     expect(standee).toHaveAttribute("aria-pressed", "true")
     await fireEvent.click(standee)
     expect(onSelectSuspect).toHaveBeenCalledWith(expect.objectContaining({ id: "iona-pike" }))
+  })
+
+  it("forwards authorized field actions to the own Detective token", async () => {
+    const detective = {
+      id: "detective-1",
+      role: "detective",
+      seat: 1,
+      display_name: "Marlowe",
+      location_id: "51",
+    }
+    const onSelectDetective = vi.fn()
+
+    render(MapStage, {
+      ...baseProps,
+      detectives: [detective],
+      actionableDetectiveId: detective.id,
+      detectiveActionTypes: ["analyze"],
+      selectedDetectiveId: detective.id,
+      onSelectDetective,
+    })
+
+    const token = screen.getByTestId("detective-token-detective-1")
+    expect(token).toHaveAttribute("aria-pressed", "true")
+    await fireEvent.click(token)
+    expect(onSelectDetective).toHaveBeenCalledWith(detective)
   })
 
   it("zooms inside the contained map viewport", async () => {

@@ -24,6 +24,10 @@ const locations = [
 const baseProps = {
   locations,
   detectives: [],
+  actionableDetectiveId: null,
+  detectiveActionTypes: [],
+  selectedDetectiveId: null,
+  detectiveInteractionsDisabled: false,
   suspects: [],
   searchableSuspectIds: [],
   interrogatableSuspectIds: [],
@@ -34,6 +38,7 @@ const baseProps = {
   pendingLocationId: null,
   lastTravel: null,
   disabled: false,
+  onSelectDetective: vi.fn(),
   onSelectSuspect: vi.fn(),
 }
 
@@ -158,6 +163,65 @@ describe("GameBoard", () => {
     expect(screen.getByTestId("case-card-slot-B")).toContainElement(
       document.querySelector('.noir-case-knowledge-marker[data-seat="1"]'),
     )
+  })
+
+  it("activates only the authorized Detective token as a field-action hub", async () => {
+    const onSelectDetective = vi.fn()
+    const detectives = [
+      {
+        id: "detective-1",
+        role: "detective",
+        seat: 1,
+        display_name: "Marlowe",
+        location_id: "51",
+      },
+      {
+        id: "detective-2",
+        role: "detective",
+        seat: 2,
+        display_name: "Archer",
+        location_id: "51",
+      },
+    ]
+    const { rerender } = render(GameBoard, {
+      ...baseProps,
+      detectives,
+      actionableDetectiveId: "detective-1",
+      detectiveActionTypes: ["search_location", "analyze"],
+      selectedDetectiveId: "detective-1",
+      onSelectDetective,
+    })
+
+    const ownToken = screen.getByTestId("detective-token-detective-1")
+    const otherToken = screen.getByTestId("detective-token-detective-2")
+
+    expect(ownToken).toHaveAccessibleName(
+      "Marlowe at L.A. Police Department Headquarters. Available actions: search location, analyze evidence.",
+    )
+    expect(ownToken).toHaveAttribute("role", "button")
+    expect(ownToken).toHaveAttribute("tabindex", "0")
+    expect(ownToken).toHaveAttribute("aria-pressed", "true")
+    expect(otherToken).toHaveAttribute("role", "img")
+    expect(otherToken).toHaveAttribute("data-actionable", "false")
+
+    await fireEvent.keyDown(ownToken, { key: "Escape" })
+    expect(onSelectDetective).not.toHaveBeenCalled()
+    await fireEvent.keyDown(ownToken, { key: " " })
+    await fireEvent.click(ownToken)
+    expect(onSelectDetective).toHaveBeenCalledTimes(2)
+    expect(onSelectDetective).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: "detective-1" }),
+    )
+
+    await rerender({
+      ...baseProps,
+      detectives,
+      actionableDetectiveId: "detective-1",
+      detectiveActionTypes: ["analyze"],
+      detectiveInteractionsDisabled: true,
+      onSelectDetective,
+    })
+    expect(screen.getByTestId("detective-token-detective-1")).toHaveAttribute("role", "img")
   })
 
   it("separates co-located suspects and exposes only authorized standees", async () => {

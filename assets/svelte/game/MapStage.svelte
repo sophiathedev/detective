@@ -4,6 +4,10 @@
   let {
     locations = [],
     detectives = [],
+    actionableDetectiveId = null,
+    detectiveActionTypes = [],
+    selectedDetectiveId = null,
+    detectiveInteractionsDisabled = false,
     suspects = [],
     searchableSuspectIds = [],
     interrogatableSuspectIds = [],
@@ -17,6 +21,7 @@
     disabled = false,
     status = "",
     onSelect = () => {},
+    onSelectDetective = () => {},
     onSelectSuspect = () => {},
   } = $props()
 
@@ -58,6 +63,10 @@
       <GameBoard
         {locations}
         {detectives}
+        {actionableDetectiveId}
+        {detectiveActionTypes}
+        {selectedDetectiveId}
+        {detectiveInteractionsDisabled}
         {suspects}
         {searchableSuspectIds}
         {interrogatableSuspectIds}
@@ -70,6 +79,7 @@
         {lastTravel}
         {disabled}
         {onSelect}
+        {onSelectDetective}
         {onSelectSuspect}
       />
     </div>

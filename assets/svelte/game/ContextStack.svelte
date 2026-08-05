@@ -1,6 +1,7 @@
 <script>
   let {
     selection = null,
+    fieldSelection = null,
     suspectSelection = null,
     actionPrompt = null,
     origin = null,
@@ -10,6 +11,8 @@
     connectionOnline = false,
     onConfirmMove = () => {},
     onCancelMove = () => {},
+    onOpenFieldAction = () => {},
+    onCancelField = () => {},
     onOpenSuspectAction = () => {},
     onCancelSuspect = () => {},
     onConfirmAction = () => {},
@@ -22,12 +25,56 @@
   let cancelLabel = $derived(
     selection?.type === "place" ? "Cancel Placement" : "Cancel Move",
   )
+
+  function fieldActionLabel(action) {
+    return (
+      {
+        search_location: "Open Location Search",
+        analyze: "Analyze Case",
+        kickback: "Collect Kickback",
+        bribe_officer: "Open Officer Bribe",
+      }[action] ?? action.replaceAll("_", " ")
+    )
+  }
 </script>
 
-{#if selection || suspectSelection || actionPrompt || commandError}
+{#if selection || fieldSelection || suspectSelection || actionPrompt || commandError}
   <div id="context-stack" class="noir-context-stack">
     {#if commandPending && (selection || actionPrompt)}
       <p class="sr-only" role="status" aria-live="polite">Dispatching action</p>
+    {/if}
+
+    {#if fieldSelection}
+      <article id="field-position-slip" class="noir-movement-slip noir-paper-sheet" aria-live="polite">
+        <div class="noir-movement-slip-stamp" aria-hidden="true">FIELD</div>
+        <p class="noir-movement-slip-kicker">Current field position</p>
+        <h3 class="noir-action-slip-title">{fieldSelection.location.name}</h3>
+        <p class="noir-action-slip-description">
+          D{fieldSelection.detective.seat} {fieldSelection.detective.display_name} · {fieldSelection.detective.actions_remaining} AP remaining
+        </p>
+        <p class="noir-movement-slip-districts">
+          Choose one authorized desk or location action.
+        </p>
+
+        <div class="noir-field-slip-controls">
+          {#each fieldSelection.actionTypes as action}
+            <button
+              id={`action-open-field-${action.replaceAll("_", "-")}`}
+              type="button"
+              class="noir-context-button noir-context-button-confirm"
+              disabled={commandPending || !connectionOnline}
+              onclick={() => onOpenFieldAction(fieldSelection, action)}
+            >{fieldActionLabel(action)}</button>
+          {/each}
+          <button
+            id="action-cancel-field"
+            type="button"
+            class="noir-context-button noir-context-button-dismiss"
+            disabled={commandPending}
+            onclick={() => onCancelField(fieldSelection)}
+          >Close position</button>
+        </div>
+      </article>
     {/if}
 
     {#if suspectSelection}

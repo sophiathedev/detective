@@ -4,6 +4,10 @@
   let {
     locations = [],
     detectives = [],
+    actionableDetectiveId = null,
+    detectiveActionTypes = [],
+    selectedDetectiveId = null,
+    detectiveInteractionsDisabled = false,
     suspects = [],
     searchableSuspectIds = [],
     interrogatableSuspectIds = [],
@@ -16,6 +20,7 @@
     lastTravel = null,
     disabled = false,
     onSelect = () => {},
+    onSelectDetective = () => {},
     onSelectSuspect = () => {},
   } = $props()
 
@@ -25,6 +30,9 @@
   )
   let interrogatableIds = $derived(
     new Set(disabled || suspectInteractionsDisabled ? [] : interrogatableSuspectIds),
+  )
+  let availableDetectiveActions = $derived(
+    disabled || detectiveInteractionsDisabled ? [] : detectiveActionTypes,
   )
   let legalLocations = $derived(locations.filter((location) => legalIds.has(location.id)))
   let travelPath = $derived.by(() => {
@@ -51,6 +59,31 @@
 
   function tokenColor(seat) {
     return ["#28485c", "#724438", "#3f5d44", "#6b5535"][seat - 1] ?? "#4d4439"
+  }
+
+  function detectiveActionLabel(action) {
+    return (
+      {
+        search_location: "search location",
+        analyze: "analyze evidence",
+        kickback: "collect kickback",
+        bribe_officer: "bribe officer",
+      }[action] ?? action.replaceAll("_", " ")
+    )
+  }
+
+  function detectiveLabel(detective, location, actions) {
+    const identity = `${detective.display_name} at ${location.name}`
+    return actions.length > 0
+      ? `${identity}. Available actions: ${actions.map(detectiveActionLabel).join(", ")}.`
+      : identity
+  }
+
+  function selectDetectiveToken(event, detective, actions) {
+    if (actions.length === 0) return
+    if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return
+    if (event.type === "keydown") event.preventDefault()
+    onSelectDetective(detective)
   }
 
   function suspectInitials(name) {
@@ -279,12 +312,30 @@
       {#each detectives as detective}
         {@const tokenLocation = locations.find((location) => location.id === detective.location_id)}
         {#if tokenLocation}
+          {@const actions = detective.id === actionableDetectiveId ? availableDetectiveActions : []}
+          {@const actionable = actions.length > 0}
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
           <g
             id={`detective-map-token-${detective.id}`}
-            class={`map-detective-token ${lastTravel?.player_id === detective.id ? "map-detective-token-active" : ""}`}
+            data-testid={`detective-token-${detective.id}`}
+            class={`map-detective-token ${lastTravel?.player_id === detective.id ? "map-detective-token-active" : ""} ${actionable ? "map-detective-token-actionable" : ""} ${selectedDetectiveId === detective.id ? "map-detective-token-selected" : ""}`}
             style={`transform: translate(${tokenLocation.x * 1000 + (detective.seat - 1) * 11}px, ${tokenLocation.y * 636 - 16}px);`}
-            aria-label={`${detective.display_name} at ${tokenLocation.name}`}
+            role={actionable ? "button" : "img"}
+            tabindex={actionable ? "0" : undefined}
+            focusable={actionable ? "true" : "false"}
+            aria-pressed={actionable ? selectedDetectiveId === detective.id : undefined}
+            aria-label={detectiveLabel(detective, tokenLocation, actions)}
+            data-actionable={actionable}
+            data-selected={selectedDetectiveId === detective.id}
+            onclick={(event) => selectDetectiveToken(event, detective, actions)}
+            onkeydown={(event) => selectDetectiveToken(event, detective, actions)}
           >
+            <circle
+              r="27"
+              class="map-detective-action-ring"
+              vector-effect="non-scaling-stroke"
+              aria-hidden="true"
+            />
             <path
               d="M0-18 15-8 12 14 0 22-12 14-15-8Z"
               fill={tokenColor(detective.seat)}

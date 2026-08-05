@@ -120,6 +120,45 @@ describe("ContextStack", () => {
     expect(onCancelSuspect).toHaveBeenCalledWith(suspectSelection)
   })
 
+  it("routes the own Detective token through authorized field actions", async () => {
+    const fieldSelection = {
+      detective: {
+        id: "detective-1",
+        seat: 1,
+        display_name: "Marlowe",
+        actions_remaining: 3,
+      },
+      location: { id: "51", name: "LAPD Headquarters" },
+      actionTypes: ["search_location", "analyze", "bribe_officer"],
+    }
+    const onOpenFieldAction = vi.fn()
+    const onCancelField = vi.fn()
+
+    render(ContextStack, {
+      selection: null,
+      fieldSelection,
+      commandPending: false,
+      commandError: null,
+      commandStatus: false,
+      connectionOnline: true,
+      onOpenFieldAction,
+      onCancelField,
+    })
+
+    expect(document.querySelector("#field-position-slip")).toHaveTextContent(
+      "LAPD Headquarters",
+    )
+    expect(screen.queryByRole("button", { name: "Collect Kickback" })).not.toBeInTheDocument()
+
+    await fireEvent.click(screen.getByRole("button", { name: "Analyze Case" }))
+    await fireEvent.click(screen.getByRole("button", { name: "Open Officer Bribe" }))
+    await fireEvent.click(screen.getByRole("button", { name: "Close position" }))
+
+    expect(onOpenFieldAction).toHaveBeenNthCalledWith(1, fieldSelection, "analyze")
+    expect(onOpenFieldAction).toHaveBeenNthCalledWith(2, fieldSelection, "bribe_officer")
+    expect(onCancelField).toHaveBeenCalledWith(fieldSelection)
+  })
+
   it("renders no empty paper without a selection or command message", () => {
     const { container } = render(ContextStack, {
       selection: null,
