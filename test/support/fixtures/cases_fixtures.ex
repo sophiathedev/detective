@@ -88,7 +88,8 @@ defmodule Detective.CasesFixtures do
               "victim-file" => %{
                 "most_useful" => %{
                   "id" => "clerk-a-truth",
-                  "text" => "The victim signed the register shortly before midnight."
+                  "text" => "The victim signed the register shortly before midnight.",
+                  "reveal_case_card_ids" => ["sealed-ledger"]
                 },
                 "misdirections" => [
                   %{

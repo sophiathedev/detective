@@ -1,7 +1,7 @@
 defmodule Detective.Cases.ValidatorTest do
   use ExUnit.Case, async: true
 
-  alias Detective.Cases.Validator
+  alias Detective.Cases.{ResponseMatrix, Validator}
 
   test "validates an exact pre-catalog published fixture through the legacy adapter" do
     legacy = %{
@@ -71,18 +71,34 @@ defmodule Detective.Cases.ValidatorTest do
           "title" => "Victim",
           "type" => "victim",
           "initially_known" => true
+        },
+        %{
+          "id" => "receipt",
+          "code" => "B",
+          "title" => "Receipt",
+          "type" => "evidence",
+          "initially_known" => false
         }
       ])
       |> Map.put("response_matrix", %{
         "suspect" => %{
           "victim" => %{
-            "most_useful" => "A useful answer.",
+            "most_useful" => %{
+              "text" => "A useful answer.",
+              "reveal_case_card_ids" => ["receipt"]
+            },
             "misdirections" => ["A false trail."]
           }
         }
       })
 
     assert :ok = Validator.validate(case_definition)
+
+    assert {:ok, [most_useful, misdirection]} =
+             ResponseMatrix.response_options(case_definition, "suspect", "victim")
+
+    assert most_useful.case_card_ids == ["receipt"]
+    assert misdirection.case_card_ids == []
 
     invalid_reference = put_in(case_definition["response_matrix"]["unknown"], %{})
     assert {:error, :invalid_response_reference} = Validator.validate(invalid_reference)
@@ -94,6 +110,26 @@ defmodule Detective.Cases.ValidatorTest do
       )
 
     assert {:error, :invalid_response_matrix} = Validator.validate(without_truth)
+
+    unknown_response_card =
+      put_in(
+        case_definition["response_matrix"]["suspect"]["victim"]["most_useful"][
+          "reveal_case_card_ids"
+        ],
+        ["missing"]
+      )
+
+    assert {:error, :invalid_response_reference} = Validator.validate(unknown_response_card)
+
+    duplicate_response_card =
+      put_in(
+        case_definition["response_matrix"]["suspect"]["victim"]["most_useful"][
+          "reveal_case_card_ids"
+        ],
+        ["receipt", "receipt"]
+      )
+
+    assert {:error, :invalid_response_matrix} = Validator.validate(duplicate_response_card)
   end
 
   test "validates server-owned Search cards and their reveal instructions" do

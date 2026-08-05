@@ -382,6 +382,8 @@ defmodule Detective.Games.EngineTest do
              "misdirection"
            ]
 
+    assert hd(chisel_payload.response_options).case_card_ids == ["sealed-ledger"]
+
     assert {:error, :wrong_phase} = apply_command(awaiting_chisel, "detective-1", :move)
 
     assert {:error, :wrong_role} =
@@ -623,6 +625,52 @@ defmodule Detective.Games.EngineTest do
              "The victim signed the register shortly before midnight."
 
     assert hd(detective.statements)["resolution"] == "challenge_succeeded"
+
+    assert "sealed-ledger" in detective.knowledge
+
+    assert event.private_payloads[detective.user_id].case_cards == [
+             %{
+               id: "sealed-ledger",
+               code: "B",
+               title: "Sealed Ledger",
+               type: "evidence",
+               description: "A ledger removed from the station records."
+             }
+           ]
+
+    refute Jason.encode!(event.public_payload) =~ "sealed-ledger"
+  end
+
+  test "selected response reveals its linked Case card only to the questioning Detective" do
+    state = awaiting_chisel_state()
+
+    assert {:ok, awaiting_decision, [published]} =
+             apply_command(state, "chisel", :select_response, %{
+               "response_id" => "response-0"
+             })
+
+    detective = player(awaiting_decision, "detective-1")
+    other_detective = player(awaiting_decision, "detective-2")
+
+    assert "sealed-ledger" in detective.knowledge
+    refute "sealed-ledger" in other_detective.knowledge
+
+    assert awaiting_decision.pending_action["selected_response_case_card_ids"] == [
+             "sealed-ledger"
+           ]
+
+    assert published.public_payload.revealed_case_card_codes == []
+    refute Jason.encode!(published.public_payload) =~ "sealed-ledger"
+
+    assert published.private_payloads[detective.user_id].case_cards == [
+             %{
+               id: "sealed-ledger",
+               code: "B",
+               title: "Sealed Ledger",
+               type: "evidence",
+               description: "A ledger removed from the station records."
+             }
+           ]
   end
 
   test "Chisel may block a question and the active Detective may pay two Scratch to proceed" do
@@ -713,7 +761,7 @@ defmodule Detective.Games.EngineTest do
 
     {:ok, decision, _events} =
       apply_command(response_stage, "chisel", :select_response, %{
-        "response_id" => "response-1"
+        "response_id" => "response-0"
       })
 
     assert {:ok, finished, [accepted]} =
@@ -721,13 +769,29 @@ defmodule Detective.Games.EngineTest do
 
     snitch = player(finished, "detective-2")
     assert snitch.scratch == 2
-    assert hd(snitch.statements)["response_text"] == "I never worked the midnight desk."
+    assert "sealed-ledger" in snitch.knowledge
+
+    assert hd(snitch.statements)["response_text"] ==
+             "The victim signed the register shortly before midnight."
+
     assert hd(snitch.statements)["resolution"] == "snitched"
+
+    assert accepted.public_payload.revealed_case_card_codes == ["B"]
+    assert "sealed-ledger" in finished.public_case_card_ids
 
     assert accepted.private_payloads[snitch.user_id] == %{
              type: "snitch_result",
              interrogation_id: state.pending_action["id"],
-             response_text: "I never worked the midnight desk.",
+             response_text: "The victim signed the register shortly before midnight.",
+             case_cards: [
+               %{
+                 id: "sealed-ledger",
+                 code: "B",
+                 title: "Sealed Ledger",
+                 type: "evidence",
+                 description: "A ledger removed from the station records."
+               }
+             ],
              scratch: 2,
              scratch_spent: 3
            }
@@ -1214,7 +1278,10 @@ defmodule Detective.Games.EngineTest do
       "response_matrix" => %{
         "night-clerk" => %{
           "victim-file" => %{
-            "most_useful" => "The victim signed the register shortly before midnight.",
+            "most_useful" => %{
+              "text" => "The victim signed the register shortly before midnight.",
+              "reveal_case_card_ids" => ["sealed-ledger"]
+            },
             "misdirections" => [
               "I never worked the midnight desk.",
               "The desk sergeant forged the register."

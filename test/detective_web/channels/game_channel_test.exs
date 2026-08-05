@@ -657,6 +657,7 @@ defmodule DetectiveWeb.GameChannelTest do
     assert_broadcast "response_published", %{payload: response_payload}
     refute Map.has_key?(response_payload, :response_text)
     refute Jason.encode!(response_payload) =~ "misdirection"
+    refute Jason.encode!(response_payload) =~ "sealed-ledger"
 
     assert_broadcast "private_event", %{
       type: "response_published",
@@ -682,13 +683,15 @@ defmodule DetectiveWeb.GameChannelTest do
       payload: %{
         type: "challenge_resolved",
         succeeded: true,
-        final_response_text: "The victim signed the register shortly before midnight."
+        final_response_text: "The victim signed the register shortly before midnight.",
+        case_cards: [%{id: "sealed-ledger", code: "B"}]
       }
     }
 
     assert_broadcast "game_state", %{version: ^resolved_version, state: resolved_public}
     assert resolved_public.phase == "detective_turn"
     assert resolved_public.pending_interrogation == nil
+    refute Jason.encode!(resolved_public) =~ "sealed-ledger"
   end
 
   defp authenticated_socket(user) do

@@ -66,6 +66,19 @@ author_response_decks = fn matrix ->
   end)
 end
 
+add_response_case_card_effects = fn matrix ->
+  update_in(matrix, ["iona-pike", "mara-venn", "most_useful"], fn
+    response when is_binary(response) ->
+      %{
+        "text" => response,
+        "reveal_case_card_ids" => ["receiver-cable"]
+      }
+
+    response when is_map(response) ->
+      Map.put(response, "reveal_case_card_ids", ["receiver-cable"])
+  end)
+end
+
 additional_case_cards = [
   %{
     "id" => "receiver-cable",
@@ -342,7 +355,11 @@ solution = %{
         content =
           content
           |> Map.update!("case_cards", add_case_codes)
-          |> Map.update!("response_matrix", author_response_decks)
+          |> Map.update!("response_matrix", fn response_matrix ->
+            response_matrix
+            |> author_response_decks.()
+            |> add_response_case_card_effects.()
+          end)
 
         {:ok, version} =
           Cases.create_version(case_file, %{
@@ -354,10 +371,11 @@ solution = %{
         version
 
       case_file ->
-        case Repo.get_by(CaseVersion, case_id: case_file.id, version: 5) do
+        case Repo.get_by(CaseVersion, case_id: case_file.id, version: 6) do
           nil ->
             legacy_version =
-              Repo.get_by(CaseVersion, case_id: case_file.id, version: 4) ||
+              Repo.get_by(CaseVersion, case_id: case_file.id, version: 5) ||
+                Repo.get_by(CaseVersion, case_id: case_file.id, version: 4) ||
                 Repo.get_by(CaseVersion, case_id: case_file.id, version: 3) ||
                 Repo.get_by(CaseVersion, case_id: case_file.id, version: 2) ||
                 Repo.get_by!(CaseVersion, case_id: case_file.id, version: 1)
@@ -368,14 +386,18 @@ solution = %{
               |> Map.delete("locations")
               |> Map.put("board_id", "dcoa_classic")
               |> Map.update!("case_cards", upgrade_case_cards)
-              |> Map.update!("response_matrix", author_response_decks)
+              |> Map.update!("response_matrix", fn response_matrix ->
+                response_matrix
+                |> author_response_decks.()
+                |> add_response_case_card_effects.()
+              end)
               |> Map.put("search_results", search_results)
               |> Map.put("accusation_options", accusation_options)
               |> Map.put("solution", solution)
 
             {:ok, version} =
               Cases.create_version(case_file, %{
-                version: 5,
+                version: 6,
                 content: upgraded_content,
                 published_at: DateTime.utc_now() |> DateTime.truncate(:second)
               })

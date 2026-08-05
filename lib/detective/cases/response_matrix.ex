@@ -144,7 +144,9 @@ defmodule Detective.Cases.ResponseMatrix do
     valid? =
       Enum.all?(matrix, fn {suspect_id, suspect_matrix} ->
         MapSet.member?(suspect_ids, suspect_id) and
-          Enum.all?(Map.keys(suspect_matrix), &MapSet.member?(topic_ids, &1))
+          Enum.all?(suspect_matrix, fn {topic_id, entry} ->
+            MapSet.member?(topic_ids, topic_id) and response_references_valid?(entry, topic_ids)
+          end)
       end)
 
     if valid?, do: :ok, else: {:error, :invalid_response_reference}
@@ -168,21 +170,41 @@ defmodule Detective.Cases.ResponseMatrix do
   defp normalize_misdirections(_misdirections), do: {:error, :invalid_response}
 
   defp normalize_response(text, default_id, type) when is_binary(text) and text != "" do
-    {:ok, %{id: default_id, text: text, type: type}}
+    {:ok, %{id: default_id, text: text, type: type, case_card_ids: []}}
   end
 
   defp normalize_response(response, default_id, type) when is_map(response) do
     id = response["id"] || default_id
     text = response["text"]
+    case_card_ids = response["reveal_case_card_ids"] || []
 
-    if is_binary(id) and id != "" and is_binary(text) and text != "" do
-      {:ok, %{id: id, text: text, type: type}}
+    if is_binary(id) and id != "" and is_binary(text) and text != "" and
+         valid_id_list?(case_card_ids) do
+      {:ok, %{id: id, text: text, type: type, case_card_ids: case_card_ids}}
     else
       {:error, :invalid_response}
     end
   end
 
   defp normalize_response(_response, _default_id, _type), do: {:error, :invalid_response}
+
+  defp response_references_valid?(entry, topic_ids) do
+    with {:ok, most_useful} <-
+           normalize_response(entry["most_useful"], "response-0", "most_useful"),
+         {:ok, misdirections} <- normalize_misdirections(entry["misdirections"] || []) do
+      Enum.all?([most_useful | misdirections], fn response ->
+        MapSet.subset?(MapSet.new(response.case_card_ids), topic_ids)
+      end)
+    else
+      _invalid -> false
+    end
+  end
+
+  defp valid_id_list?(ids) when is_list(ids) do
+    Enum.all?(ids, &(is_binary(&1) and &1 != "")) and Enum.uniq(ids) == ids
+  end
+
+  defp valid_id_list?(_ids), do: false
 
   defp topic_code(index) do
     index

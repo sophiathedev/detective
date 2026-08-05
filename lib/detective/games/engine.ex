@@ -524,7 +524,8 @@ defmodule Detective.Games.Engine do
         "blocked_snitch_player_ids" => [],
         "selected_response_id" => nil,
         "selected_response_text" => nil,
-        "selected_response_type" => nil
+        "selected_response_type" => nil,
+        "selected_response_case_card_ids" => []
       }
 
       chisel = Map.fetch!(state.players, state.chisel_player_id)
@@ -858,10 +859,14 @@ defmodule Detective.Games.Engine do
         | "stage" => "response_decision",
           "selected_response_id" => option.id,
           "selected_response_text" => option.text,
-          "selected_response_type" => option.type
+          "selected_response_type" => option.type,
+          "selected_response_case_card_ids" => option.case_card_ids
       }
 
       detective = Map.fetch!(state.players, pending["detective_player_id"])
+
+      {state, response_case_cards, newly_public_card_ids} =
+        grant_response_case_cards(state, detective.id, option.case_card_ids)
 
       next_state =
         state
@@ -881,13 +886,15 @@ defmodule Detective.Games.Engine do
           interrogation_id: pending["id"],
           detective_player_id: detective.id,
           suspect_id: pending["suspect_id"],
-          topic_code: pending["topic_code"]
+          topic_code: pending["topic_code"],
+          revealed_case_card_codes: case_card_codes(state, newly_public_card_ids)
         },
         private_payloads: %{
           detective.user_id => %{
             type: "suspect_response",
             interrogation_id: pending["id"],
-            response_text: option.text
+            response_text: option.text,
+            case_cards: response_case_cards
           }
         }
       }
@@ -900,8 +907,14 @@ defmodule Detective.Games.Engine do
     pending = state.pending_action
     response_text = pending["selected_response_text"]
 
-    {state, snitch_private_payloads} =
-      deliver_snitch_results(state, pending, response_text, "snitched")
+    {state, snitch_private_payloads, newly_public_card_ids} =
+      deliver_snitch_results(
+        state,
+        pending,
+        response_text,
+        "snitched",
+        pending["selected_response_case_card_ids"] || []
+      )
 
     next_actor =
       state.players
@@ -928,7 +941,8 @@ defmodule Detective.Games.Engine do
         detective_player_id: actor.id,
         suspect_id: pending["suspect_id"],
         topic_code: pending["topic_code"],
-        snitch_count: length(pending["snitch_player_ids"] || [])
+        snitch_count: length(pending["snitch_player_ids"] || []),
+        revealed_case_card_codes: case_card_codes(state, newly_public_card_ids)
       },
       private_payloads: snitch_private_payloads
     }
@@ -962,12 +976,20 @@ defmodule Detective.Games.Engine do
         |> put_player(next_actor)
         |> put_player(next_chisel)
 
-      {state, snitch_private_payloads} =
+      {state, challenge_case_cards, challenge_public_card_ids} =
+        if succeeded do
+          grant_response_case_cards(state, actor.id, most_useful.case_card_ids)
+        else
+          {state, [], []}
+        end
+
+      {state, snitch_private_payloads, snitch_public_card_ids} =
         deliver_snitch_results(
           state,
           pending,
           most_useful.text,
-          if(succeeded, do: "snitch_challenge_succeeded", else: "snitch_challenge_failed")
+          if(succeeded, do: "snitch_challenge_succeeded", else: "snitch_challenge_failed"),
+          most_useful.case_card_ids
         )
 
       next_actor = Map.fetch!(state.players, actor.id)
@@ -997,7 +1019,12 @@ defmodule Detective.Games.Engine do
           suspect_id: pending["suspect_id"],
           topic_code: pending["topic_code"],
           succeeded: succeeded,
-          snitch_count: length(pending["snitch_player_ids"] || [])
+          snitch_count: length(pending["snitch_player_ids"] || []),
+          revealed_case_card_codes:
+            case_card_codes(
+              state,
+              Enum.uniq(challenge_public_card_ids ++ snitch_public_card_ids)
+            )
         },
         private_payloads:
           Map.put(snitch_private_payloads, actor.user_id, %{
@@ -1005,6 +1032,7 @@ defmodule Detective.Games.Engine do
             interrogation_id: pending["id"],
             succeeded: succeeded,
             final_response_text: most_useful.text,
+            case_cards: challenge_case_cards,
             leverage_supply: next_actor.leverage_supply,
             suspect_leverage: Map.get(next_actor.leverage_on_suspects, pending["suspect_id"], 0)
           })
@@ -1922,28 +1950,54 @@ defmodule Detective.Games.Engine do
     end)
   end
 
-  defp deliver_snitch_results(state, pending, response_text, resolution) do
-    pending
-    |> Map.get("snitch_player_ids", [])
-    |> Enum.reduce({state, %{}}, fn player_id, {next_state, private_payloads} ->
-      detective = Map.fetch!(next_state.players, player_id)
+  defp deliver_snitch_results(state, pending, response_text, resolution, case_card_ids) do
+    case_cards = private_response_case_cards(state, case_card_ids)
 
-      next_detective =
-        detective
-        |> Map.put(:scratch, detective.scratch - 3)
-        |> append_statement(pending, response_text, resolution)
+    {state, private_payloads} =
+      pending
+      |> Map.get("snitch_player_ids", [])
+      |> Enum.reduce({state, %{}}, fn player_id, {next_state, private_payloads} ->
+        detective = Map.fetch!(next_state.players, player_id)
 
-      private_payload = %{
-        type: "snitch_result",
-        interrogation_id: pending["id"],
-        response_text: response_text,
-        scratch: next_detective.scratch,
-        scratch_spent: 3
-      }
+        next_detective =
+          detective
+          |> Map.put(:scratch, detective.scratch - 3)
+          |> Map.update!(:knowledge, &Enum.uniq(&1 ++ case_card_ids))
+          |> append_statement(pending, response_text, resolution)
 
-      {put_player(next_state, next_detective),
-       Map.put(private_payloads, detective.user_id, private_payload)}
-    end)
+        private_payload = %{
+          type: "snitch_result",
+          interrogation_id: pending["id"],
+          response_text: response_text,
+          case_cards: case_cards,
+          scratch: next_detective.scratch,
+          scratch_spent: 3
+        }
+
+        {put_player(next_state, next_detective),
+         Map.put(private_payloads, detective.user_id, private_payload)}
+      end)
+
+    {state, newly_public_card_ids} = promote_shared_knowledge(state)
+    {state, private_payloads, newly_public_card_ids}
+  end
+
+  defp grant_response_case_cards(state, player_id, case_card_ids) do
+    player = Map.fetch!(state.players, player_id)
+    next_player = %{player | knowledge: Enum.uniq(player.knowledge ++ case_card_ids)}
+
+    {next_state, newly_public_card_ids} =
+      state
+      |> put_player(next_player)
+      |> promote_shared_knowledge()
+
+    {next_state, private_response_case_cards(state, case_card_ids), newly_public_card_ids}
+  end
+
+  defp private_response_case_cards(state, case_card_ids) do
+    {:ok, case_cards} = SearchDeck.case_cards(state.case_definition, case_card_ids)
+
+    Enum.map(case_cards, &Map.take(&1, [:id, :code, :title, :type, :description]))
   end
 
   defp detective_players(state) do

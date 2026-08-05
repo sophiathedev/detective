@@ -24,9 +24,22 @@ describe("caseCardCodeFromPrivateEvent", () => {
     ).toBe("B")
   })
 
+  it.each(["suspect_response", "challenge_resolved", "snitch_result"])(
+    "selects the first linked Case card from a %s event",
+    (type) => {
+      expect(
+        caseCardCodeFromPrivateEvent({
+          type,
+          case_cards: [{ id: "sealed-ledger", code: "B" }],
+        }),
+      ).toBe("B")
+    },
+  )
+
   it("does not infer a card from unrelated or incomplete private events", () => {
     expect(caseCardCodeFromPrivateEvent({ type: "search_result", case_cards: [] })).toBeNull()
     expect(caseCardCodeFromPrivateEvent({ type: "bribe_result" })).toBeNull()
+    expect(caseCardCodeFromPrivateEvent({ type: "challenge_resolved" })).toBeNull()
     expect(caseCardCodeFromPrivateEvent({ type: "scratch_updated", received: 2 })).toBeNull()
   })
 })
