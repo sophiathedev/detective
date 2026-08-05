@@ -349,6 +349,7 @@
     setAccusationSuspect: (suspectId) => (accusationSuspectId = suspectId),
     setAccusationWeapon: (weaponId) => (accusationWeaponId = weaponId),
     setAccusationMotive: (motiveId) => (accusationMotiveId = motiveId),
+    selectEvidenceCaseCard,
     submitAccusation,
     retryCommand: retryLastCommand,
   }
@@ -561,6 +562,12 @@
 
     selectedEvidenceCaseCardCode = slot.code
     openDrawer("evidence")
+  }
+
+  function selectEvidenceCaseCard(code) {
+    if (privateState.role !== "detective" || !inspectableCaseCardCodes.includes(code)) return
+
+    selectedEvidenceCaseCardCode = code
   }
 
   function openMapFieldAction(selection, action) {

@@ -71,9 +71,15 @@
     actions.setBlockedSnitchPlayers?.([...selected])
   }
 
-  function caseCardLabel(cardId) {
-    const card = (evidence.knownCaseCards ?? []).find((candidate) => candidate.id === cardId)
-    return card ? `${card.code} ${card.title}` : cardId
+  function accessibleCaseCard(cardId) {
+    return (evidence.caseCards ?? []).find((candidate) => candidate.id === cardId) ?? null
+  }
+
+  function selectEvidenceCaseCard(card) {
+    if (!card || !(evidence.caseCards ?? []).some((candidate) => candidate.code === card.code))
+      return
+
+    actions.selectEvidenceCaseCard?.(card.code)
   }
 
   function setAccusationSelection(action, value) {
@@ -413,11 +419,15 @@
       </div>
       <div id="accessible-case-card-index" class="mt-4 grid gap-2 sm:grid-cols-3">
         {#each evidence.caseCards ?? [] as card}
-          <article
+          <button
             id={`evidence-case-card-${card.code}`}
+            type="button"
             data-selected={evidence.selectedCaseCardCode === card.code}
             aria-current={evidence.selectedCaseCardCode === card.code ? "true" : undefined}
-            class={`scroll-mt-6 border px-3 py-2 ${evidence.selectedCaseCardCode === card.code ? "border-[#8c3f33] bg-[#f1e2c4] ring-2 ring-[#a54235]" : "border-[#8b7257] bg-[#e7d6b5]"}`}
+            aria-pressed={evidence.selectedCaseCardCode === card.code}
+            aria-label={`Focus Case ${card.code}: ${card.title} on the board`}
+            class={`group scroll-mt-6 min-h-24 w-full cursor-pointer border px-3 py-2 text-left transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8c3f33] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8c3f33] active:translate-y-px motion-reduce:transition-none ${evidence.selectedCaseCardCode === card.code ? "border-[#8c3f33] bg-[#f1e2c4] ring-2 ring-[#a54235]" : "border-[#8b7257] bg-[#e7d6b5]"}`}
+            onclick={() => selectEvidenceCaseCard(card)}
           >
             <div class="flex items-center justify-between gap-3">
               <span class="font-mono text-[10px] font-semibold text-[#8c3f33]">Case {card.code}</span>
@@ -427,7 +437,7 @@
             {#if card.description}
               <p class="mt-1 text-[11px] leading-4 text-[#695642]">{card.description}</p>
             {/if}
-          </article>
+          </button>
         {:else}
           <p class="casebook-empty-page sm:col-span-3">No Case card content is available to this Detective.</p>
         {/each}
@@ -453,8 +463,22 @@
               {#if (note.case_card_ids?.length ?? 0) > 0}
                 <ul class="mt-3 grid gap-1 border-t border-[#b19b7b] pt-2">
                   {#each note.case_card_ids as cardId}
-                    <li class="font-mono text-[9px] uppercase tracking-[0.08em] text-[#6b5844]">
-                      Revealed: {caseCardLabel(cardId)}
+                    {@const card = accessibleCaseCard(cardId)}
+                    <li>
+                      {#if card}
+                        <button
+                          id={`search-note-revealed-${index}-${cardId}`}
+                          type="button"
+                          aria-pressed={evidence.selectedCaseCardCode === card.code}
+                          class="w-full cursor-pointer border-l-2 border-[#8b7257] bg-[#dfcead] px-2 py-1.5 text-left font-mono text-[9px] uppercase tracking-[0.08em] text-[#6b5844] transition duration-200 hover:-translate-y-px hover:border-[#8c3f33] hover:bg-[#eadbbc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8c3f33] active:translate-y-px motion-reduce:transition-none"
+                          onclick={() => selectEvidenceCaseCard(card)}
+                        >Revealed · Case {card.code} · {card.title}</button>
+                      {:else}
+                        <span
+                          data-inert-case-card={cardId}
+                          class="block border-l-2 border-[#9e8a70] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.08em] text-[#6b5844]"
+                        >Revealed · {cardId}</span>
+                      {/if}
                     </li>
                   {/each}
                 </ul>
@@ -463,8 +487,22 @@
               {#if (note.taken_case_card_ids?.length ?? 0) > 0}
                 <ul class="mt-2 grid gap-1">
                   {#each note.taken_case_card_ids as cardId}
-                    <li class="font-mono text-[9px] uppercase tracking-[0.08em] text-[#8c3f33]">
-                      Evidence held: {caseCardLabel(cardId)}
+                    {@const card = accessibleCaseCard(cardId)}
+                    <li>
+                      {#if card}
+                        <button
+                          id={`search-note-held-${index}-${cardId}`}
+                          type="button"
+                          aria-pressed={evidence.selectedCaseCardCode === card.code}
+                          class="w-full cursor-pointer border-l-2 border-[#8c3f33] bg-[#e6d2b4] px-2 py-1.5 text-left font-mono text-[9px] uppercase tracking-[0.08em] text-[#8c3f33] transition duration-200 hover:-translate-y-px hover:bg-[#f0dfc2] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8c3f33] active:translate-y-px motion-reduce:transition-none"
+                          onclick={() => selectEvidenceCaseCard(card)}
+                        >Evidence held · Case {card.code} · {card.title}</button>
+                      {:else}
+                        <span
+                          data-inert-case-card={cardId}
+                          class="block border-l-2 border-[#8c3f33] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.08em] text-[#8c3f33]"
+                        >Evidence held · {cardId}</span>
+                      {/if}
                     </li>
                   {/each}
                 </ul>
@@ -476,7 +514,13 @@
         </div>
         <div id="held-evidence-list" class="grid content-start gap-2">
           {#each evidence.heldEvidence ?? [] as card}
-            <article id={`held-evidence-${card.id}`} class="border border-[#8b7257] bg-[#efe0c0] px-3 py-2"><div class="flex items-center justify-between gap-3"><span class="font-mono text-[10px] font-semibold text-[#8c3f33]">{card.code}</span><span class="font-mono text-[8px] uppercase tracking-[0.1em] text-[#725e48]">held evidence</span></div><h4 class="mt-1 font-serif text-sm font-semibold">{card.title}</h4>{#if card.description}<p class="mt-1 text-[11px] leading-4 text-[#695642]">{card.description}</p>{/if}</article>
+            <button
+              id={`held-evidence-${card.id}`}
+              type="button"
+              aria-pressed={evidence.selectedCaseCardCode === card.code}
+              class={`w-full cursor-pointer border px-3 py-2 text-left transition duration-200 hover:-translate-y-0.5 hover:border-[#8c3f33] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8c3f33] active:translate-y-px motion-reduce:transition-none ${evidence.selectedCaseCardCode === card.code ? "border-[#8c3f33] bg-[#f1e2c4]" : "border-[#8b7257] bg-[#efe0c0]"}`}
+              onclick={() => selectEvidenceCaseCard(card)}
+            ><div class="flex items-center justify-between gap-3"><span class="font-mono text-[10px] font-semibold text-[#8c3f33]">{card.code}</span><span class="font-mono text-[8px] uppercase tracking-[0.1em] text-[#725e48]">held evidence</span></div><h4 class="mt-1 font-serif text-sm font-semibold">{card.title}</h4>{#if card.description}<p class="mt-1 text-[11px] leading-4 text-[#695642]">{card.description}</p>{/if}</button>
           {:else}<p class="casebook-empty-page">No Case card is currently held as evidence.</p>{/each}
         </div>
       </div>

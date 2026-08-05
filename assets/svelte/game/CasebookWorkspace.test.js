@@ -29,6 +29,7 @@ const noActions = {
   setAccusationSuspect: () => {},
   setAccusationWeapon: () => {},
   setAccusationMotive: () => {},
+  selectEvidenceCaseCard: () => {},
   submitAccusation: () => {},
   retryCommand: () => {},
 }
@@ -291,6 +292,7 @@ describe("CasebookWorkspace", () => {
 
   it("indexes only accessible Case cards and brings the selected card into view", async () => {
     const scrollIntoView = vi.fn()
+    const selectEvidenceCaseCard = vi.fn()
     Element.prototype.scrollIntoView = scrollIntoView
     const view = {
       ...baseView,
@@ -298,12 +300,14 @@ describe("CasebookWorkspace", () => {
         ...baseView.evidence,
         caseCards: [
           {
+            id: "victim-file",
             code: "A",
             title: "Victim File",
             description: "Public victim details.",
             visibility: "public",
           },
           {
+            id: "copper-key",
             code: "B",
             title: "Copper Tuning Key",
             description: "A detail known only to this Detective.",
@@ -314,7 +318,11 @@ describe("CasebookWorkspace", () => {
       },
     }
 
-    render(CasebookWorkspace, { page: "evidence", view, actions: noActions })
+    render(CasebookWorkspace, {
+      page: "evidence",
+      view,
+      actions: { ...noActions, selectEvidenceCaseCard },
+    })
 
     expect(document.querySelector("#evidence-case-card-A")).toHaveTextContent("Victim File")
     expect(document.querySelector("#evidence-case-card-B")).toHaveAttribute(
@@ -326,6 +334,58 @@ describe("CasebookWorkspace", () => {
     )
     expect(screen.queryByText("Sealed Case C")).not.toBeInTheDocument()
     await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" }))
+
+    await fireEvent.click(document.querySelector("#evidence-case-card-A"))
+    expect(selectEvidenceCaseCard).toHaveBeenCalledWith("A")
+  })
+
+  it("links only projected Search and held-evidence references to board cards", async () => {
+    const selectEvidenceCaseCard = vi.fn()
+    const card = {
+      id: "copper-key",
+      code: "B",
+      title: "Copper Tuning Key",
+      description: "A private evidence detail.",
+      visibility: "held",
+    }
+    const view = {
+      ...baseView,
+      evidence: {
+        ...baseView.evidence,
+        heldEvidence: [card],
+        knownCaseCards: [card],
+        caseCards: [card],
+        searchNotes: [
+          {
+            day: 1,
+            target_type: "location",
+            text: "A tuning key was recovered.",
+            case_card_ids: ["copper-key", "sealed-case-c"],
+            taken_case_card_ids: ["copper-key"],
+          },
+        ],
+      },
+    }
+
+    render(CasebookWorkspace, {
+      page: "evidence",
+      view,
+      actions: { ...noActions, selectEvidenceCaseCard },
+    })
+
+    const revealed = document.querySelector("#search-note-revealed-0-copper-key")
+    const held = document.querySelector("#held-evidence-copper-key")
+
+    expect(revealed).toHaveTextContent("Case B")
+    expect(document.querySelector('[data-inert-case-card="sealed-case-c"]')).toHaveTextContent(
+      "sealed-case-c",
+    )
+    expect(document.querySelector("#search-note-revealed-0-sealed-case-c")).not.toBeInTheDocument()
+
+    await fireEvent.click(revealed)
+    await fireEvent.click(held)
+    expect(selectEvidenceCaseCard).toHaveBeenNthCalledWith(1, "B")
+    expect(selectEvidenceCaseCard).toHaveBeenNthCalledWith(2, "B")
   })
 
   it("routes the selected public history page", () => {
