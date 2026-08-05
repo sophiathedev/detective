@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/svelte"
-import { describe, expect, it } from "vitest"
+import { fireEvent, render, screen } from "@testing-library/svelte"
+import { describe, expect, it, vi } from "vitest"
 
 import CaseCardRail from "./CaseCardRail.svelte"
 
@@ -70,5 +70,43 @@ describe("CaseCardRail", () => {
     expect(screen.getByTestId("case-card-slot-C")).toHaveAccessibleName(
       "Case C evidence removed by D2 Archer. Returns faceup on Day 4. Known by D2 Archer, D4 Ellis.",
     )
+  })
+
+  it("opens only projected Case cards without revealing sealed content", async () => {
+    const onSelectCaseCard = vi.fn()
+
+    render(CaseCardRail, {
+      slots,
+      players,
+      inspectableCaseCardCodes: ["A", "B"],
+      selectedCaseCardCode: "B",
+      onSelectCaseCard,
+    })
+
+    const publicCard = screen.getByTestId("case-card-action-A")
+    const knownCard = screen.getByTestId("case-card-action-B")
+
+    expect(publicCard).toHaveAttribute("aria-pressed", "false")
+    expect(knownCard).toHaveAttribute("aria-pressed", "true")
+    expect(knownCard).toHaveAccessibleName("Case B facedown. Known by D1 Marlowe, D3 Vega. Open evidence folio.")
+    expect(knownCard).not.toHaveTextContent("Hidden Fingerprint")
+    expect(screen.queryByTestId("case-card-action-C")).not.toBeInTheDocument()
+
+    await fireEvent.click(knownCard)
+    expect(onSelectCaseCard).toHaveBeenCalledOnce()
+    expect(onSelectCaseCard).toHaveBeenCalledWith(expect.objectContaining({ code: "B" }))
+  })
+
+  it("removes Case-card controls while the board is disabled", () => {
+    render(CaseCardRail, {
+      slots,
+      players,
+      inspectableCaseCardCodes: ["A", "B", "C"],
+      disabled: true,
+    })
+
+    expect(screen.queryByTestId("case-card-action-A")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("case-card-action-B")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("case-card-action-C")).not.toBeInTheDocument()
   })
 })

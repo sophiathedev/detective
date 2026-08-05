@@ -14,6 +14,8 @@
     selectedSuspectId = null,
     suspectInteractionsDisabled = false,
     caseCardSlots = [],
+    inspectableCaseCardCodes = [],
+    selectedCaseCardCode = null,
     legalLocationIds = [],
     selectedLocationId = null,
     pendingLocationId = null,
@@ -22,6 +24,7 @@
     onSelect = () => {},
     onSelectDetective = () => {},
     onSelectSuspect = () => {},
+    onSelectCaseCard = () => {},
   } = $props()
 
   let legalIds = $derived(new Set(disabled ? [] : legalLocationIds))
@@ -357,7 +360,14 @@
     </g>
   </svg>
 
-  <CaseCardRail slots={caseCardSlots} players={detectives} />
+  <CaseCardRail
+    slots={caseCardSlots}
+    players={detectives}
+    {inspectableCaseCardCodes}
+    {selectedCaseCardCode}
+    {disabled}
+    {onSelectCaseCard}
+  />
 
   <nav
     id="legal-map-destinations"

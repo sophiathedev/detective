@@ -60,7 +60,13 @@ const baseView = {
     selectedResponseId: null,
     blockedSnitchPlayerIds: [],
   },
-  evidence: { heldEvidence: [], knownCaseCards: [], searchNotes: [] },
+  evidence: {
+    heldEvidence: [],
+    knownCaseCards: [],
+    caseCards: [],
+    selectedCaseCardCode: null,
+    searchNotes: [],
+  },
   bribes: {
     mode: "detective",
     scratch: 4,
@@ -266,6 +272,8 @@ describe("CasebookWorkspace", () => {
       evidence: {
         heldEvidence: [],
         knownCaseCards: [],
+        caseCards: [],
+        selectedCaseCardCode: null,
         searchNotes: [
           { id: "note-2", day: 2, target_type: "suspect", text: "Second filed result." },
           { id: "note-1", day: 1, target_type: "location", text: "First filed result." },
@@ -279,6 +287,42 @@ describe("CasebookWorkspace", () => {
     expect(notes).toHaveLength(2)
     expect(notes[0]).toHaveTextContent("Second filed result.")
     expect(notes[1]).toHaveTextContent("First filed result.")
+  })
+
+  it("indexes only accessible Case cards and highlights the board selection", () => {
+    const view = {
+      ...baseView,
+      evidence: {
+        ...baseView.evidence,
+        caseCards: [
+          {
+            code: "A",
+            title: "Victim File",
+            description: "Public victim details.",
+            visibility: "public",
+          },
+          {
+            code: "B",
+            title: "Copper Tuning Key",
+            description: "A detail known only to this Detective.",
+            visibility: "known",
+          },
+        ],
+        selectedCaseCardCode: "B",
+      },
+    }
+
+    render(CasebookWorkspace, { page: "evidence", view, actions: noActions })
+
+    expect(document.querySelector("#evidence-case-card-A")).toHaveTextContent("Victim File")
+    expect(document.querySelector("#evidence-case-card-B")).toHaveAttribute(
+      "aria-current",
+      "true",
+    )
+    expect(document.querySelector("#evidence-case-card-B")).toHaveTextContent(
+      "Copper Tuning Key",
+    )
+    expect(screen.queryByText("Sealed Case C")).not.toBeInTheDocument()
   })
 
   it("routes the selected public history page", () => {

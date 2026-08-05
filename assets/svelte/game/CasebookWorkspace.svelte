@@ -398,6 +398,27 @@
         <div><p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Private folio</p><h3 id="evidence-dossier-heading" class="mt-1 font-serif text-xl font-semibold">Search notes and evidence</h3></div>
         <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#705b45]">{evidence.heldEvidence?.length ?? 0} held / {evidence.knownCaseCards?.length ?? 0} known</p>
       </div>
+      <div id="accessible-case-card-index" class="mt-4 grid gap-2 sm:grid-cols-3">
+        {#each evidence.caseCards ?? [] as card}
+          <article
+            id={`evidence-case-card-${card.code}`}
+            data-selected={evidence.selectedCaseCardCode === card.code}
+            aria-current={evidence.selectedCaseCardCode === card.code ? "true" : undefined}
+            class={`border px-3 py-2 ${evidence.selectedCaseCardCode === card.code ? "border-[#8c3f33] bg-[#f1e2c4] ring-2 ring-[#a54235]" : "border-[#8b7257] bg-[#e7d6b5]"}`}
+          >
+            <div class="flex items-center justify-between gap-3">
+              <span class="font-mono text-[10px] font-semibold text-[#8c3f33]">Case {card.code}</span>
+              <span class="font-mono text-[8px] uppercase tracking-[0.1em] text-[#725e48]">{card.visibility}</span>
+            </div>
+            <h4 class="mt-1 font-serif text-sm font-semibold">{card.title}</h4>
+            {#if card.description}
+              <p class="mt-1 text-[11px] leading-4 text-[#695642]">{card.description}</p>
+            {/if}
+          </article>
+        {:else}
+          <p class="casebook-empty-page sm:col-span-3">No Case card content is available to this Detective.</p>
+        {/each}
+      </div>
       <div class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1.1fr)_minmax(12rem,0.9fr)]">
         <div id="search-note-ledger" class="grid content-start gap-3">
           {#each evidence.searchNotes ?? [] as note, index}

@@ -1,5 +1,14 @@
 <script>
-  let { slots = [], players = [] } = $props()
+  let {
+    slots = [],
+    players = [],
+    inspectableCaseCardCodes = [],
+    selectedCaseCardCode = null,
+    disabled = false,
+    onSelectCaseCard = () => {},
+  } = $props()
+
+  let inspectableCodes = $derived(new Set(disabled ? [] : inspectableCaseCardCodes))
 
   let detectivesById = $derived(
     new Map(
@@ -44,7 +53,35 @@
 
     return `Case ${slot.code} facedown.${knowledge ? ` Known by ${knowledge}.` : ""}`
   }
+
+  function selectCaseCard(slot) {
+    if (!inspectableCodes.has(slot.code)) return
+    onSelectCaseCard(slot)
+  }
 </script>
+
+{#snippet cardFace(slot)}
+  {#if slot.status === "faceup"}
+    <div class="noir-case-card-face noir-case-card-faceup">
+      <span>{slot.type}</span>
+      <strong>{slot.code}</strong>
+      <p>{slot.title}</p>
+    </div>
+  {:else if slot.status === "removed"}
+    <div class="noir-case-card-face noir-case-card-removed">
+      <span>Evidence</span>
+      <strong>{slot.code}</strong>
+      <p>Removed</p>
+      <small>
+        {slot.evidence_release_day ? `Day ${slot.evidence_release_day}` : "Held"}
+      </small>
+    </div>
+  {:else}
+    <div class="noir-case-card-face noir-case-card-facedown" aria-hidden="true">
+      <span>{slot.code}</span>
+    </div>
+  {/if}
+{/snippet}
 
 <section
   id="case-card-rail"
@@ -53,6 +90,7 @@
 >
   <ol class="noir-case-card-grid">
     {#each slots as slot (slot.code)}
+      {@const inspectable = inspectableCodes.has(slot.code)}
       <li
         id={`case-card-slot-${slot.code}`}
         data-testid={`case-card-slot-${slot.code}`}
@@ -61,25 +99,21 @@
         style={`--case-slot-position: ${slotPosition(slot)};`}
         aria-label={slotLabel(slot)}
       >
-        {#if slot.status === "faceup"}
-          <div class="noir-case-card-face noir-case-card-faceup">
-            <span>{slot.type}</span>
-            <strong>{slot.code}</strong>
-            <p>{slot.title}</p>
-          </div>
-        {:else if slot.status === "removed"}
-          <div class="noir-case-card-face noir-case-card-removed">
-            <span>Evidence</span>
-            <strong>{slot.code}</strong>
-            <p>Removed</p>
-            <small>
-              {slot.evidence_release_day ? `Day ${slot.evidence_release_day}` : "Held"}
-            </small>
-          </div>
+        {#if inspectable}
+          <button
+            id={`case-card-action-${slot.code}`}
+            data-testid={`case-card-action-${slot.code}`}
+            type="button"
+            class:noir-case-card-action-selected={selectedCaseCardCode === slot.code}
+            class="noir-case-card-action"
+            aria-pressed={selectedCaseCardCode === slot.code}
+            aria-label={`${slotLabel(slot)} Open evidence folio.`}
+            onclick={() => selectCaseCard(slot)}
+          >
+            {@render cardFace(slot)}
+          </button>
         {:else}
-          <div class="noir-case-card-face noir-case-card-facedown" aria-hidden="true">
-            <span>{slot.code}</span>
-          </div>
+          {@render cardFace(slot)}
         {/if}
 
         <div class="noir-case-knowledge-rack" aria-hidden="true">

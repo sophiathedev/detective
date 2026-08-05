@@ -24,6 +24,8 @@ const baseProps = {
   interrogatableSuspectIds: [],
   selectedSuspectId: null,
   suspectInteractionsDisabled: false,
+  inspectableCaseCardCodes: [],
+  selectedCaseCardCode: null,
   legalLocationIds: [],
   selectedLocationId: null,
   pendingLocationId: null,
@@ -33,6 +35,7 @@ const baseProps = {
   onSelect: vi.fn(),
   onSelectDetective: vi.fn(),
   onSelectSuspect: vi.fn(),
+  onSelectCaseCard: vi.fn(),
 }
 
 describe("MapStage", () => {
@@ -111,6 +114,30 @@ describe("MapStage", () => {
     expect(token).toHaveAttribute("aria-pressed", "true")
     await fireEvent.click(token)
     expect(onSelectDetective).toHaveBeenCalledWith(detective)
+  })
+
+  it("forwards projected Case-card inspection to the board", async () => {
+    const onSelectCaseCard = vi.fn()
+    const slot = {
+      code: "A",
+      position: 1,
+      status: "faceup",
+      type: "victim",
+      title: "Victim File",
+      knowledge_player_ids: [],
+      evidence_holder_player_id: null,
+      evidence_release_day: null,
+    }
+
+    render(MapStage, {
+      ...baseProps,
+      caseCardSlots: [slot],
+      inspectableCaseCardCodes: ["A"],
+      onSelectCaseCard,
+    })
+
+    await fireEvent.click(screen.getByTestId("case-card-action-A"))
+    expect(onSelectCaseCard).toHaveBeenCalledWith(slot)
   })
 
   it("zooms inside the contained map viewport", async () => {

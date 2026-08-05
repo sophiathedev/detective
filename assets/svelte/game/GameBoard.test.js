@@ -33,6 +33,8 @@ const baseProps = {
   interrogatableSuspectIds: [],
   selectedSuspectId: null,
   suspectInteractionsDisabled: false,
+  inspectableCaseCardCodes: [],
+  selectedCaseCardCode: null,
   legalLocationIds: ["51"],
   selectedLocationId: null,
   pendingLocationId: null,
@@ -40,6 +42,7 @@ const baseProps = {
   disabled: false,
   onSelectDetective: vi.fn(),
   onSelectSuspect: vi.fn(),
+  onSelectCaseCard: vi.fn(),
 }
 
 describe("GameBoard", () => {
@@ -163,6 +166,40 @@ describe("GameBoard", () => {
     expect(screen.getByTestId("case-card-slot-B")).toContainElement(
       document.querySelector('.noir-case-knowledge-marker[data-seat="1"]'),
     )
+  })
+
+  it("forwards projected Case-card inspection from the board rail", async () => {
+    const onSelectCaseCard = vi.fn()
+    const slot = {
+      code: "B",
+      position: 2,
+      status: "facedown",
+      knowledge_player_ids: ["detective-1"],
+      evidence_holder_player_id: null,
+      evidence_release_day: null,
+    }
+
+    render(GameBoard, {
+      ...baseProps,
+      detectives: [
+        {
+          id: "detective-1",
+          role: "detective",
+          seat: 1,
+          display_name: "Marlowe",
+          location_id: null,
+        },
+      ],
+      caseCardSlots: [slot],
+      inspectableCaseCardCodes: ["B"],
+      selectedCaseCardCode: "B",
+      onSelectCaseCard,
+    })
+
+    const action = screen.getByTestId("case-card-action-B")
+    expect(action).toHaveAttribute("aria-pressed", "true")
+    await fireEvent.click(action)
+    expect(onSelectCaseCard).toHaveBeenCalledWith(slot)
   })
 
   it("activates only the authorized Detective token as a field-action hub", async () => {

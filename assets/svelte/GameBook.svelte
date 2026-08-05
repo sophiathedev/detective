@@ -33,6 +33,7 @@
   let accusationSuspectId = $state(null)
   let accusationWeaponId = $state(null)
   let accusationMotiveId = $state(null)
+  let selectedEvidenceCaseCardCode = $state(null)
   let bribeMode = $state("detective")
   let selectedBribeTargetId = $state(null)
   let selectedBribeCardId = $state(null)
@@ -163,6 +164,32 @@
   let latestStatement = $derived(privateState.statements?.[0])
   let heldEvidence = $derived(privateState.evidence ?? [])
   let knownCaseCards = $derived(privateState.known_case_cards ?? [])
+  let accessibleCaseCards = $derived.by(() => {
+    const cardsByCode = new Map()
+
+    for (const card of publicState.case_cards ?? []) {
+      cardsByCode.set(card.code, { ...card, visibility: "public" })
+    }
+    for (const card of knownCaseCards) {
+      if (!cardsByCode.has(card.code)) {
+        cardsByCode.set(card.code, { ...card, visibility: "known" })
+      }
+    }
+    for (const card of heldEvidence) {
+      cardsByCode.set(card.code, {
+        ...(cardsByCode.get(card.code) ?? {}),
+        ...card,
+        visibility: "held",
+      })
+    }
+
+    return (publicState.case_card_slots ?? [])
+      .map((slot) => cardsByCode.get(slot.code))
+      .filter(Boolean)
+  })
+  let inspectableCaseCardCodes = $derived(
+    privateState.role === "detective" ? accessibleCaseCards.map((card) => card.code) : [],
+  )
   let accusationOptions = $derived(
     privateState.accusation_options ?? { suspects: [], weapons: [], motives: [] },
   )
@@ -251,6 +278,8 @@
     evidence: {
       heldEvidence,
       knownCaseCards,
+      caseCards: accessibleCaseCards,
+      selectedCaseCardCode: selectedEvidenceCaseCardCode,
       searchNotes: privateState.search_notes ?? [],
     },
     bribes: {
@@ -524,6 +553,13 @@
     mapSuspectSelectionId = null
     mapSelection = null
     actionPrompt = null
+  }
+
+  function selectBoardCaseCard(slot) {
+    if (privateState.role !== "detective" || !inspectableCaseCardCodes.includes(slot.code)) return
+
+    selectedEvidenceCaseCardCode = slot.code
+    openDrawer("evidence")
   }
 
   function openMapFieldAction(selection, action) {
@@ -1250,6 +1286,10 @@
         selectedSuspectId={mapSuspectSelectionId}
         suspectInteractionsDisabled={activeAction !== null}
         caseCardSlots={publicState.case_card_slots ?? []}
+        {inspectableCaseCardCodes}
+        selectedCaseCardCode={drawerOpen && drawerPage === "evidence"
+          ? selectedEvidenceCaseCardCode
+          : null}
         legalLocationIds={effectiveLegalLocationIds}
         {selectedLocationId}
         pendingLocationId={mapIntent?.locationId ?? null}
@@ -1259,6 +1299,7 @@
         onSelect={selectMapLocation}
         onSelectDetective={selectMapDetective}
         onSelectSuspect={selectMapSuspect}
+        onSelectCaseCard={selectBoardCaseCard}
       />
     {/snippet}
 

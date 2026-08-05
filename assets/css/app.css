@@ -1278,6 +1278,43 @@
   padding-inline: 0.55cqw;
 }
 
+.noir-case-card-action {
+  pointer-events: auto;
+  cursor: pointer;
+  border-radius: 0.22cqw;
+  transition:
+    translate 160ms ease-out,
+    rotate 160ms ease-out;
+}
+
+.noir-case-card-action:hover,
+.noir-case-card-action:focus-visible,
+.noir-case-card-action-selected {
+  translate: 0 -0.28cqw;
+  rotate: -0.45deg;
+  outline: none;
+}
+
+.noir-case-card-action:hover .noir-case-card-face,
+.noir-case-card-action:focus-visible .noir-case-card-face,
+.noir-case-card-action-selected .noir-case-card-face {
+  border-color: #d8b466;
+  box-shadow:
+    0 0.6cqw 1cqw rgb(33 24 16 / 0.52),
+    0 0 0 0.15cqw rgb(216 180 102 / 0.66),
+    inset 0 0 0 0.12cqw rgb(255 244 215 / 0.32);
+}
+
+.noir-case-card-action:focus-visible .noir-case-card-face {
+  outline: max(2px, 0.14cqw) solid var(--noir-focus);
+  outline-offset: max(2px, 0.12cqw);
+}
+
+.noir-case-card-action .noir-case-card-facedown {
+  border-color: rgb(216 180 102 / 0.68);
+  background: rgb(216 180 102 / 0.06);
+}
+
 .noir-case-card-face {
   display: grid;
   width: 6.65cqw;

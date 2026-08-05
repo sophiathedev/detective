@@ -14,6 +14,8 @@
     selectedSuspectId = null,
     suspectInteractionsDisabled = false,
     caseCardSlots = [],
+    inspectableCaseCardCodes = [],
+    selectedCaseCardCode = null,
     legalLocationIds = [],
     selectedLocationId = null,
     pendingLocationId = null,
@@ -23,6 +25,7 @@
     onSelect = () => {},
     onSelectDetective = () => {},
     onSelectSuspect = () => {},
+    onSelectCaseCard = () => {},
   } = $props()
 
   const zoomLevels = [1, 1.25, 1.5, 1.75, 2, 2.25, 2.5]
@@ -73,6 +76,8 @@
         {selectedSuspectId}
         {suspectInteractionsDisabled}
         {caseCardSlots}
+        {inspectableCaseCardCodes}
+        {selectedCaseCardCode}
         legalLocationIds={disabled ? [] : legalLocationIds}
         {selectedLocationId}
         {pendingLocationId}
@@ -81,6 +86,7 @@
         {onSelect}
         {onSelectDetective}
         {onSelectSuspect}
+        {onSelectCaseCard}
       />
     </div>
   </div>
