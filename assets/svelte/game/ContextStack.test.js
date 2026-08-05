@@ -45,6 +45,38 @@ describe("ContextStack", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument()
   })
 
+  it("holds an immediate field action until the dispatch slip is confirmed", async () => {
+    const prompt = {
+      type: "kickback",
+      stamp: "KICKBACK",
+      kicker: "Mob Joint collection",
+      title: "Collect $3 Scratch",
+      description: "Costs 1 action and can be used only once this Day.",
+      confirmLabel: "Collect kickback",
+    }
+    const onConfirmAction = vi.fn()
+
+    render(ContextStack, {
+      selection: null,
+      actionPrompt: prompt,
+      origin: { id: "22", name: "The Stag & Bull" },
+      commandPending: false,
+      commandError: null,
+      commandStatus: false,
+      connectionOnline: true,
+      onConfirmAction,
+      onCancelAction: vi.fn(),
+    })
+
+    expect(onConfirmAction).not.toHaveBeenCalled()
+    expect(document.querySelector("#action-confirmation-slip")).toHaveTextContent(
+      "Collect $3 Scratch",
+    )
+
+    await fireEvent.click(screen.getByRole("button", { name: "Collect kickback" }))
+    expect(onConfirmAction).toHaveBeenCalledWith(prompt)
+  })
+
   it("renders no empty paper without a selection or command message", () => {
     const { container } = render(ContextStack, {
       selection: null,

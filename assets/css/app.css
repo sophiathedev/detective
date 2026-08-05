@@ -857,6 +857,23 @@
   line-height: 1.25;
 }
 
+.noir-action-slip-title {
+  margin-top: 0.75rem;
+  padding-right: 3.5rem;
+  color: var(--noir-ink-900);
+  font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.noir-action-slip-description {
+  margin-top: 0.45rem;
+  color: #5f4b39;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
 .noir-movement-slip-districts {
   margin-top: 0.7rem;
   border-top: 1px dashed var(--noir-paper-500);

@@ -9,6 +9,7 @@
   import GameTableShell from "./game/GameTableShell.svelte"
   import MapStage from "./game/MapStage.svelte"
   import PauseCurtain from "./game/PauseCurtain.svelte"
+  import { buildImmediateActionPrompt } from "./game/actionPrompts"
 
   let { game_id, user_id, initial_public, initial_private } = $props()
 
@@ -22,6 +23,7 @@
   let drawerPage = $state(initialPrivate().role === "chisel" ? "chisel" : "search")
   let activeAction = $state(null)
   let mapSelection = $state(null)
+  let actionPrompt = $state(null)
   let selectedSuspectId = $state(null)
   let selectedTopicId = $state(null)
   let selectedResponseId = $state(null)
@@ -301,6 +303,10 @@
       mapIntent = null
     }
 
+    if (actionPrompt && !nextActions.has(actionPrompt.type)) {
+      actionPrompt = null
+    }
+
     if (nextState.role === "detective" && nextState.free_question_suspect_id) {
       prepareQuestionSelection(
         nextState.interrogation_options ?? [],
@@ -373,6 +379,7 @@
 
     activeAction = activeAction === action ? null : action
     mapSelection = null
+    actionPrompt = null
   }
 
   function confirmMapMovement() {
@@ -452,7 +459,28 @@
     if (retryCommand) sendCommand(retryCommand.type, retryCommand.payload, retryCommand)
   }
 
+  function immediateActionPrompt(action) {
+    return buildImmediateActionPrompt(action, {
+      actionsRemaining: ownPlayer?.actions_remaining ?? 0,
+      playerCount: publicState.players.length,
+    })
+  }
+
+  function confirmImmediateAction(prompt) {
+    if (!prompt || prompt.type !== actionPrompt?.type) return
+
+    actionPrompt = null
+    sendCommand(prompt.type, {})
+  }
+
+  function cancelImmediateAction() {
+    if (commandPending) return
+    actionPrompt = null
+  }
+
   function handleDockAction(action) {
+    const prompt = immediateActionPrompt(action)
+
     if (action === "search_location" || action === "search_suspect") {
       openDrawer("search")
     } else if (action === "interrogate") {
@@ -460,6 +488,10 @@
       openDrawer("question")
     } else if (action === "accuse" || action === "submit_final_guess") {
       openDrawer("accusation")
+    } else if (prompt && availableActions.has(action)) {
+      activeAction = null
+      mapSelection = null
+      actionPrompt = prompt
     } else {
       sendCommand(action, {})
     }
@@ -581,6 +613,7 @@
   }
 
   function openDrawer(page) {
+    actionPrompt = null
     drawerPage = page
     drawerOpen = true
   }
@@ -650,6 +683,7 @@
     mapSelection = null
     mapIntent = null
     activeAction = null
+    actionPrompt = null
     commandPending = false
     retryCommand = null
     publicProjectionReady = false
@@ -663,6 +697,7 @@
     mapSelection = null
     mapIntent = null
     activeAction = null
+    actionPrompt = null
     commandPending = false
     retryCommand = null
     publicProjectionReady = false
@@ -960,6 +995,7 @@
     {#snippet contextStack()}
       <ContextStack
         selection={mapSelection}
+        {actionPrompt}
         origin={ownLocation}
         {commandPending}
         commandError={publicState.status === "paused" ? null : commandError}
@@ -967,6 +1003,8 @@
         connectionOnline={controlsReady}
         onConfirmMove={confirmMapMovement}
         onCancelMove={cancelMapMovement}
+        onConfirmAction={confirmImmediateAction}
+        onCancelAction={cancelImmediateAction}
       />
     {/snippet}
 
