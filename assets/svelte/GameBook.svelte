@@ -1,10 +1,14 @@
 <script>
-  import { onDestroy, onMount } from "svelte"
-  import ActionDock from "./game/ActionDock.svelte"
-  import CasebookDrawer from "./game/CasebookDrawer.svelte"
+  import { onMount } from "svelte"
+  import ActionRail from "./game/ActionRail.svelte"
+  import CasebookOverlay from "./game/CasebookOverlay.svelte"
   import CasebookWorkspace from "./game/CasebookWorkspace.svelte"
-  import GameBoard from "./game/GameBoard.svelte"
-  import PlayerHUD from "./game/PlayerHUD.svelte"
+  import ChiselConsole from "./game/ChiselConsole.svelte"
+  import ContextStack from "./game/ContextStack.svelte"
+  import DetectiveRail from "./game/DetectiveRail.svelte"
+  import GameTableShell from "./game/GameTableShell.svelte"
+  import MapStage from "./game/MapStage.svelte"
+  import PauseCurtain from "./game/PauseCurtain.svelte"
 
   let { game_id, user_id, initial_public, initial_private } = $props()
 
@@ -14,8 +18,9 @@
   let publicState = $state(initialPublic())
   let privateState = $state(initialPrivate())
   let connectionState = $state("connecting")
-  let drawerOpen = $state(true)
+  let drawerOpen = $state(false)
   let drawerPage = $state(initialPrivate().role === "chisel" ? "chisel" : "search")
+  let activeAction = $state(null)
   let mapSelection = $state(null)
   let selectedSuspectId = $state(null)
   let selectedTopicId = $state(null)
@@ -41,9 +46,6 @@
   let allPlayersOnline = $state(false)
   let connectionSnapshotReceived = $state(false)
   let connectionClock = $state(Date.now())
-  let pauseDocument = $state(null)
-  let previouslyFocusedElement = null
-  let pauseActive = false
   let gameChannel = null
   let userChannel = null
   const seenPublicEventIds = new Set()
@@ -74,7 +76,13 @@
   )
   let moveLocationIds = $derived(new Set(privateState.valid_move_location_ids ?? []))
   let placementLocationIds = $derived(new Set(privateState.placement_location_ids ?? []))
-  let legalLocationIds = $derived([...placementLocationIds, ...moveLocationIds])
+  let effectiveLegalLocationIds = $derived(
+    activeAction === "place"
+      ? [...placementLocationIds]
+      : activeAction === "move"
+        ? [...moveLocationIds]
+        : [],
+  )
   let availableActions = $derived(new Set(privateState.available_actions ?? []))
   let drawerPages = $derived(
     privateState.role === "chisel" ? chiselDrawerPages : detectiveDrawerPages,
@@ -120,8 +128,31 @@
       ? publicState.players.filter((player) => !onlinePlayerIds.includes(player.id))
       : [],
   )
+  let chiselOnline = $derived(
+    Boolean(chisel && connectionSnapshotReceived && onlinePlayerIds.includes(chisel.id)),
+  )
+  let chiselConnectionLabel = $derived(
+    !chisel
+      ? "UNASSIGNED"
+      : !connectionSnapshotReceived
+        ? "SYNCING"
+        : chiselOnline
+          ? "ONLINE"
+          : disconnectCountdown(chisel.id),
+  )
+  let canResume = $derived(
+    privateState.role === "chisel" &&
+      allPlayersOnline &&
+      availableActions.has("resume_game"),
+  )
   let selectedSuspectLeverage = $derived(
     privateState.leverage_on_suspects?.[selectedSuspectId] ?? 0,
+  )
+  let pauseReason = $derived(
+    publicState.pause?.reason ??
+      (offlinePlayers.length > 0
+        ? `${offlinePlayers.map((player) => player.display_name).join(", ")} disconnected.`
+        : "Waiting for every investigator to return."),
   )
   let mapStatus = $derived(
     privateState.role !== "detective"
@@ -130,9 +161,15 @@
       ? `${mapIntent.type === "place" ? "Placing" : "Moving to"} ${locationName(mapIntent.locationId)}…`
       : mapSelection
         ? `${mapSelection.location.name} selected · confirm on the dispatch slip.`
-      : ownPlayer?.location_id
-        ? "Select a red-ringed location to review a one-action Move."
-        : "Select any available Police Station to review free placement.",
+      : activeAction === "place"
+        ? "Placement mode · choose one highlighted Police Station."
+        : activeAction === "move"
+          ? "Move mode · choose one highlighted location in the current district."
+          : availableActions.has("place")
+            ? "Choose Place below before selecting a Police Station."
+            : availableActions.has("move")
+              ? "Choose Move below before selecting a destination."
+              : "No movement command is currently authorized.",
   )
   let casebookView = $derived.by(() => ({
     role: privateState.role,
@@ -231,6 +268,7 @@
     if (mapIntent && nextOwnPlayer?.location_id === mapIntent.locationId) {
       mapIntent = null
       mapSelection = null
+      activeAction = null
     }
 
     publicState = nextState
@@ -243,6 +281,13 @@
     privateState = nextState
     privateProjectionVersion = version
     privateProjectionReady = true
+
+    const nextActions = new Set(nextState.available_actions ?? [])
+    if (activeAction && !nextActions.has(activeAction)) {
+      activeAction = null
+      mapSelection = null
+      mapIntent = null
+    }
 
     if (mapSelection && !mapSelectionLegalIn(mapSelection, nextState)) {
       mapSelection = null
@@ -280,11 +325,26 @@
   function selectMapLocation(location) {
     if (commandPending || !controlsReady) return
 
-    if (placementLocationIds.has(location.id) && availableActions.has("place")) {
+    if (
+      activeAction === "place" &&
+      placementLocationIds.has(location.id) &&
+      availableActions.has("place")
+    ) {
       mapSelection = { type: "place", location }
-    } else if (moveLocationIds.has(location.id) && availableActions.has("move")) {
+    } else if (
+      activeAction === "move" &&
+      moveLocationIds.has(location.id) &&
+      availableActions.has("move")
+    ) {
       mapSelection = { type: "move", location }
     }
+  }
+
+  function chooseActionMode(action) {
+    if (commandPending || !controlsReady || !availableActions.has(action)) return
+
+    activeAction = activeAction === action ? null : action
+    mapSelection = null
   }
 
   function confirmMapMovement() {
@@ -348,6 +408,7 @@
         if (mapIntent?.commandId === command.command_id) mapIntent = null
         if ((type === "place" || type === "move") && mapErrorInvalidatesSelection(code)) {
           mapSelection = null
+          activeAction = null
         }
         commandError = commandErrorMessage(code)
         if (code === "stale_version") requestProjectionResync()
@@ -440,41 +501,6 @@
     return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
   }
 
-  function restorePreviousFocus() {
-    const focusTarget = previouslyFocusedElement
-    previouslyFocusedElement = null
-
-    window.requestAnimationFrame(() => {
-      if (
-        focusTarget?.isConnected &&
-        !focusTarget.closest("[inert]") &&
-        typeof focusTarget.focus === "function"
-      ) {
-        focusTarget.focus({ preventScroll: true })
-      }
-    })
-  }
-
-  $effect(() => {
-    const paused = publicState.status === "paused"
-
-    if (paused === pauseActive) return
-
-    pauseActive = paused
-
-    if (paused) {
-      previouslyFocusedElement = document.activeElement
-
-      window.requestAnimationFrame(() => {
-        if (publicState.status === "paused" && pauseDocument?.isConnected) {
-          pauseDocument.focus({ preventScroll: true })
-        }
-      })
-    } else {
-      restorePreviousFocus()
-    }
-  })
-
   $effect(() => {
     if (drawerPages.some((page) => page.id === drawerPage)) return
     drawerPage = drawerPages[0]?.id ?? "history"
@@ -485,10 +511,6 @@
 
     resynchronizingAfterStale = false
     commandError = "Game state changed; map resynchronized"
-  })
-
-  onDestroy(() => {
-    if (typeof window !== "undefined" && pauseActive) restorePreviousFocus()
   })
 
   function selectSuspect(suspectId) {
@@ -513,8 +535,8 @@
     drawerOpen = false
   }
 
-  function legalMapLocation(locationId) {
-    return placementLocationIds.has(locationId) || moveLocationIds.has(locationId)
+  function openCasebook() {
+    openDrawer(drawerPages[0]?.id ?? "history")
   }
 
   function submitInterrogation() {
@@ -573,6 +595,7 @@
     allPlayersOnline = false
     mapSelection = null
     mapIntent = null
+    activeAction = null
     commandPending = false
     retryCommand = null
     publicProjectionReady = false
@@ -585,6 +608,7 @@
   function requestProjectionResync() {
     mapSelection = null
     mapIntent = null
+    activeAction = null
     commandPending = false
     retryCommand = null
     publicProjectionReady = false
@@ -818,194 +842,112 @@
   })
 </script>
 
-<div id="game-book-shell" class="min-h-[calc(100dvh-3.5rem)] overflow-hidden bg-[#17130f] text-[#241d17]">
-  <div class="mx-auto flex min-h-[calc(100dvh-3.5rem)] max-w-[1800px] flex-col px-2 py-3 sm:px-4 lg:px-6 lg:py-5">
-    <header class="mb-3 flex flex-wrap items-center justify-between gap-3 px-1 text-[#d8cdb8]">
-      <div class="flex items-center gap-3">
-        <span class="font-mono text-[11px] uppercase tracking-[0.18em] text-[#d96b58]">Case in progress</span>
-        <span class="h-3 w-px bg-white/20" aria-hidden="true"></span>
-        <span class="font-mono text-[11px] uppercase tracking-[0.14em]">Day {publicState.day} · {publicState.days_remaining} left</span>
-      </div>
-      <div class="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em]">
-        <span class={connectionState === "online" ? "text-emerald-300" : "text-stone-400"}>{connectionState}</span>
-        <span class="text-stone-500">v{publicState.version}</span>
-      </div>
-    </header>
+<div id="game-book-shell" class="noir-game-book-shell">
+  <GameTableShell
+    phase={publicState.phase}
+    day={publicState.day}
+    daysRemaining={publicState.days_remaining}
+    activeDetectiveName={activeDetective?.display_name ?? null}
+    {connectionState}
+    version={publicState.version}
+  >
+    {#snippet detectiveRail()}
+      <DetectiveRail
+        players={publicState.players}
+        currentDetectiveId={publicState.current_detective_id}
+        ownPlayerId={privateState.role === "detective" ? ownPlayer?.id ?? null : null}
+        privateResources={privateState.role === "detective"
+          ? {
+              scratch: privateState.scratch ?? 0,
+              leverage: privateState.leverage_supply ?? 0,
+            }
+          : null}
+        {onlinePlayerIds}
+        {connectionSnapshotReceived}
+        disconnectLabel={disconnectCountdown}
+      />
+    {/snippet}
 
-    {#if commandStatus}
-      <p id="game-sync-status" class="game-sync-status" role="status" aria-live="polite">{commandError}</p>
-    {/if}
+    {#snippet chiselConsole()}
+      <ChiselConsole
+        {chisel}
+        isCurrentChisel={privateState.role === "chisel"}
+        pendingInterrogation={privateState.role === "chisel" ? pendingPrivate : null}
+        leverageByDetective={privateState.role === "chisel"
+          ? privateState.leverage_by_detective ?? {}
+          : {}}
+        detectiveSlots={detectives}
+        online={chiselOnline}
+        connectionLabel={chiselConnectionLabel}
+      />
+    {/snippet}
 
-    <main
-      id="open-casebook"
-      class:casebook-drawer-open={drawerOpen}
-      class="relative grid min-h-0 flex-1 overflow-hidden border border-[#6f5b45] bg-[#d8c9aa] shadow-[0_24px_70px_rgba(0,0,0,0.55)]"
-    >
-      <div id="game-casebook-workspace" class="contents" inert={!controlsReady}>
-        <section id="casebook-map-page" class="relative z-10 flex min-h-[38rem] flex-col border-b border-[#8d765d] bg-[#d9ccb0] lg:min-h-0 lg:border-b-0 lg:border-r">
-          <div class="flex items-start justify-between gap-4 border-b border-[#9f896d] px-4 py-3 sm:px-5">
-            <div>
-              <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-[#8c3f33]">Plate 01 · field map</p>
-              <h1 class="mt-1 font-serif text-2xl font-semibold tracking-[-0.025em] text-[#2e241c]">Greater Los Angeles</h1>
-            </div>
-            <div class="text-right font-mono text-[10px] uppercase tracking-[0.12em] text-[#6f5d49]">
-              <p>{publicState.phase.replaceAll("_", " ")}</p>
-              <p class="mt-1">Active: {activeDetective?.display_name ?? "-"}</p>
-            </div>
-          </div>
+    {#snippet mapStage()}
+      <MapStage
+        locations={publicState.locations}
+        {detectives}
+        legalLocationIds={effectiveLegalLocationIds}
+        {selectedLocationId}
+        pendingLocationId={mapIntent?.locationId ?? null}
+        {lastTravel}
+        disabled={!controlsReady || commandPending}
+        status={mapStatus}
+        onSelect={selectMapLocation}
+      />
+    {/snippet}
 
-          <nav id="casebook-page-tabs" class="casebook-page-tabs" aria-label="Casebook pages">
-            {#each drawerPages as page}
-              <button
-                id={"open-casebook-" + page.id}
-                type="button"
-                aria-pressed={drawerOpen && drawerPage === page.id}
-                onclick={() => openDrawer(page.id)}
-                class:casebook-page-tab-active={drawerOpen && drawerPage === page.id}
-                class="casebook-page-tab"
-              >{page.label}</button>
-            {/each}
-          </nav>
+    {#snippet contextStack()}
+      <ContextStack
+        selection={mapSelection}
+        origin={ownLocation}
+        {commandPending}
+        commandError={publicState.status === "paused" ? null : commandError}
+        {commandStatus}
+        connectionOnline={controlsReady}
+        onConfirmMove={confirmMapMovement}
+        onCancelMove={cancelMapMovement}
+      />
+    {/snippet}
 
-          <div class="relative min-h-0 flex-1 overflow-hidden bg-[#b7a78b] p-2 sm:p-3">
-            <div
-              id="map-command-status"
-              class={[
-                "pointer-events-none absolute left-4 top-4 z-10 max-w-[18rem] border px-3 py-2 font-mono text-[9px] uppercase tracking-[0.1em] shadow-[0_8px_24px_rgba(35,24,16,0.22)] sm:left-5 sm:top-5",
-                mapIntent
-                  ? "map-command-pending border-[#8e342d] bg-[#f1dec0] text-[#7d2e28]"
-                  : "border-[#776149] bg-[#e8dcc3]/95 text-[#5d4b38]",
-              ]}
-              aria-live="polite"
-              aria-busy={mapIntent !== null}
-            >
-              {mapStatus}
-            </div>
-            <GameBoard
-              locations={publicState.locations}
-              {detectives}
-              {legalLocationIds}
-              {selectedLocationId}
-              pendingLocationId={mapIntent?.locationId ?? null}
-              {lastTravel}
-              disabled={commandPending || !controlsReady}
-              onSelect={selectMapLocation}
-            />
-            <p class="mt-2 font-mono text-[8px] leading-3 text-[#594936] sm:text-[9px]">
-              Board artwork © Van Ryder Games / Vincent Dutrait. Unofficial non-commercial fan project; not affiliated with or endorsed by the publisher.
-            </p>
-          </div>
-        </section>
+    {#snippet actionRail()}
+      <ActionRail
+        availableActions={[...availableActions]}
+        {activeAction}
+        {commandPending}
+        connectionOnline={controlsReady}
+        onChooseAction={chooseActionMode}
+        onAction={handleDockAction}
+        onOpenCasebook={openCasebook}
+      />
+    {/snippet}
 
-        <CasebookDrawer open={drawerOpen} title={drawerTitle} onClose={closeDrawer}>
-          <section class="relative flex min-h-0 flex-col bg-[#e4d8bd]">
-            <PlayerHUD
-              players={publicState.players}
-              currentDetectiveId={publicState.current_detective_id}
-              {privateState}
-              {onlinePlayerIds}
-              {connectionSnapshotReceived}
-              disconnectLabel={disconnectCountdown}
-            />
+    {#snippet overlay()}
+      <CasebookOverlay
+        open={drawerOpen}
+        title={drawerTitle}
+        page={drawerPage}
+        pages={drawerPages}
+        onSelectPage={(page) => (drawerPage = page)}
+        onClose={closeDrawer}
+      >
+        {#snippet children()}
+          <CasebookWorkspace page={drawerPage} view={casebookView} actions={casebookActions} />
+        {/snippet}
+      </CasebookOverlay>
 
-            <div class="min-h-0 flex-1 overflow-auto p-4 sm:p-5">
-              {#if drawerPage === "search"}
-                <ActionDock
-                  {availableActions}
-                  selection={mapSelection}
-                  origin={ownLocation}
-                  {commandPending}
-                  commandError={commandStatus ? null : commandError}
-                  commandStatus={false}
-                  connectionOnline={controlsReady}
-                  onConfirmMove={confirmMapMovement}
-                  onCancelMove={cancelMapMovement}
-                  onAction={handleDockAction}
-                />
-              {/if}
-
-              <CasebookWorkspace page={drawerPage} view={casebookView} actions={casebookActions} />
-
-              {#if drawerPage === "search"}
-                <section id="keyboard-location-list" class="mt-5 border-t border-[#a38b6e] pt-4" aria-labelledby="location-list-heading">
-                  <h3 id="location-list-heading" class="font-mono text-[10px] uppercase tracking-[0.14em] text-[#80694f]">Location index</h3>
-                  <div class="mt-2 grid gap-1 sm:grid-cols-2">
-                    {#each publicState.locations as location}
-                      {#if legalMapLocation(location.id)}
-                        <button
-                          id={"location-index-" + location.id}
-                          type="button"
-                          onclick={() => selectMapLocation(location)}
-                          class="min-h-11 cursor-pointer bg-[#a54235] px-2 py-1.5 text-left text-xs text-[#fff0d6] transition hover:bg-[#b94d3f]"
-                        >
-                          {location.name}
-                          <span class="float-right font-mono text-[9px] uppercase">legal</span>
-                        </button>
-                      {:else}
-                        <div id={"location-index-" + location.id} class="px-2 py-1.5 text-left text-xs text-[#6f5c47]">
-                          {location.name}
-                          <span class="float-right font-mono text-[9px] uppercase">{location.type.replaceAll("_", " ")}</span>
-                        </div>
-                      {/if}
-                    {/each}
-                  </div>
-                </section>
-              {/if}
-            </div>
-          </section>
-        </CasebookDrawer>
-      </div>
-
-      {#if publicState.status === "paused"}
-        <section
-          id="game-pause-seal"
-          class="game-pause-seal"
-          role="status"
-          aria-labelledby="game-pause-heading"
-          aria-describedby="game-pause-description"
-        >
-          <div id="game-pause-document" class="game-pause-document" role="document" tabindex="-1" bind:this={pauseDocument}>
-            <p class="game-pause-kicker">Case sealed</p>
-            <h2 id="game-pause-heading" class="mt-2 font-serif text-3xl font-semibold tracking-[-0.025em] sm:text-4xl">Investigation paused</h2>
-            <p id="game-pause-description" class="mt-3 font-serif text-base italic leading-7">Waiting for every investigator to return.</p>
-
-            <div class="game-pause-ledger">
-              <span>Connection ledger</span>
-              <strong>
-                {connectionSnapshotReceived
-                  ? allPlayersOnline
-                    ? "All investigators present"
-                    : `${offlinePlayers.length} ${offlinePlayers.length === 1 ? "investigator" : "investigators"} absent`
-                  : "Synchronizing presence"}
-              </strong>
-            </div>
-
-            <p class="game-pause-provenance">
-              Seal record · {publicState.pause?.player_ids?.length ?? 0} disconnected · held from
-              {publicState.pause?.previous_phase?.replaceAll("_", " ") ?? "active investigation"}
-            </p>
-
-            {#if commandError}
-              <div id="game-pause-command-error" class="game-pause-command-error" role="alert">
-                <p>{commandError}</p>
-                {#if retryCommand?.type === "resume_game"}
-                  <button id="action-retry-resume-game" type="button" onclick={retryLastCommand}>Retry resume</button>
-                {/if}
-              </div>
-            {/if}
-
-            {#if privateState.role === "chisel"}
-              <button
-                id="action-resume-game"
-                type="button"
-                disabled={!allPlayersOnline || !availableActions.has("resume_game") || commandPending}
-                onclick={() => sendCommand("resume_game", {})}
-              >Resume investigation</button>
-            {/if}
-          </div>
-        </section>
-      {/if}
-    </main>
-  </div>
+      <PauseCurtain
+        active={publicState.status === "paused"}
+        reason={pauseReason}
+        {offlinePlayers}
+        {canResume}
+        {commandPending}
+        commandError={publicState.status === "paused" ? commandError : null}
+        onResume={() =>
+          retryCommand?.type === "resume_game"
+            ? retryLastCommand()
+            : sendCommand("resume_game", {})}
+      />
+    {/snippet}
+  </GameTableShell>
 </div>
 
