@@ -17,6 +17,8 @@
     { id: "interrogate", label: "Question Suspect" },
     { id: "analyze", label: "Analyze" },
     { id: "kickback", label: "Kickback" },
+    { id: "bribe_detective", label: "Bribe Detective" },
+    { id: "bribe_officer", label: "Bribe Officer" },
     { id: "skip_free_question", label: "Decline Free Question" },
     { id: "accuse", label: "Accuse", danger: true },
     { id: "submit_final_guess", label: "Seal Final Guess", danger: true },

@@ -19,6 +19,8 @@ defmodule Detective.Games.Command do
           | :block_question
           | :accept_question_block
           | :bribe_goon
+          | :bribe_detective
+          | :bribe_officer
           | :choose_snitch
           | :decline_snitch
           | :resolve_snitches
@@ -69,6 +71,8 @@ defmodule Detective.Games.Command do
   defp command_type("block_question"), do: {:ok, :block_question}
   defp command_type("accept_question_block"), do: {:ok, :accept_question_block}
   defp command_type("bribe_goon"), do: {:ok, :bribe_goon}
+  defp command_type("bribe_detective"), do: {:ok, :bribe_detective}
+  defp command_type("bribe_officer"), do: {:ok, :bribe_officer}
   defp command_type("choose_snitch"), do: {:ok, :choose_snitch}
   defp command_type("decline_snitch"), do: {:ok, :decline_snitch}
   defp command_type("resolve_snitches"), do: {:ok, :resolve_snitches}

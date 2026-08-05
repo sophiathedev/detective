@@ -393,6 +393,81 @@ defmodule Detective.Games.RuntimeTest do
     assert hd(player.statements)["resolution"] == "challenge_succeeded"
   end
 
+  test "a Detective bribe persists its public marker and private Case card" do
+    %{
+      host: host,
+      detective: detective,
+      second_detective: second_detective,
+      game: game,
+      version: version
+    } = ready_game()
+
+    {:ok, %{lobby: lobby}} =
+      Games.start_game(
+        Scope.for_user(host),
+        game.id,
+        Ecto.UUID.generate(),
+        version
+      )
+
+    {:ok, %{version: first_placed}} =
+      execute_session_command(game.id, detective.id, :place, lobby.current_version, %{
+        "location_id" => "51"
+      })
+
+    {:ok, %{version: second_turn}} =
+      execute_session_command(game.id, detective.id, :end_turn, first_placed)
+
+    {:ok, %{version: second_placed}} =
+      execute_session_command(game.id, second_detective.id, :place, second_turn, %{
+        "location_id" => "51"
+      })
+
+    {:ok, %{version: searched}} =
+      execute_session_command(game.id, second_detective.id, :search_location, second_placed)
+
+    {:ok, %{version: first_next_turn}} =
+      execute_session_command(game.id, second_detective.id, :end_turn, searched)
+
+    assert {:ok, before_bribe} = Session.get_state(game.id)
+    target = State.player_by_user_id(before_bribe, second_detective.id)
+
+    assert {:ok, %{version: bribed_version}} =
+             execute_session_command(
+               game.id,
+               detective.id,
+               :bribe_detective,
+               first_next_turn,
+               %{
+                 "detective_player_id" => target.id,
+                 "case_card_id" => "sealed-ledger"
+               }
+             )
+
+    event = Repo.get_by!(GameEvent, event_type: "detective_bribed")
+    assert event.public_payload["case_card_code"] == "B"
+    refute Jason.encode!(event.public_payload) =~ "Sealed Ledger"
+
+    private_event =
+      GamePrivateEvent
+      |> Repo.all()
+      |> Enum.find(&(&1.payload["type"] == "bribe_result"))
+
+    assert private_event.recipient_user_id == detective.id
+    assert private_event.payload["case_card"]["title"] == "Sealed Ledger"
+
+    restart_session(game.id)
+    assert {:ok, restored} = Session.get_state(game.id)
+    assert restored.version == bribed_version
+
+    actor = State.player_by_user_id(restored, detective.id)
+    restored_target = State.player_by_user_id(restored, second_detective.id)
+    assert actor.scratch == 2
+    assert actor.actions_remaining == 4
+    assert "sealed-ledger" in actor.knowledge
+    assert restored_target.scratch == 7
+  end
+
   test "disconnect pause persists the pending interrogation and is idempotent" do
     %{host: host, detective: detective, game: game, version: version} = ready_game()
 
@@ -720,5 +795,14 @@ defmodule Detective.Games.RuntimeTest do
     monitor = Process.monitor(pid)
     assert :ok = DynamicSupervisor.terminate_child(SessionSupervisor, pid)
     assert_receive {:DOWN, ^monitor, :process, ^pid, :shutdown}
+  end
+
+  defp execute_session_command(game_id, user_id, type, version, payload \\ %{}) do
+    Session.execute(game_id, user_id, %Command{
+      command_id: Ecto.UUID.generate(),
+      type: type,
+      expected_version: version,
+      payload: payload
+    })
   end
 end

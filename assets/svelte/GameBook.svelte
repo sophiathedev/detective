@@ -31,6 +31,9 @@
   let accusationSuspectId = $state(null)
   let accusationWeaponId = $state(null)
   let accusationMotiveId = $state(null)
+  let bribeMode = $state("detective")
+  let selectedBribeTargetId = $state(null)
+  let selectedBribeCardId = $state(null)
   let spendLeverage = $state(false)
   let commandPending = $state(false)
   let retryCommand = $state(null)
@@ -57,6 +60,7 @@
     { id: "search", label: "Search" },
     { id: "question", label: "Question" },
     { id: "evidence", label: "Evidence" },
+    { id: "bribes", label: "Bribes" },
     { id: "accusation", label: "Accusation" },
     { id: "history", label: "History" },
   ]
@@ -123,6 +127,9 @@
   let knownCaseCards = $derived(privateState.known_case_cards ?? [])
   let accusationOptions = $derived(
     privateState.accusation_options ?? { suspects: [], weapons: [], motives: [] },
+  )
+  let bribeOptions = $derived(
+    privateState.bribe_options ?? { detective_targets: [], officer_case_cards: [] },
   )
   let offlinePlayers = $derived(
     connectionSnapshotReceived
@@ -208,6 +215,13 @@
       knownCaseCards,
       searchNotes: privateState.search_notes ?? [],
     },
+    bribes: {
+      mode: bribeMode,
+      scratch: privateState.scratch ?? 0,
+      options: bribeOptions,
+      selectedTargetId: selectedBribeTargetId,
+      selectedCardId: selectedBribeCardId,
+    },
     accusation: {
       options: accusationOptions,
       selectedSuspectId: accusationSuspectId,
@@ -260,6 +274,10 @@
     submitResponse,
     acceptResponse: () => sendCommand("accept_response", {}),
     challengeResponse: () => sendCommand("challenge_response", {}),
+    setBribeMode: prepareBribeSelection,
+    setBribeTarget: selectBribeTarget,
+    setBribeCard: (cardId) => (selectedBribeCardId = cardId),
+    submitBribe,
     setAccusationSuspect: (suspectId) => (accusationSuspectId = suspectId),
     setAccusationWeapon: (weaponId) => (accusationWeaponId = weaponId),
     setAccusationMotive: (motiveId) => (accusationMotiveId = motiveId),
@@ -312,6 +330,10 @@
         nextState.interrogation_options ?? [],
         nextState.free_question_suspect_id,
       )
+    }
+
+    if (nextState.role === "detective") {
+      synchronizeBribeSelection(nextState.bribe_options ?? bribeOptions)
     }
   }
 
@@ -488,6 +510,9 @@
       openDrawer("question")
     } else if (action === "accuse" || action === "submit_final_guess") {
       openDrawer("accusation")
+    } else if (action === "bribe_detective" || action === "bribe_officer") {
+      prepareBribeSelection(action === "bribe_officer" ? "officer" : "detective")
+      openDrawer("bribes")
     } else if (prompt && availableActions.has(action)) {
       activeAction = null
       mapSelection = null
@@ -505,10 +530,17 @@
       wrong_phase: "This action is sealed during the current case phase.",
       placement_required: "Place your token at a Police Station first.",
       invalid_location: "That location is not part of the active board catalog.",
+      police_station_required: "Bribe Officer is available only at a Police Station.",
       destination_outside_district: "That location is outside the current district.",
       no_actions_remaining: "No actions remain this turn.",
       mob_joint_required: "Kickback is available only at a Mob Joint.",
       kickback_already_used: "Kickback was already used today.",
+      invalid_bribe_target: "That Detective cannot receive this bribe.",
+      bribe_target_not_at_location: "Move to the same location as that Detective first.",
+      case_card_not_known_by_target: "That Detective does not hold the selected knowledge marker.",
+      case_card_not_known_by_detective: "No other Detective knows that Case card.",
+      case_card_already_known: "You already know that Case card.",
+      invalid_case_card: "That Case card is not part of the active case.",
       invalid_suspect: "That suspect is not available in this case.",
       suspect_not_at_location: "Move to the suspect's location before questioning them.",
       topic_not_known: "That case topic has not been discovered.",
@@ -612,6 +644,41 @@
     if (suspectChanged) spendLeverage = false
   }
 
+  function prepareBribeSelection(mode) {
+    bribeMode = mode === "officer" ? "officer" : "detective"
+    selectedBribeTargetId = null
+    selectedBribeCardId = null
+    synchronizeBribeSelection(bribeOptions)
+  }
+
+  function synchronizeBribeSelection(options) {
+    if (bribeMode === "officer") {
+      selectedBribeTargetId = null
+      const officerCards = options.officer_case_cards ?? []
+      const selected = officerCards.find((card) => card.id === selectedBribeCardId)
+      selectedBribeCardId = selected?.id ?? officerCards[0]?.id ?? null
+      return
+    }
+
+    const targets = options.detective_targets ?? []
+    const target =
+      targets.find((detective) => detective.player_id === selectedBribeTargetId) ?? targets[0]
+
+    selectedBribeTargetId = target?.player_id ?? null
+    const cards = target?.case_cards ?? []
+    const selected = cards.find((card) => card.id === selectedBribeCardId)
+    selectedBribeCardId = selected?.id ?? cards[0]?.id ?? null
+  }
+
+  function selectBribeTarget(playerId) {
+    const target = bribeOptions.detective_targets?.find(
+      (detective) => detective.player_id === playerId,
+    )
+
+    selectedBribeTargetId = target?.player_id ?? null
+    selectedBribeCardId = target?.case_cards?.[0]?.id ?? null
+  }
+
   function openDrawer(page) {
     actionPrompt = null
     drawerPage = page
@@ -667,6 +734,23 @@
       suspect_id: accusationSuspectId,
       weapon_id: accusationWeaponId,
       motive_id: accusationMotiveId,
+    })
+  }
+
+  function submitBribe() {
+    if (!selectedBribeCardId) return
+
+    if (bribeMode === "officer") {
+      if (!availableActions.has("bribe_officer")) return
+      sendCommand("bribe_officer", { case_card_id: selectedBribeCardId })
+      return
+    }
+
+    if (!availableActions.has("bribe_detective") || !selectedBribeTargetId) return
+
+    sendCommand("bribe_detective", {
+      detective_player_id: selectedBribeTargetId,
+      case_card_id: selectedBribeCardId,
     })
   }
 
@@ -814,6 +898,18 @@
     gameChannel.on("goon_bribed", (message) =>
       recordQuestionEvent(message, "The Detective paid the goon and restored the question."),
     )
+    gameChannel.on("detective_bribed", (message) =>
+      recordPublicEvent(
+        message,
+        `A Detective bought access to Case ${message.payload.case_card_code}.`,
+      ),
+    )
+    gameChannel.on("officer_bribed", (message) =>
+      recordPublicEvent(
+        message,
+        `A desk officer opened Case ${message.payload.case_card_code}.`,
+      ),
+    )
     gameChannel.on("snitch_decision_recorded", (message) =>
       recordPublicEvent(message, "A facedown Snitch decision was filed."),
     )
@@ -890,6 +986,11 @@
           ? "Search complete. A newly discovered suspect may be questioned for free."
           : "Search complete. The private result is filed in your notebook."
         openDrawer(payload.free_question_suspect_id ? "question" : "evidence")
+      } else if (payload.type === "bribe_result") {
+        lastEvent = `Case ${payload.case_card.code} entered your private evidence folio.`
+        openDrawer("evidence")
+      } else if (payload.type === "scratch_updated" && payload.received) {
+        lastEvent = `You received $${payload.received} Scratch from another Detective.`
       } else if (payload.type === "snitch_choice_recorded") {
         lastEvent = payload.snitch
           ? "Your Snitch marker is facedown. Other players cannot see the choice yet."

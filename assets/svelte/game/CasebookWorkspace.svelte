@@ -5,9 +5,11 @@
   let search = $derived(view?.search ?? {})
   let question = $derived(view?.question ?? {})
   let evidence = $derived(view?.evidence ?? {})
+  let bribes = $derived(view?.bribes ?? {})
   let accusation = $derived(view?.accusation ?? {})
   let history = $derived(view?.history ?? {})
   let accusationConfirming = $state(false)
+  let bribeConfirming = $state(false)
   let selectedInterrogation = $derived(
     (question.interrogationOptions ?? []).find(
       (option) => option.suspect_id === question.selectedSuspectId,
@@ -34,6 +36,20 @@
   let finalGuessFiledCount = $derived(
     (view?.detectives ?? []).filter((detective) => detective.final_guess_submitted).length,
   )
+  let selectedBribeTarget = $derived(
+    (bribes.options?.detective_targets ?? []).find(
+      (detective) => detective.player_id === bribes.selectedTargetId,
+    ),
+  )
+  let selectedBribeCard = $derived(
+    (bribes.mode === "officer"
+      ? (bribes.options?.officer_case_cards ?? [])
+      : (selectedBribeTarget?.case_cards ?? [])
+    ).find((card) => card.id === bribes.selectedCardId),
+  )
+  let bribeCommandAvailable = $derived(
+    availableActions.has(bribes.mode === "officer" ? "bribe_officer" : "bribe_detective"),
+  )
 
   function toggleBlockedPlayer(playerId, checked) {
     const selected = new Set(question.blockedSnitchPlayerIds ?? [])
@@ -55,6 +71,26 @@
   function confirmAccusation() {
     accusationConfirming = false
     actions.submitAccusation?.()
+  }
+
+  function setBribeMode(mode) {
+    bribeConfirming = false
+    actions.setBribeMode?.(mode)
+  }
+
+  function setBribeTarget(playerId) {
+    bribeConfirming = false
+    actions.setBribeTarget?.(playerId)
+  }
+
+  function setBribeCard(cardId) {
+    bribeConfirming = false
+    actions.setBribeCard?.(cardId)
+  }
+
+  function confirmBribe() {
+    bribeConfirming = false
+    actions.submitBribe?.()
   }
 </script>
 
@@ -413,6 +449,90 @@
     </section>
   {:else}
     <p id="evidence-private-seal" class="casebook-empty-page">Detective evidence stays sealed on each private user channel.</p>
+  {/if}
+
+{:else if page === "bribes"}
+  {#if view.role === "detective"}
+    <section id="bribe-folio" class="casebook-workspace-page border-y border-[#91785c] bg-[#d4c3a3] p-4 sm:p-5" aria-labelledby="bribe-folio-heading">
+      <div class="flex flex-wrap items-start justify-between gap-3 border-b border-[#9d8669] pb-4">
+        <div>
+          <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Knowledge exchange</p>
+          <h3 id="bribe-folio-heading" class="mt-1 font-serif text-xl font-semibold">Sealed Case card access</h3>
+          <p class="mt-2 max-w-2xl text-xs leading-5 text-[#695642]">Bribes cost Scratch, never an Action. Card codes and knowledge markers are visible; card content stays sealed until payment succeeds.</p>
+        </div>
+        <span class="border border-[#806749] px-2 py-1 font-mono text-[9px] uppercase text-[#725e48]">${bribes.scratch ?? 0} Scratch</span>
+      </div>
+
+      <div class="mt-4 grid grid-cols-2 gap-2" role="group" aria-label="Bribe source">
+        <button id="bribe-mode-detective" type="button" aria-pressed={bribes.mode !== "officer"} onclick={() => setBribeMode("detective")} class={`min-h-11 cursor-pointer border px-3 text-sm font-semibold ${bribes.mode !== "officer" ? "border-[#8c3f33] bg-[#eadbbc]" : "border-[#9d8669] bg-[#e4d6b8]"}`}>Detective / $2</button>
+        <button id="bribe-mode-officer" type="button" aria-pressed={bribes.mode === "officer"} onclick={() => setBribeMode("officer")} class={`min-h-11 cursor-pointer border px-3 text-sm font-semibold ${bribes.mode === "officer" ? "border-[#8c3f33] bg-[#eadbbc]" : "border-[#9d8669] bg-[#e4d6b8]"}`}>Desk officer / $3</button>
+      </div>
+
+      {#if bribes.mode === "officer"}
+        <div class="mt-4 border-l-4 border-[#315046] bg-[#ded2b4] p-4">
+          <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#315046]">Police Station only</p>
+          <p class="mt-2 text-xs leading-5 text-[#695642]">Pay the general supply to inspect any unknown Case card another Detective knows.</p>
+        </div>
+
+        <fieldset id="officer-bribe-cards" class="mt-4">
+          <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">Knowledge markers on file</legend>
+          <div class="mt-2 grid gap-2 sm:grid-cols-2">
+            {#each bribes.options?.officer_case_cards ?? [] as card}
+              <button id={`bribe-case-card-${card.id}`} type="button" aria-pressed={bribes.selectedCardId === card.id} onclick={() => setBribeCard(card.id)} class={`min-h-12 cursor-pointer border px-3 py-2 text-left ${bribes.selectedCardId === card.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}>
+                <span class="block font-serif text-sm font-semibold">Case {card.code}</span>
+                <span class="mt-1 block font-mono text-[8px] uppercase tracking-[0.08em] text-[#705b45]">Known by {(card.known_by ?? []).map((holder) => holder.display_name).join(" / ")}</span>
+              </button>
+            {:else}
+              <p class="casebook-empty-page">No unknown Case card is held by another Detective.</p>
+            {/each}
+          </div>
+        </fieldset>
+      {:else}
+        <fieldset id="detective-bribe-targets" class="mt-4">
+          <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">Detectives at your location</legend>
+          <div class="mt-2 grid gap-2 sm:grid-cols-2">
+            {#each bribes.options?.detective_targets ?? [] as detective}
+              <button id={`bribe-detective-${detective.player_id}`} type="button" aria-pressed={bribes.selectedTargetId === detective.player_id} onclick={() => setBribeTarget(detective.player_id)} class={`min-h-12 cursor-pointer border px-3 py-2 text-left ${bribes.selectedTargetId === detective.player_id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}>
+                <span class="block font-serif text-sm font-semibold">{detective.display_name}</span>
+                <span class="mt-1 block font-mono text-[8px] uppercase tracking-[0.08em] text-[#705b45]">{detective.case_cards?.length ?? 0} sealed markers</span>
+              </button>
+            {:else}
+              <p class="casebook-empty-page">No co-located Detective holds an unknown Case card.</p>
+            {/each}
+          </div>
+        </fieldset>
+
+        {#if selectedBribeTarget}
+          <fieldset id="detective-bribe-cards" class="mt-4">
+            <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">Choose one marker from {selectedBribeTarget.display_name}</legend>
+            <div class="mt-2 grid gap-2 sm:grid-cols-3">
+              {#each selectedBribeTarget.case_cards ?? [] as card}
+                <button id={`bribe-case-card-${card.id}`} type="button" aria-pressed={bribes.selectedCardId === card.id} onclick={() => setBribeCard(card.id)} class={`min-h-12 cursor-pointer border px-3 py-2 text-left ${bribes.selectedCardId === card.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}>
+                  <span class="block font-serif text-sm font-semibold">Case {card.code}</span>
+                  <span class="mt-1 block font-mono text-[8px] uppercase tracking-[0.08em] text-[#705b45]">Content sealed</span>
+                </button>
+              {/each}
+            </div>
+          </fieldset>
+        {/if}
+      {/if}
+
+      {#if bribeConfirming}
+        <div id="bribe-confirmation" class="mt-4 border-2 border-[#8c3f33] bg-[#eadbbc] p-4" role="alert">
+          <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#8c3f33]">Payment authorization</p>
+          <p class="mt-2 font-serif text-base font-semibold">Case {selectedBribeCard?.code} / {bribes.mode === "officer" ? "Desk officer" : selectedBribeTarget?.display_name}</p>
+          <p class="mt-2 text-xs leading-5 text-[#695642]">Confirm ${bribes.mode === "officer" ? 3 : 2} Scratch. The server will reveal the card only after validating location, funds, and knowledge ownership.</p>
+          <div class="mt-3 grid grid-cols-2 gap-2">
+            <button id="casebook-cancel-bribe" type="button" onclick={() => (bribeConfirming = false)} class="min-h-11 cursor-pointer border border-[#796349] bg-[#d7c7aa] px-3 text-sm font-semibold">Cancel payment</button>
+            <button id="casebook-confirm-bribe" type="button" onclick={confirmBribe} class="min-h-11 cursor-pointer bg-[#8f372f] px-3 text-sm font-semibold text-[#fff0d6]">Pay and inspect</button>
+          </div>
+        </div>
+      {:else}
+        <button id="casebook-submit-bribe" type="button" disabled={!bribeCommandAvailable || !selectedBribeCard || (bribes.mode !== "officer" && !selectedBribeTarget)} onclick={() => (bribeConfirming = true)} class="mt-4 min-h-12 w-full cursor-pointer bg-[#30261f] px-4 text-left text-sm font-semibold text-[#f5e7c9] disabled:cursor-not-allowed disabled:opacity-40">Review bribe <span class="float-right font-mono text-[10px]">${bribes.mode === "officer" ? 3 : 2}</span></button>
+      {/if}
+    </section>
+  {:else}
+    <p class="casebook-empty-page">Bribe records are private to each Detective.</p>
   {/if}
 
 {:else if page === "accusation"}

@@ -10,7 +10,7 @@ describe("ActionRail", () => {
     const onOpenCasebook = vi.fn()
 
     render(ActionRail, {
-      availableActions: ["move", "analyze", "end_turn"],
+      availableActions: ["move", "analyze", "bribe_detective", "end_turn"],
       activeAction: null,
       commandPending: false,
       connectionOnline: true,
@@ -21,10 +21,12 @@ describe("ActionRail", () => {
 
     await fireEvent.click(screen.getByRole("button", { name: "Move" }))
     await fireEvent.click(screen.getByRole("button", { name: "Analyze" }))
+    await fireEvent.click(screen.getByRole("button", { name: "Bribe Detective" }))
     await fireEvent.click(screen.getByRole("button", { name: "Casebook" }))
 
     expect(onChooseAction).toHaveBeenCalledWith("move")
     expect(onAction).toHaveBeenCalledWith("analyze")
+    expect(onAction).toHaveBeenCalledWith("bribe_detective")
     expect(onOpenCasebook).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole("button", { name: "Kickback" })).not.toBeInTheDocument()
   })

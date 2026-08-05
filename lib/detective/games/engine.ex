@@ -328,6 +328,130 @@ defmodule Detective.Games.Engine do
     end
   end
 
+  defp execute(state, actor, %Command{type: :bribe_detective, payload: payload}) do
+    target_id = payload_value(payload, "detective_player_id")
+    case_card_id = payload_value(payload, "case_card_id")
+
+    with :ok <- validate_placed(actor),
+         {:ok, target} <- fetch_detective(state, target_id),
+         :ok <- validate_other_detective(actor, target),
+         :ok <- validate_bribe_target_location(actor, target),
+         :ok <- validate_scratch(actor, 2),
+         :ok <- validate_target_case_card(target, case_card_id),
+         :ok <- validate_case_card_unknown(actor, case_card_id),
+         {:ok, case_card} <- fetch_private_case_card(state, case_card_id) do
+      next_actor = %{
+        actor
+        | scratch: actor.scratch - 2,
+          knowledge: Enum.uniq([case_card_id | actor.knowledge])
+      }
+
+      next_target = %{target | scratch: target.scratch + 2}
+
+      {next_state, newly_public_ids} =
+        state
+        |> put_player(next_actor)
+        |> put_player(next_target)
+        |> promote_shared_knowledge()
+
+      next_actor = Map.fetch!(next_state.players, actor.id)
+      next_target = Map.fetch!(next_state.players, target.id)
+
+      next_state =
+        next_state
+        |> advance_version()
+        |> append_history(%{
+          type: "detective_bribed",
+          player_id: actor.id,
+          target_player_id: target.id,
+          case_card_code: case_card.code
+        })
+
+      event = %Event{
+        type: :detective_bribed,
+        public_payload: %{
+          player_id: actor.id,
+          target_player_id: target.id,
+          case_card_code: case_card.code,
+          revealed_publicly: case_card_id in newly_public_ids
+        },
+        private_payloads: %{
+          actor.user_id => %{
+            type: "bribe_result",
+            source: "detective",
+            scratch: next_actor.scratch,
+            case_card: case_card
+          },
+          target.user_id => %{
+            type: "scratch_updated",
+            scratch: next_target.scratch,
+            received: 2
+          }
+        }
+      }
+
+      {:ok, next_state, [event]}
+    end
+  end
+
+  defp execute(state, actor, %Command{type: :bribe_officer, payload: payload}) do
+    case_card_id = payload_value(payload, "case_card_id")
+
+    with :ok <- validate_placed(actor),
+         :ok <- validate_scratch(actor, 3),
+         {:ok, location} <- Map.fetch(state.locations, actor.location_id),
+         :ok <- validate_police_station(location),
+         :ok <- validate_case_card_unknown(actor, case_card_id),
+         :ok <- validate_case_card_known_by_other_detective(state, actor, case_card_id),
+         {:ok, case_card} <- fetch_private_case_card(state, case_card_id) do
+      next_actor = %{
+        actor
+        | scratch: actor.scratch - 3,
+          knowledge: Enum.uniq([case_card_id | actor.knowledge])
+      }
+
+      {next_state, newly_public_ids} =
+        state
+        |> put_player(next_actor)
+        |> promote_shared_knowledge()
+
+      next_actor = Map.fetch!(next_state.players, actor.id)
+
+      next_state =
+        next_state
+        |> advance_version()
+        |> append_history(%{
+          type: "officer_bribed",
+          player_id: actor.id,
+          location_id: location.id,
+          case_card_code: case_card.code
+        })
+
+      event = %Event{
+        type: :officer_bribed,
+        public_payload: %{
+          player_id: actor.id,
+          location_id: location.id,
+          case_card_code: case_card.code,
+          revealed_publicly: case_card_id in newly_public_ids
+        },
+        private_payloads: %{
+          actor.user_id => %{
+            type: "bribe_result",
+            source: "officer",
+            scratch: next_actor.scratch,
+            case_card: case_card
+          }
+        }
+      }
+
+      {:ok, next_state, [event]}
+    else
+      :error -> {:error, :invalid_location}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp execute(state, actor, %Command{type: :search_location}) do
     with :ok <- validate_placed(actor),
          :ok <- validate_action_point(actor),
@@ -1312,6 +1436,25 @@ defmodule Detective.Games.Engine do
 
   defp fetch_suspect(_state, _suspect_id), do: {:error, :invalid_suspect}
 
+  defp fetch_detective(state, player_id) when is_binary(player_id) do
+    case Map.get(state.players, player_id) do
+      %{role: "detective"} = detective -> {:ok, detective}
+      _player -> {:error, :invalid_bribe_target}
+    end
+  end
+
+  defp fetch_detective(_state, _player_id), do: {:error, :invalid_bribe_target}
+
+  defp fetch_private_case_card(state, case_card_id) when is_binary(case_card_id) do
+    case SearchDeck.case_cards(state.case_definition, [case_card_id]) do
+      {:ok, [case_card]} ->
+        {:ok, Map.take(case_card, [:id, :code, :title, :type, :description])}
+
+      _error ->
+        {:error, :invalid_case_card}
+    end
+  end
+
   defp normalize_locations(locations) when is_list(locations) do
     locations
     |> Enum.reduce_while({:ok, %{}}, fn location, {:ok, acc} ->
@@ -1702,6 +1845,47 @@ defmodule Detective.Games.Engine do
 
   defp validate_scratch(%{scratch: scratch}, cost) when scratch >= cost, do: :ok
   defp validate_scratch(_actor, _cost), do: {:error, :insufficient_scratch}
+
+  defp validate_other_detective(%{id: player_id}, %{id: player_id}),
+    do: {:error, :invalid_bribe_target}
+
+  defp validate_other_detective(_actor, _target), do: :ok
+
+  defp validate_bribe_target_location(%{location_id: location_id}, %{location_id: location_id})
+       when not is_nil(location_id),
+       do: :ok
+
+  defp validate_bribe_target_location(_actor, _target),
+    do: {:error, :bribe_target_not_at_location}
+
+  defp validate_target_case_card(target, case_card_id) when is_binary(case_card_id) do
+    if case_card_id in target.knowledge,
+      do: :ok,
+      else: {:error, :case_card_not_known_by_target}
+  end
+
+  defp validate_target_case_card(_target, _case_card_id),
+    do: {:error, :case_card_not_known_by_target}
+
+  defp validate_case_card_unknown(actor, case_card_id) when is_binary(case_card_id) do
+    if case_card_id in actor.knowledge,
+      do: {:error, :case_card_already_known},
+      else: :ok
+  end
+
+  defp validate_case_card_unknown(_actor, _case_card_id), do: {:error, :invalid_case_card}
+
+  defp validate_case_card_known_by_other_detective(state, actor, case_card_id)
+       when is_binary(case_card_id) do
+    known? =
+      state.players
+      |> Map.values()
+      |> Enum.any?(fn player ->
+        player.role == "detective" and player.id != actor.id and case_card_id in player.knowledge
+      end)
+
+    if known?, do: :ok, else: {:error, :case_card_not_known_by_detective}
+  end
 
   defp validate_blocked_snitch_ids(blocked_ids, chosen_ids)
        when is_list(blocked_ids) do

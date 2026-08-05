@@ -142,6 +142,46 @@ defmodule Detective.Games.Rules do
   def accusation_options(%State{}, _player),
     do: %{suspects: [], weapons: [], motives: []}
 
+  def bribe_options(%State{} = state, %{role: "detective"} = player) do
+    other_detectives =
+      state.detective_order
+      |> Enum.reject(&(&1 == player.id))
+      |> Enum.map(&Map.fetch!(state.players, &1))
+
+    detective_targets =
+      other_detectives
+      |> Enum.filter(&(&1.location_id == player.location_id and not is_nil(player.location_id)))
+      |> Enum.map(fn detective ->
+        %{
+          player_id: detective.id,
+          display_name: detective.display_name,
+          case_cards: sealed_case_card_refs(state, private_unknown_ids(state, player, detective))
+        }
+      end)
+      |> Enum.reject(&(&1.case_cards == []))
+
+    holders_by_card_id =
+      Enum.reduce(other_detectives, %{}, fn detective, acc ->
+        holder = %{player_id: detective.id, display_name: detective.display_name}
+
+        Enum.reduce(private_unknown_ids(state, player, detective), acc, fn card_id, holders ->
+          Map.update(holders, card_id, [holder], &[holder | &1])
+        end)
+      end)
+
+    officer_case_cards =
+      state
+      |> sealed_case_card_refs(Map.keys(holders_by_card_id))
+      |> Enum.map(fn card ->
+        Map.put(card, :known_by, holders_by_card_id |> Map.fetch!(card.id) |> Enum.reverse())
+      end)
+
+    %{detective_targets: detective_targets, officer_case_cards: officer_case_cards}
+  end
+
+  def bribe_options(%State{}, _player),
+    do: %{detective_targets: [], officer_case_cards: []}
+
   defp detective_actions(_state, %{location_id: nil}), do: ["place"]
 
   defp detective_actions(state, %{free_question_suspect_id: suspect_id} = player)
@@ -198,6 +238,23 @@ defmodule Detective.Games.Rules do
       if player.actions_remaining > 0 and current_location.type == "mob_joint" and
            player.kickback_day != state.day do
         ["kickback" | actions]
+      else
+        actions
+      end
+
+    bribe_options = bribe_options(state, player)
+
+    actions =
+      if player.scratch >= 2 and bribe_options.detective_targets != [] do
+        ["bribe_detective" | actions]
+      else
+        actions
+      end
+
+    actions =
+      if player.scratch >= 3 and current_location.type == "police_station" and
+           bribe_options.officer_case_cards != [] do
+        ["bribe_officer" | actions]
       else
         actions
       end
@@ -283,5 +340,23 @@ defmodule Detective.Games.Rules do
   defp accusation_ready?(state, player) do
     options = accusation_options(state, player)
     options.suspects != [] and options.weapons != [] and options.motives != []
+  end
+
+  defp private_unknown_ids(state, player, other_detective) do
+    other_detective.knowledge
+    |> Enum.reject(&(&1 in player.knowledge or &1 in state.public_case_card_ids))
+    |> Enum.uniq()
+  end
+
+  defp sealed_case_card_refs(state, card_ids) do
+    case SearchDeck.case_cards(state.case_definition, card_ids) do
+      {:ok, cards} ->
+        cards
+        |> Enum.map(&Map.take(&1, [:id, :code]))
+        |> Enum.sort_by(& &1.code)
+
+      {:error, _reason} ->
+        []
+    end
   end
 end

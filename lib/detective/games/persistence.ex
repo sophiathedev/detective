@@ -33,6 +33,8 @@ defmodule Detective.Games.Persistence do
     "question_blocked" => :question_blocked,
     "question_abandoned" => :question_abandoned,
     "goon_bribed" => :goon_bribed,
+    "detective_bribed" => :detective_bribed,
+    "officer_bribed" => :officer_bribed,
     "snitch_decision_recorded" => :snitch_decision_recorded,
     "snitch_window_closed" => :snitch_window_closed,
     "snitches_resolved" => :snitches_resolved,

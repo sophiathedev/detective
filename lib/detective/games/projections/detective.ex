@@ -25,6 +25,7 @@ defmodule Detective.Games.Projections.Detective do
           solve_attempt: Map.get(player, :solve_attempt),
           final_guess: Map.get(player, :final_guess),
           accusation_options: Rules.accusation_options(state, player),
+          bribe_options: Rules.bribe_options(state, player),
           available_actions: available_actions,
           searchable_suspect_ids:
             state

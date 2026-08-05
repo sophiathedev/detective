@@ -288,6 +288,54 @@ defmodule Detective.Games.ProjectionsTest do
     assert {:error, :not_a_member} = Projections.for_user(state, "not-a-member")
   end
 
+  test "bribe options expose sealed card codes but never another Detective's content" do
+    hidden_card = %{
+      "id" => "sealed-ledger",
+      "code" => "B",
+      "title" => "Sealed Ledger",
+      "type" => "evidence",
+      "description" => "The private ledger contents.",
+      "initially_known" => false
+    }
+
+    state =
+      engine_state_fixture(
+        Map.update!(engine_case_definition(), "case_cards", &[hidden_card | &1])
+      )
+      |> place_detective()
+      |> put_in(
+        [Access.key!(:players), second_detective_id(), Access.key!(:location_id)],
+        "51"
+      )
+      |> update_in(
+        [Access.key!(:players), second_detective_id(), Access.key!(:knowledge)],
+        &["sealed-ledger" | &1]
+      )
+
+    assert {:ok, projection} = Projections.for_user(state, detective_user_id())
+
+    assert projection.private.bribe_options.detective_targets == [
+             %{
+               player_id: second_detective_id(),
+               display_name: "Detective Two",
+               case_cards: [%{id: "sealed-ledger", code: "B"}]
+             }
+           ]
+
+    assert projection.private.bribe_options.officer_case_cards == [
+             %{
+               id: "sealed-ledger",
+               code: "B",
+               known_by: [
+                 %{player_id: second_detective_id(), display_name: "Detective Two"}
+               ]
+             }
+           ]
+
+    refute Jason.encode!(projection.private.bribe_options) =~ "Sealed Ledger"
+    refute Jason.encode!(projection.private.bribe_options) =~ "private ledger contents"
+  end
+
   defp state_fixture do
     detective_id = "10000000-0000-0000-0000-000000000001"
     chisel_id = "10000000-0000-0000-0000-000000000002"

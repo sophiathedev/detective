@@ -259,6 +259,93 @@ defmodule Detective.Games.EngineTest do
     assert "interrogate" in actions
   end
 
+  test "Classic bribes transfer knowledge without spending an action" do
+    detective_two_id = player_id("detective-2")
+
+    state =
+      placed_state()
+      |> put_known_weapon("detective-2")
+      |> put_in([Access.key!(:players), detective_two_id, Access.key!(:location_id)], "51")
+
+    actions = Rules.available_actions(state, user_id("detective-1"))
+    assert "bribe_detective" in actions
+    assert "bribe_officer" in actions
+
+    zero_action_state =
+      put_in(state.players[player_id("detective-1")].actions_remaining, 0)
+
+    assert "bribe_detective" in Rules.available_actions(zero_action_state, user_id("detective-1"))
+    assert "bribe_officer" in Rules.available_actions(zero_action_state, user_id("detective-1"))
+
+    assert {:ok, detective_bribed, [event]} =
+             apply_command(state, "detective-1", :bribe_detective, %{
+               "detective_player_id" => detective_two_id,
+               "case_card_id" => "sealed-ledger"
+             })
+
+    actor = player(detective_bribed, "detective-1")
+    target = player(detective_bribed, "detective-2")
+    assert actor.scratch == 2
+    assert target.scratch == 7
+    assert actor.actions_remaining == 4
+    assert "sealed-ledger" in actor.knowledge
+    assert event.type == :detective_bribed
+    refute Jason.encode!(event.public_payload) =~ "sealed-ledger"
+
+    assert {:ok, officer_bribed, [officer_event]} =
+             apply_command(state, "detective-1", :bribe_officer, %{
+               "case_card_id" => "sealed-ledger"
+             })
+
+    officer_actor = player(officer_bribed, "detective-1")
+    assert officer_actor.scratch == 1
+    assert player(officer_bribed, "detective-2").scratch == 5
+    assert officer_actor.actions_remaining == 4
+    assert "sealed-ledger" in officer_actor.knowledge
+    assert officer_event.type == :officer_bribed
+    refute Jason.encode!(officer_event.public_payload) =~ "sealed-ledger"
+  end
+
+  test "Detective bribes require Scratch, a co-located target, and their knowledge" do
+    state = placed_state() |> put_known_weapon("detective-2")
+    detective_one_id = player_id("detective-1")
+    detective_two_id = player_id("detective-2")
+
+    assert {:error, :bribe_target_not_at_location} =
+             apply_command(state, "detective-1", :bribe_detective, %{
+               "detective_player_id" => detective_two_id,
+               "case_card_id" => "sealed-ledger"
+             })
+
+    same_location =
+      put_in(state.players[detective_two_id].location_id, "51")
+
+    poor = put_in(same_location.players[detective_one_id].scratch, 1)
+
+    assert {:error, :insufficient_scratch} =
+             apply_command(poor, "detective-1", :bribe_detective, %{
+               "detective_player_id" => detective_two_id,
+               "case_card_id" => "sealed-ledger"
+             })
+
+    assert {:error, :case_card_not_known_by_target} =
+             apply_command(same_location, "detective-1", :bribe_detective, %{
+               "detective_player_id" => detective_two_id,
+               "case_card_id" => "unknown-card"
+             })
+
+    {:ok, at_border, _events} =
+      apply_command(state, "detective-1", :move, %{"location_id" => "82"})
+
+    {:ok, at_mob_joint, _events} =
+      apply_command(at_border, "detective-1", :move, %{"location_id" => "96"})
+
+    assert {:error, :police_station_required} =
+             apply_command(at_mob_joint, "detective-1", :bribe_officer, %{
+               "case_card_id" => "sealed-ledger"
+             })
+  end
+
   test "interrogation is location-bound, costs one action, and exposes options only to Chisel" do
     state = placed_state()
 

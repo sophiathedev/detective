@@ -22,6 +22,10 @@ const noActions = {
   submitResponse: () => {},
   acceptResponse: () => {},
   challengeResponse: () => {},
+  setBribeMode: () => {},
+  setBribeTarget: () => {},
+  setBribeCard: () => {},
+  submitBribe: () => {},
   setAccusationSuspect: () => {},
   setAccusationWeapon: () => {},
   setAccusationMotive: () => {},
@@ -57,6 +61,13 @@ const baseView = {
     blockedSnitchPlayerIds: [],
   },
   evidence: { heldEvidence: [], knownCaseCards: [], searchNotes: [] },
+  bribes: {
+    mode: "detective",
+    scratch: 4,
+    options: { detective_targets: [], officer_case_cards: [] },
+    selectedTargetId: null,
+    selectedCardId: null,
+  },
   accusation: {
     options: { suspects: [], weapons: [], motives: [] },
     selectedSuspectId: null,
@@ -159,6 +170,47 @@ describe("CasebookWorkspace", () => {
 
     await fireEvent.click(document.querySelector("#casebook-confirm-accusation"))
     expect(submitAccusation).toHaveBeenCalledOnce()
+  })
+
+  it("keeps bribed Case content sealed until payment is confirmed", async () => {
+    const submitBribe = vi.fn()
+    const view = {
+      ...baseView,
+      availableActions: ["bribe_detective"],
+      bribes: {
+        mode: "detective",
+        scratch: 4,
+        options: {
+          detective_targets: [
+            {
+              player_id: "d2",
+              display_name: "Rowan",
+              case_cards: [{ id: "sealed-ledger", code: "B" }],
+            },
+          ],
+          officer_case_cards: [],
+        },
+        selectedTargetId: "d2",
+        selectedCardId: "sealed-ledger",
+      },
+    }
+
+    render(CasebookWorkspace, {
+      page: "bribes",
+      view,
+      actions: { ...noActions, submitBribe },
+    })
+
+    expect(document.querySelector("#bribe-case-card-sealed-ledger")).toHaveTextContent(
+      "Case B",
+    )
+    expect(document.querySelector("#bribe-folio")).not.toHaveTextContent("Sealed Ledger")
+
+    await fireEvent.click(document.querySelector("#casebook-submit-bribe"))
+    expect(submitBribe).not.toHaveBeenCalled()
+
+    await fireEvent.click(document.querySelector("#casebook-confirm-bribe"))
+    expect(submitBribe).toHaveBeenCalledOnce()
   })
 
   it("shows public final-guess filing progress without revealing choices", () => {
