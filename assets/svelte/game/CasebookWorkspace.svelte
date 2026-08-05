@@ -1,4 +1,6 @@
 <script>
+  import { tick } from "svelte"
+
   let { page = "history", view, actions = {} } = $props()
 
   let availableActions = $derived(new Set(view?.availableActions ?? []))
@@ -50,6 +52,17 @@
   let bribeCommandAvailable = $derived(
     availableActions.has(bribes.mode === "officer" ? "bribe_officer" : "bribe_detective"),
   )
+
+  $effect(() => {
+    const selectedCode = evidence.selectedCaseCardCode
+    if (page !== "evidence" || !selectedCode) return
+
+    void tick().then(() => {
+      document
+        .getElementById(`evidence-case-card-${selectedCode}`)
+        ?.scrollIntoView?.({ block: "nearest" })
+    })
+  })
 
   function toggleBlockedPlayer(playerId, checked) {
     const selected = new Set(question.blockedSnitchPlayerIds ?? [])
@@ -404,7 +417,7 @@
             id={`evidence-case-card-${card.code}`}
             data-selected={evidence.selectedCaseCardCode === card.code}
             aria-current={evidence.selectedCaseCardCode === card.code ? "true" : undefined}
-            class={`border px-3 py-2 ${evidence.selectedCaseCardCode === card.code ? "border-[#8c3f33] bg-[#f1e2c4] ring-2 ring-[#a54235]" : "border-[#8b7257] bg-[#e7d6b5]"}`}
+            class={`scroll-mt-6 border px-3 py-2 ${evidence.selectedCaseCardCode === card.code ? "border-[#8c3f33] bg-[#f1e2c4] ring-2 ring-[#a54235]" : "border-[#8b7257] bg-[#e7d6b5]"}`}
           >
             <div class="flex items-center justify-between gap-3">
               <span class="font-mono text-[10px] font-semibold text-[#8c3f33]">Case {card.code}</span>

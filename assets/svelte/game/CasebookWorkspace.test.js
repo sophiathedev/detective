@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/svelte"
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte"
 import { describe, expect, it, vi } from "vitest"
 
 import CasebookWorkspace from "./CasebookWorkspace.svelte"
@@ -289,7 +289,9 @@ describe("CasebookWorkspace", () => {
     expect(notes[1]).toHaveTextContent("First filed result.")
   })
 
-  it("indexes only accessible Case cards and highlights the board selection", () => {
+  it("indexes only accessible Case cards and brings the selected card into view", async () => {
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
     const view = {
       ...baseView,
       evidence: {
@@ -323,6 +325,7 @@ describe("CasebookWorkspace", () => {
       "Copper Tuning Key",
     )
     expect(screen.queryByText("Sealed Case C")).not.toBeInTheDocument()
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" }))
   })
 
   it("routes the selected public history page", () => {

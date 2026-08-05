@@ -10,6 +10,7 @@
   import MapStage from "./game/MapStage.svelte"
   import PauseCurtain from "./game/PauseCurtain.svelte"
   import { buildImmediateActionPrompt } from "./game/actionPrompts"
+  import { caseCardCodeFromPrivateEvent } from "./game/caseCardFocus"
 
   let { game_id, user_id, initial_public, initial_private } = $props()
 
@@ -1169,6 +1170,9 @@
       const { game_id: eventGameId, payload } = message
       if (eventGameId !== game_id) return
       if (!acceptEvent(message, seenPrivateEventIds)) return
+
+      const eventCaseCardCode = caseCardCodeFromPrivateEvent(payload)
+      if (eventCaseCardCode) selectedEvidenceCaseCardCode = eventCaseCardCode
 
       if (payload.type === "challenge_resolved") {
         lastEvent = payload.succeeded
