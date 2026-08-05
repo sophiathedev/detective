@@ -39,4 +39,24 @@ describe("Lobby", () => {
 
     expect(screen.getByRole("button", { name: "Waiting for Detectives" })).toBeDisabled()
   })
+
+  it("keeps Classic mode locked with only one ready Detective", () => {
+    render(Lobby, {
+      lobby: {
+        ...lobby,
+        players: [
+          ...lobby.players,
+          {
+            id: "p2",
+            display_name: "Cal Rowan",
+            role: "detective",
+            ready: true,
+            seat: 1,
+          },
+        ],
+      },
+    })
+
+    expect(screen.getByRole("button", { name: "Waiting for Detectives" })).toBeDisabled()
+  })
 })

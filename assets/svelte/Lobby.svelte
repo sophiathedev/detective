@@ -22,7 +22,7 @@
     [1, 2, 3, 4].map((seat) => detectives.find((player) => player.seat === seat)),
   )
   let chisel = $derived(room.players.find((player) => player.role === "chisel"))
-  let canStart = $derived(detectives.length > 0 && detectives.every((player) => player.ready))
+  let canStart = $derived(detectives.length >= 2 && detectives.every((player) => player.ready))
 
   function applyLobby(nextLobby, version = nextLobby.current_version) {
     if (version < room.current_version) return
