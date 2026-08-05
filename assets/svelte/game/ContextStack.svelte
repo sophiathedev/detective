@@ -1,6 +1,7 @@
 <script>
   let {
     selection = null,
+    suspectSelection = null,
     actionPrompt = null,
     origin = null,
     commandPending = false,
@@ -9,6 +10,8 @@
     connectionOnline = false,
     onConfirmMove = () => {},
     onCancelMove = () => {},
+    onOpenSuspectAction = () => {},
+    onCancelSuspect = () => {},
     onConfirmAction = () => {},
     onCancelAction = () => {},
   } = $props()
@@ -21,10 +24,52 @@
   )
 </script>
 
-{#if selection || actionPrompt || commandError}
+{#if selection || suspectSelection || actionPrompt || commandError}
   <div id="context-stack" class="noir-context-stack">
     {#if commandPending && (selection || actionPrompt)}
       <p class="sr-only" role="status" aria-live="polite">Dispatching action</p>
+    {/if}
+
+    {#if suspectSelection}
+      <article id="suspect-dossier-slip" class="noir-movement-slip noir-paper-sheet" aria-live="polite">
+        <div class="noir-movement-slip-stamp" aria-hidden="true">PERSON</div>
+        <p class="noir-movement-slip-kicker">Authorized field lead</p>
+        <h3 class="noir-action-slip-title">{suspectSelection.suspect.name}</h3>
+        <p class="noir-action-slip-description">
+          {suspectSelection.suspect.occupation ?? "Person of interest"} · {suspectSelection.location.name}
+        </p>
+        <p class="noir-movement-slip-districts">
+          Open the matching folio before spending an action.
+        </p>
+
+        <div class="noir-suspect-slip-controls">
+          {#if suspectSelection.canSearch}
+            <button
+              id="action-open-suspect-search"
+              type="button"
+              class="noir-context-button noir-context-button-confirm"
+              disabled={commandPending || !connectionOnline}
+              onclick={() => onOpenSuspectAction(suspectSelection, "search_suspect")}
+            >Open Search</button>
+          {/if}
+          {#if suspectSelection.canInterrogate}
+            <button
+              id="action-open-suspect-question"
+              type="button"
+              class="noir-context-button noir-context-button-confirm"
+              disabled={commandPending || !connectionOnline}
+              onclick={() => onOpenSuspectAction(suspectSelection, "interrogate")}
+            >Open Question</button>
+          {/if}
+          <button
+            id="action-cancel-suspect"
+            type="button"
+            class="noir-context-button noir-context-button-dismiss"
+            disabled={commandPending}
+            onclick={() => onCancelSuspect(suspectSelection)}
+          >Close file</button>
+        </div>
+      </article>
     {/if}
 
     {#if selection}

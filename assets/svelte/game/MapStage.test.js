@@ -16,6 +16,10 @@ const baseProps = {
   locations: [location],
   detectives: [],
   suspects: [],
+  searchableSuspectIds: [],
+  interrogatableSuspectIds: [],
+  selectedSuspectId: null,
+  suspectInteractionsDisabled: false,
   legalLocationIds: [],
   selectedLocationId: null,
   pendingLocationId: null,
@@ -23,6 +27,7 @@ const baseProps = {
   disabled: false,
   status: "Observing",
   onSelect: vi.fn(),
+  onSelectSuspect: vi.fn(),
 }
 
 describe("MapStage", () => {
@@ -55,7 +60,8 @@ describe("MapStage", () => {
     expect(screen.getByText(/Van Ryder Games/)).toBeInTheDocument()
   })
 
-  it("forwards public suspects to the board", () => {
+  it("forwards authorized suspect interaction to the board", async () => {
+    const onSelectSuspect = vi.fn()
     render(MapStage, {
       ...baseProps,
       suspects: [
@@ -66,9 +72,15 @@ describe("MapStage", () => {
           location_id: "51",
         },
       ],
+      searchableSuspectIds: ["iona-pike"],
+      selectedSuspectId: "iona-pike",
+      onSelectSuspect,
     })
 
-    expect(screen.getByTestId("suspect-standee-iona-pike")).toBeInTheDocument()
+    const standee = screen.getByTestId("suspect-standee-iona-pike")
+    expect(standee).toHaveAttribute("aria-pressed", "true")
+    await fireEvent.click(standee)
+    expect(onSelectSuspect).toHaveBeenCalledWith(expect.objectContaining({ id: "iona-pike" }))
   })
 
   it("zooms inside the contained map viewport", async () => {

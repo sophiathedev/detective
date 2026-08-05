@@ -23,6 +23,7 @@
   let drawerPage = $state(initialPrivate().role === "chisel" ? "chisel" : "search")
   let activeAction = $state(null)
   let mapSelection = $state(null)
+  let mapSuspectSelectionId = $state(null)
   let actionPrompt = $state(null)
   let selectedSuspectId = $state(null)
   let selectedTopicId = $state(null)
@@ -114,6 +115,24 @@
   let interrogatableSuspectIds = $derived(
     new Set(interrogationOptions.map((option) => option.suspect_id)),
   )
+  let mapSuspectSelection = $derived.by(() => {
+    if (!mapSuspectSelectionId) return null
+
+    const suspect = publicState.suspects.find(
+      (candidate) => candidate.id === mapSuspectSelectionId,
+    )
+    const location = publicState.locations.find(
+      (candidate) => candidate.id === suspect?.location_id,
+    )
+    const canSearch =
+      availableActions.has("search_suspect") && searchableSuspectIds.has(mapSuspectSelectionId)
+    const canInterrogate =
+      availableActions.has("interrogate") && interrogatableSuspectIds.has(mapSuspectSelectionId)
+
+    return suspect && location && (canSearch || canInterrogate)
+      ? { suspect, location, canSearch, canInterrogate }
+      : null
+  })
   let selectedInterrogation = $derived(
     interrogationOptions.find((option) => option.suspect_id === selectedSuspectId),
   )
@@ -298,6 +317,13 @@
       activeAction = null
     }
 
+    if (
+      mapSuspectSelectionId &&
+      !(nextState.suspects ?? []).some((suspect) => suspect.id === mapSuspectSelectionId)
+    ) {
+      mapSuspectSelectionId = null
+    }
+
     publicState = nextState
     publicProjectionVersion = nextState.version
     publicProjectionReady = true
@@ -319,6 +345,10 @@
     if (mapSelection && !mapSelectionLegalIn(mapSelection, nextState)) {
       mapSelection = null
       mapIntent = null
+    }
+
+    if (mapSuspectSelectionId && !mapSuspectSelectableIn(mapSuspectSelectionId, nextState)) {
+      mapSuspectSelectionId = null
     }
 
     if (actionPrompt && !nextActions.has(actionPrompt.type)) {
@@ -378,6 +408,19 @@
     return actions.has(selection.type) && destinationIds.has(selection.location.id)
   }
 
+  function mapSuspectSelectableIn(suspectId, state) {
+    const actions = new Set(state.available_actions ?? [])
+    const searchable = new Set(state.searchable_suspect_ids ?? [])
+    const interrogatable = new Set(
+      (state.interrogation_options ?? []).map((option) => option.suspect_id),
+    )
+
+    return (
+      (actions.has("search_suspect") && searchable.has(suspectId)) ||
+      (actions.has("interrogate") && interrogatable.has(suspectId))
+    )
+  }
+
   function selectMapLocation(location) {
     if (commandPending || !controlsReady) return
 
@@ -387,13 +430,49 @@
       availableActions.has("place")
     ) {
       mapSelection = { type: "place", location }
+      mapSuspectSelectionId = null
     } else if (
       activeAction === "move" &&
       moveLocationIds.has(location.id) &&
       availableActions.has("move")
     ) {
       mapSelection = { type: "move", location }
+      mapSuspectSelectionId = null
     }
+  }
+
+  function selectMapSuspect(suspect) {
+    if (commandPending || !controlsReady || activeAction) return
+    if (!mapSuspectSelectableIn(suspect.id, privateState)) return
+
+    selectSuspect(suspect.id)
+    mapSuspectSelectionId = suspect.id
+    mapSelection = null
+    actionPrompt = null
+  }
+
+  function openMapSuspectAction(selection, action) {
+    if (
+      !selection ||
+      selection.suspect.id !== mapSuspectSelectionId ||
+      commandPending ||
+      !controlsReady
+    )
+      return
+
+    const allowed =
+      (action === "search_suspect" && selection.canSearch) ||
+      (action === "interrogate" && selection.canInterrogate)
+    if (!allowed) return
+
+    selectSuspect(selection.suspect.id)
+    mapSuspectSelectionId = null
+    openDrawer(action === "search_suspect" ? "search" : "question")
+  }
+
+  function cancelMapSuspect() {
+    if (commandPending) return
+    mapSuspectSelectionId = null
   }
 
   function chooseActionMode(action) {
@@ -401,6 +480,7 @@
 
     activeAction = activeAction === action ? null : action
     mapSelection = null
+    mapSuspectSelectionId = null
     actionPrompt = null
   }
 
@@ -502,6 +582,7 @@
 
   function handleDockAction(action) {
     const prompt = immediateActionPrompt(action)
+    mapSuspectSelectionId = null
 
     if (action === "search_location" || action === "search_suspect") {
       openDrawer("search")
@@ -765,6 +846,7 @@
     offlineDeadlines = {}
     allPlayersOnline = false
     mapSelection = null
+    mapSuspectSelectionId = null
     mapIntent = null
     activeAction = null
     actionPrompt = null
@@ -779,6 +861,7 @@
 
   function requestProjectionResync() {
     mapSelection = null
+    mapSuspectSelectionId = null
     mapIntent = null
     activeAction = null
     actionPrompt = null
@@ -1084,6 +1167,10 @@
         locations={publicState.locations}
         {detectives}
         suspects={publicState.suspects ?? []}
+        searchableSuspectIds={[...searchableSuspectIds]}
+        interrogatableSuspectIds={[...interrogatableSuspectIds]}
+        selectedSuspectId={mapSuspectSelectionId}
+        suspectInteractionsDisabled={activeAction !== null}
         caseCardSlots={publicState.case_card_slots ?? []}
         legalLocationIds={effectiveLegalLocationIds}
         {selectedLocationId}
@@ -1092,12 +1179,14 @@
         disabled={!controlsReady || commandPending}
         status={mapStatus}
         onSelect={selectMapLocation}
+        onSelectSuspect={selectMapSuspect}
       />
     {/snippet}
 
     {#snippet contextStack()}
       <ContextStack
         selection={mapSelection}
+        suspectSelection={mapSuspectSelection}
         {actionPrompt}
         origin={ownLocation}
         {commandPending}
@@ -1106,6 +1195,8 @@
         connectionOnline={controlsReady}
         onConfirmMove={confirmMapMovement}
         onCancelMove={cancelMapMovement}
+        onOpenSuspectAction={openMapSuspectAction}
+        onCancelSuspect={cancelMapSuspect}
         onConfirmAction={confirmImmediateAction}
         onCancelAction={cancelImmediateAction}
       />

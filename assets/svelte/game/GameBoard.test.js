@@ -25,11 +25,16 @@ const baseProps = {
   locations,
   detectives: [],
   suspects: [],
+  searchableSuspectIds: [],
+  interrogatableSuspectIds: [],
+  selectedSuspectId: null,
+  suspectInteractionsDisabled: false,
   legalLocationIds: ["51"],
   selectedLocationId: null,
   pendingLocationId: null,
   lastTravel: null,
   disabled: false,
+  onSelectSuspect: vi.fn(),
 }
 
 describe("GameBoard", () => {
@@ -155,7 +160,8 @@ describe("GameBoard", () => {
     )
   })
 
-  it("renders revealed suspects as inert standees and separates co-located suspects", () => {
+  it("separates co-located suspects and exposes only authorized standees", async () => {
+    const onSelectSuspect = vi.fn()
     render(GameBoard, {
       ...baseProps,
       detectives: [
@@ -187,6 +193,10 @@ describe("GameBoard", () => {
           location_id: "404",
         },
       ],
+      searchableSuspectIds: ["iona-pike"],
+      interrogatableSuspectIds: ["iona-pike"],
+      selectedSuspectId: "iona-pike",
+      onSelectSuspect,
       onSelect: vi.fn(),
     })
 
@@ -194,15 +204,50 @@ describe("GameBoard", () => {
     const celeste = screen.getByTestId("suspect-standee-celeste-rook")
 
     expect(iona).toHaveAccessibleName(
-      "Iona Pike, array engineer, at L.A. Police Department Headquarters",
+      "Iona Pike, array engineer, at L.A. Police Department Headquarters. Available actions: search and question.",
     )
     expect(celeste).toHaveAccessibleName(
       "Celeste Rook, journalist, at L.A. Police Department Headquarters",
     )
     expect(iona).toHaveAttribute("data-location-id", "51")
+    expect(iona).toHaveAttribute("role", "button")
+    expect(iona).toHaveAttribute("tabindex", "0")
+    expect(iona).toHaveAttribute("aria-pressed", "true")
+    expect(celeste).toHaveAttribute("role", "img")
+    expect(celeste).not.toHaveAttribute("tabindex")
     expect(iona).toHaveStyle({ transform: "translate(482px, 360px)" })
     expect(celeste).toHaveStyle({ transform: "translate(502px, 360px)" })
     expect(iona.getAttribute("style")).not.toEqual(celeste.getAttribute("style"))
     expect(screen.queryByTestId("suspect-standee-off-board")).not.toBeInTheDocument()
+
+    await fireEvent.keyDown(iona, { key: "Escape" })
+    expect(onSelectSuspect).not.toHaveBeenCalled()
+
+    await fireEvent.keyDown(iona, { key: "Enter" })
+    await fireEvent.click(iona)
+    expect(onSelectSuspect).toHaveBeenCalledTimes(2)
+    expect(onSelectSuspect).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: "iona-pike" }),
+    )
+  })
+
+  it("seals suspect interaction while another map mode is active", () => {
+    render(GameBoard, {
+      ...baseProps,
+      suspects: [
+        {
+          id: "iona-pike",
+          name: "Iona Pike",
+          occupation: "array engineer",
+          location_id: "51",
+        },
+      ],
+      searchableSuspectIds: ["iona-pike"],
+      suspectInteractionsDisabled: true,
+    })
+
+    const standee = screen.getByTestId("suspect-standee-iona-pike")
+    expect(standee).toHaveAttribute("role", "img")
+    expect(standee).toHaveAttribute("data-actionable", "false")
   })
 })

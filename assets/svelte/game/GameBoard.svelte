@@ -5,6 +5,10 @@
     locations = [],
     detectives = [],
     suspects = [],
+    searchableSuspectIds = [],
+    interrogatableSuspectIds = [],
+    selectedSuspectId = null,
+    suspectInteractionsDisabled = false,
     caseCardSlots = [],
     legalLocationIds = [],
     selectedLocationId = null,
@@ -12,9 +16,16 @@
     lastTravel = null,
     disabled = false,
     onSelect = () => {},
+    onSelectSuspect = () => {},
   } = $props()
 
   let legalIds = $derived(new Set(disabled ? [] : legalLocationIds))
+  let searchableIds = $derived(
+    new Set(disabled || suspectInteractionsDisabled ? [] : searchableSuspectIds),
+  )
+  let interrogatableIds = $derived(
+    new Set(disabled || suspectInteractionsDisabled ? [] : interrogatableSuspectIds),
+  )
   let legalLocations = $derived(locations.filter((location) => legalIds.has(location.id)))
   let travelPath = $derived.by(() => {
     if (!lastTravel?.from_location_id || !lastTravel?.location_id) return null
@@ -50,6 +61,27 @@
       .map((part) => part[0] ?? "")
       .join("")
       .toUpperCase()
+  }
+
+  function suspectActions(suspect) {
+    return [
+      searchableIds.has(suspect.id) ? "search" : null,
+      interrogatableIds.has(suspect.id) ? "question" : null,
+    ].filter(Boolean)
+  }
+
+  function suspectLabel(suspect, location, actions) {
+    const identity = `${suspect.name}, ${suspect.occupation}, at ${location.name}`
+    return actions.length > 0
+      ? `${identity}. Available actions: ${actions.join(" and ")}.`
+      : identity
+  }
+
+  function selectSuspectStandee(event, suspect, actions) {
+    if (actions.length === 0) return
+    if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return
+    if (event.type === "keydown") event.preventDefault()
+    onSelectSuspect(suspect)
   }
 
   function suspectPlacement(suspect) {
@@ -188,16 +220,35 @@
       {#each suspects as suspect (suspect.id)}
         {@const placement = suspectPlacement(suspect)}
         {#if placement}
+          {@const actions = suspectActions(suspect)}
+          {@const actionable = actions.length > 0}
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
           <g
             id={`suspect-map-standee-${suspect.id}`}
             data-testid={`suspect-standee-${suspect.id}`}
             data-location-id={placement.location.id}
-            class="map-suspect-standee"
+            class={`map-suspect-standee ${actionable ? "map-suspect-standee-actionable" : ""} ${selectedSuspectId === suspect.id ? "map-suspect-standee-selected" : ""}`}
             style={`transform: translate(${placement.x}px, ${placement.y}px);`}
-            role="img"
-            aria-label={`${suspect.name}, ${suspect.occupation}, at ${placement.location.name}`}
+            role={actionable ? "button" : "img"}
+            tabindex={actionable ? "0" : undefined}
+            focusable={actionable ? "true" : "false"}
+            aria-pressed={actionable ? selectedSuspectId === suspect.id : undefined}
+            aria-label={suspectLabel(suspect, placement.location, actions)}
+            data-actionable={actionable}
+            data-selected={selectedSuspectId === suspect.id}
+            onclick={(event) => selectSuspectStandee(event, suspect, actions)}
+            onkeydown={(event) => selectSuspectStandee(event, suspect, actions)}
           >
-            <title>{suspect.name}, {suspect.occupation}, at {placement.location.name}</title>
+            <title>{suspectLabel(suspect, placement.location, actions)}</title>
+            <ellipse
+              cx="0"
+              cy="-3"
+              rx="21"
+              ry="29"
+              class="map-suspect-action-ring"
+              vector-effect="non-scaling-stroke"
+              aria-hidden="true"
+            />
             <rect
               x="-14"
               y="-25"

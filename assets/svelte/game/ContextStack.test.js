@@ -77,6 +77,49 @@ describe("ContextStack", () => {
     expect(onConfirmAction).toHaveBeenCalledWith(prompt)
   })
 
+  it("opens only the server-authorized folios from a suspect slip", async () => {
+    const suspectSelection = {
+      suspect: { id: "iona-pike", name: "Iona Pike", occupation: "array engineer" },
+      location: { id: "51", name: "LAPD Headquarters" },
+      canSearch: true,
+      canInterrogate: true,
+    }
+    const onOpenSuspectAction = vi.fn()
+    const onCancelSuspect = vi.fn()
+
+    render(ContextStack, {
+      selection: null,
+      suspectSelection,
+      commandPending: false,
+      commandError: null,
+      commandStatus: false,
+      connectionOnline: true,
+      onOpenSuspectAction,
+      onCancelSuspect,
+    })
+
+    expect(document.querySelector("#suspect-dossier-slip")).toHaveTextContent(
+      "Iona Pike",
+    )
+    expect(onOpenSuspectAction).not.toHaveBeenCalled()
+
+    await fireEvent.click(screen.getByRole("button", { name: "Open Search" }))
+    await fireEvent.click(screen.getByRole("button", { name: "Open Question" }))
+    await fireEvent.click(screen.getByRole("button", { name: "Close file" }))
+
+    expect(onOpenSuspectAction).toHaveBeenNthCalledWith(
+      1,
+      suspectSelection,
+      "search_suspect",
+    )
+    expect(onOpenSuspectAction).toHaveBeenNthCalledWith(
+      2,
+      suspectSelection,
+      "interrogate",
+    )
+    expect(onCancelSuspect).toHaveBeenCalledWith(suspectSelection)
+  })
+
   it("renders no empty paper without a selection or command message", () => {
     const { container } = render(ContextStack, {
       selection: null,
