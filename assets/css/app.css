@@ -266,6 +266,197 @@
   display: none;
 }
 
+.noir-detective-tray {
+  width: 15rem;
+  overflow: hidden;
+  padding: 0.55rem;
+}
+
+.noir-detective-tray-header,
+.noir-chisel-console-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid rgb(194 163 95 / 0.32);
+  padding: 0.5rem 0.6rem 0.65rem;
+}
+
+.noir-detective-tray-header p,
+.noir-chisel-console-header p {
+  color: var(--noir-gold-500);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.5625rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.noir-detective-tray-header h2 {
+  color: var(--noir-paper-300);
+  font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.noir-detective-tray-list {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+.noir-detective-slot {
+  position: relative;
+  display: flex;
+  min-height: 5.5rem;
+  align-items: center;
+  gap: 0.65rem;
+  overflow: hidden;
+  border: 1px solid rgb(116 96 57 / 0.72);
+  border-radius: 0.45rem;
+  background: rgb(15 13 12 / 0.9);
+  padding: 0.6rem;
+  box-shadow: inset 0 0 1.25rem rgb(0 0 0 / 0.58);
+  transition: border-color 160ms ease, translate 160ms ease;
+}
+
+.noir-detective-slot-active {
+  border-color: var(--noir-gold-500);
+  box-shadow: inset 0.2rem 0 var(--noir-red-500), inset 0 0 1.25rem rgb(0 0 0 / 0.58);
+  translate: 0.15rem 0;
+}
+
+.noir-presence-lamp {
+  position: absolute;
+  right: -0.1rem;
+  bottom: 0;
+  width: 0.65rem;
+  height: 0.65rem;
+  border: 2px solid var(--noir-ebony-900);
+  border-radius: 50%;
+  background: #5e5142;
+}
+
+.noir-presence-lamp-online {
+  background: #61916e;
+  box-shadow: 0 0 0.55rem rgb(97 145 110 / 0.8);
+}
+
+.noir-detective-slot-label,
+.noir-connection-label {
+  color: var(--noir-paper-500);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.5rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.noir-connection-label {
+  max-width: 5.5rem;
+  text-align: right;
+}
+
+.noir-connection-online {
+  color: #8fbd99;
+}
+
+.noir-detective-public-stats,
+.noir-detective-private-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.6rem;
+  margin-top: 0.35rem;
+  color: #b49c78;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.5rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.noir-detective-private-stats {
+  border-top: 1px solid rgb(194 163 95 / 0.25);
+  padding-top: 0.35rem;
+  color: #d46a5e;
+}
+
+.noir-detective-slot-empty {
+  display: flex;
+  width: 100%;
+  min-height: 3.6rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  border: 1px dashed rgb(116 96 57 / 0.65);
+  color: #806b4a;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  text-transform: uppercase;
+}
+
+.noir-detective-slot-empty span {
+  font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
+  font-size: 1.25rem;
+}
+
+.noir-detective-slot-empty small {
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+}
+
+.noir-chisel-console {
+  width: 19rem;
+  overflow: hidden;
+  padding: 0.6rem;
+}
+
+.noir-chisel-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 0.65rem;
+}
+
+.noir-chisel-private-ledger,
+.noir-chisel-sealed-copy {
+  border-top: 1px solid rgb(194 163 95 / 0.28);
+  background: rgb(9 8 7 / 0.45);
+  padding: 0.7rem;
+}
+
+.noir-chisel-response-state,
+.noir-chisel-sealed-copy {
+  color: #d46a5e;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.noir-chisel-private-ledger dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.8rem;
+  margin-top: 0.55rem;
+}
+
+.noir-chisel-private-ledger dl > div {
+  display: flex;
+  gap: 0.25rem;
+  color: var(--noir-paper-300);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.5625rem;
+}
+
+.noir-chisel-private-ledger dd {
+  color: var(--noir-gold-500);
+  font-weight: 600;
+}
+
+.noir-chisel-sealed-copy {
+  color: #9f8967;
+  font-weight: 400;
+}
+
 .noir-wood-nav {
   background-color: var(--noir-ebony-800);
   background-image: url("/images/ui/noir/wood-grain.svg");
