@@ -1676,6 +1676,7 @@
 .map-special-actor {
   transform-box: fill-box;
   transform-origin: center;
+  animation: map-special-actor-arrive 520ms cubic-bezier(0.18, 0.78, 0.22, 1) both;
   filter: drop-shadow(0 4px 3px rgb(28 18 13 / 0.66));
   transition:
     transform 480ms cubic-bezier(0.22, 0.72, 0.24, 1),
@@ -1842,6 +1843,19 @@
   }
 }
 
+@keyframes map-special-actor-arrive {
+  from {
+    opacity: 0;
+    scale: 0.62;
+    rotate: -8deg;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+    rotate: 0deg;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   #game-book-shell *,
   #game-book-shell *::before,
@@ -1870,6 +1884,11 @@
   }
 
   .map-suspect-standee {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .map-special-actor {
     animation: none !important;
     transition: none !important;
   }

@@ -11,12 +11,25 @@ defmodule Detective.Cases.SpecialRules do
   @detective_counts ~w(2 3 4)
   @visibilities ~w(public chisel)
 
+  alias Detective.Cases.BoardCatalog
+
   def validate(case_definition) when is_map(case_definition) do
+    with {:ok, locations} <- BoardCatalog.locations(case_definition["board_id"]) do
+      validate(case_definition, locations)
+    else
+      _error -> {:error, :invalid_special_rules}
+    end
+  end
+
+  def validate(_case_definition), do: {:error, :invalid_special_rules}
+
+  def validate(case_definition, locations)
+      when is_map(case_definition) and is_list(locations) do
     rules = case_definition["special_rules"] || []
 
     with true <- is_list(rules),
          true <- unique_rule_ids?(rules),
-         true <- Enum.all?(rules, &valid_rule?(&1, case_definition)),
+         true <- Enum.all?(rules, &valid_rule?(&1, case_definition, locations)),
          true <- unique_setup_effects?(rules) do
       :ok
     else
@@ -24,7 +37,7 @@ defmodule Detective.Cases.SpecialRules do
     end
   end
 
-  def validate(_case_definition), do: {:error, :invalid_special_rules}
+  def validate(_case_definition, _locations), do: {:error, :invalid_special_rules}
 
   def starting_days(case_definition, detective_count, default_days) do
     case Enum.find(rules(case_definition), &(effect_type(&1) == "starting_days")) do
@@ -69,14 +82,14 @@ defmodule Detective.Cases.SpecialRules do
     end
   end
 
-  defp valid_rule?(rule, case_definition) when is_map(rule) do
+  defp valid_rule?(rule, case_definition, locations) when is_map(rule) do
     is_binary(rule["id"]) and rule["id"] != "" and
       is_binary(rule["title"]) and rule["title"] != "" and
       is_binary(rule["text"]) and rule["text"] != "" and
-      rule["visibility"] in @visibilities and valid_effect?(rule, case_definition)
+      rule["visibility"] in @visibilities and valid_effect?(rule, case_definition, locations)
   end
 
-  defp valid_rule?(_rule, _case_definition), do: false
+  defp valid_rule?(_rule, _case_definition, _locations), do: false
 
   defp valid_effect?(
          %{
@@ -87,7 +100,8 @@ defmodule Detective.Cases.SpecialRules do
              "days_by_detective_count" => days
            }
          },
-         _case_definition
+         _case_definition,
+         _locations
        ) do
     is_map(days) and Enum.sort(Map.keys(days)) == @detective_counts and
       Enum.all?(days, fn {_count, value} -> positive_integer?(value) end)
@@ -98,21 +112,49 @@ defmodule Detective.Cases.SpecialRules do
            "trigger" => "day_started",
            "effect" => %{"type" => "day_reveal", "day" => day} = effect
          },
-         case_definition
+         case_definition,
+         locations
        ) do
     case_card_ids = effect["reveal_case_card_ids"] || []
     suspect_ids = effect["reveal_suspect_ids"] || []
+    actor_updates = effect["special_actor_updates"] || []
     valid_case_card_ids = case_definition |> Map.get("case_cards", []) |> ids()
     valid_suspect_ids = case_definition |> Map.get("suspects", []) |> ids()
+    valid_actor_ids = case_definition |> Map.get("special_actors", []) |> ids()
+    valid_location_ids = ids(locations)
 
     positive_integer?(day) and day > 1 and day <= minimum_starting_days(case_definition) and
       valid_id_list?(case_card_ids) and valid_id_list?(suspect_ids) and
-      case_card_ids ++ suspect_ids != [] and
+      valid_actor_updates?(actor_updates, valid_actor_ids, valid_location_ids) and
+      (case_card_ids ++ suspect_ids != [] or actor_updates != []) and
       MapSet.subset?(MapSet.new(case_card_ids), valid_case_card_ids) and
       MapSet.subset?(MapSet.new(suspect_ids), valid_suspect_ids)
   end
 
-  defp valid_effect?(_rule, _case_definition), do: false
+  defp valid_effect?(_rule, _case_definition, _locations), do: false
+
+  defp valid_actor_updates?(updates, actor_ids, location_ids) when is_list(updates) do
+    update_actor_ids = Enum.map(updates, fn update -> is_map(update) && update["actor_id"] end)
+
+    Enum.uniq(update_actor_ids) == update_actor_ids and
+      Enum.all?(updates, fn
+        update when is_map(update) ->
+          keys = update |> Map.keys() |> Enum.sort()
+          location_id = update["location_id"]
+
+          keys in [
+            ["active", "actor_id", "visible"],
+            ["active", "actor_id", "location_id", "visible"]
+          ] and MapSet.member?(actor_ids, update["actor_id"]) and update["visible"] == true and
+            is_boolean(update["active"]) and
+            (is_nil(location_id) or MapSet.member?(location_ids, location_id))
+
+        _update ->
+          false
+      end)
+  end
+
+  defp valid_actor_updates?(_updates, _actor_ids, _location_ids), do: false
 
   defp unique_rule_ids?(rules) do
     ids = Enum.map(rules, fn rule -> is_map(rule) && rule["id"] end)

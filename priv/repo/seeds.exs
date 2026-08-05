@@ -242,6 +242,26 @@ special_rules = [
     }
   },
   %{
+    "id" => "harbor-tail-spotted",
+    "title" => "A Shadow at the Breakwater",
+    "text" =>
+      "At the start of Day 2, the harbor pilot spots a lookout shadowing the breakwater relay.",
+    "visibility" => "chisel",
+    "trigger" => "day_started",
+    "effect" => %{
+      "type" => "day_reveal",
+      "day" => 2,
+      "special_actor_updates" => [
+        %{
+          "actor_id" => "harbor-tail",
+          "visible" => true,
+          "active" => true,
+          "location_id" => "99"
+        }
+      ]
+    }
+  },
+  %{
     "id" => "breakwater-flare",
     "title" => "Flare Beyond the Breakwater",
     "text" =>
@@ -264,6 +284,8 @@ special_actors = [
     "role" => "counter-surveillance lookout",
     "kind" => "counter_surveillance",
     "location_id" => "99",
+    "initially_visible" => false,
+    "initially_active" => false,
     "blocks" => ["search_location", "search_suspect", "interrogate"],
     "options" => [
       %{
@@ -428,10 +450,11 @@ special_actors = [
         version
 
       case_file ->
-        case Repo.get_by(CaseVersion, case_id: case_file.id, version: 9) do
+        case Repo.get_by(CaseVersion, case_id: case_file.id, version: 11) do
           nil ->
             legacy_version =
-              Repo.get_by(CaseVersion, case_id: case_file.id, version: 8) ||
+              Repo.get_by(CaseVersion, case_id: case_file.id, version: 9) ||
+                Repo.get_by(CaseVersion, case_id: case_file.id, version: 8) ||
                 Repo.get_by(CaseVersion, case_id: case_file.id, version: 7) ||
                 Repo.get_by(CaseVersion, case_id: case_file.id, version: 6) ||
                 Repo.get_by(CaseVersion, case_id: case_file.id, version: 5) ||
@@ -460,7 +483,7 @@ special_actors = [
 
             {:ok, version} =
               Cases.create_version(case_file, %{
-                version: 9,
+                version: 11,
                 content: upgraded_content,
                 published_at: DateTime.utc_now() |> DateTime.truncate(:second)
               })

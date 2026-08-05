@@ -22,7 +22,7 @@ defmodule Detective.Cases.Validator do
          :ok <- ResponseMatrix.validate(case_definition),
          :ok <- SearchDeck.validate(case_definition, locations),
          :ok <- SpecialActors.validate(case_definition, locations),
-         :ok <- SpecialRules.validate(case_definition),
+         :ok <- SpecialRules.validate(case_definition, locations),
          :ok <- AccusationSheet.validate(case_definition) do
       :ok
     end

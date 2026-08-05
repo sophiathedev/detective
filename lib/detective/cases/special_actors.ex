@@ -36,7 +36,9 @@ defmodule Detective.Cases.SpecialActors do
          role: actor["role"],
          kind: actor["kind"],
          location_id: actor["location_id"],
-         active: true,
+         visible: Map.get(actor, "initially_visible", true),
+         active: Map.get(actor, "initially_active", true),
+         interaction_disabled: false,
          blocks: actor["blocks"] || [],
          options: Enum.map(actor["options"], &normalize_option/1),
          used_option_ids: []
@@ -47,6 +49,7 @@ defmodule Detective.Cases.SpecialActors do
   def public_actors(runtime_actors) when is_map(runtime_actors) do
     runtime_actors
     |> Map.values()
+    |> Enum.filter(& &1.visible)
     |> Enum.sort_by(& &1.name)
     |> Enum.map(fn actor ->
       %{
@@ -65,7 +68,7 @@ defmodule Detective.Cases.SpecialActors do
       when is_map(runtime_actors) and is_binary(location_id) do
     runtime_actors
     |> Map.values()
-    |> Enum.filter(&(&1.active and &1.location_id == location_id))
+    |> Enum.filter(&(&1.visible and &1.active and &1.location_id == location_id))
     |> Enum.map(fn actor ->
       options =
         actor.options
@@ -89,7 +92,7 @@ defmodule Detective.Cases.SpecialActors do
 
   def fetch_option(runtime_actors, actor_id, option_id)
       when is_map(runtime_actors) and is_binary(actor_id) and is_binary(option_id) do
-    with %{active: true} = actor <- Map.get(runtime_actors, actor_id),
+    with %{visible: true, active: true} = actor <- Map.get(runtime_actors, actor_id),
          option when is_map(option) <- Enum.find(actor.options, &(&1.id == option_id)) do
       {:ok, actor, option}
     else
@@ -108,7 +111,8 @@ defmodule Detective.Cases.SpecialActors do
   def blocks_action?(runtime_actors, location_id, action)
       when is_map(runtime_actors) and is_binary(location_id) and is_binary(action) do
     Enum.any?(runtime_actors, fn {_id, actor} ->
-      actor.active and actor.location_id == location_id and action in actor.blocks
+      actor.visible and actor.active and actor.location_id == location_id and
+        action in actor.blocks
     end)
   end
 
@@ -124,7 +128,7 @@ defmodule Detective.Cases.SpecialActors do
         end
 
       if Enum.any?(option.effects, &(&1["type"] == "disable_actor")) do
-        %{actor | active: false}
+        %{actor | active: false, interaction_disabled: true}
       else
         actor
       end
@@ -138,6 +142,32 @@ defmodule Detective.Cases.SpecialActors do
     |> Enum.uniq()
   end
 
+  def apply_lifecycle_updates(runtime_actors, updates)
+      when is_map(runtime_actors) and is_list(updates) do
+    Enum.reduce(updates, {runtime_actors, []}, fn update, {actors, public_updates} ->
+      actor = Map.fetch!(actors, update["actor_id"])
+      requested_active = update["active"]
+
+      next_actor = %{
+        actor
+        | visible: true,
+          active: requested_active and not actor.interaction_disabled,
+          location_id: update["location_id"] || actor.location_id
+      }
+
+      public_update = %{
+        id: actor.id,
+        name: actor.name,
+        revealed: not actor.visible,
+        active: next_actor.active,
+        from_location_id: actor.location_id,
+        location_id: next_actor.location_id
+      }
+
+      {Map.put(actors, actor.id, next_actor), public_updates ++ [public_update]}
+    end)
+  end
+
   defp actors(case_definition) do
     case case_definition["special_actors"] do
       nil -> []
@@ -149,10 +179,14 @@ defmodule Detective.Cases.SpecialActors do
   defp valid_actor?(actor, location_ids, case_card_ids) when is_map(actor) do
     blocks = actor["blocks"] || []
     options = actor["options"]
+    initially_visible = Map.get(actor, "initially_visible", true)
+    initially_active = Map.get(actor, "initially_active", true)
 
     non_empty_binary?(actor["id"]) and non_empty_binary?(actor["name"]) and
       non_empty_binary?(actor["role"]) and actor["kind"] in @kinds and
       MapSet.member?(location_ids, actor["location_id"]) and valid_blocks?(blocks) and
+      is_boolean(initially_visible) and is_boolean(initially_active) and
+      (not initially_active or initially_visible) and
       (actor["kind"] != "counter_surveillance" or blocks != []) and
       is_list(options) and options != [] and unique_ids?(options) and
       Enum.all?(options, &valid_option?(&1, case_card_ids))

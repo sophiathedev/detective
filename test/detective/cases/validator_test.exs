@@ -345,6 +345,112 @@ defmodule Detective.Cases.ValidatorTest do
       )
 
     assert {:error, :invalid_special_actors} = Validator.validate(unknown_effect)
+
+    hidden_but_active =
+      put_in(valid, ["special_actors", Access.at(0), "initially_visible"], false)
+
+    assert {:error, :invalid_special_actors} = Validator.validate(hidden_but_active)
+  end
+
+  test "validates day-driven special actor reveal, activation, and movement" do
+    hidden_actor =
+      special_actor()
+      |> Map.put("initially_visible", false)
+      |> Map.put("initially_active", false)
+
+    valid =
+      valid_case()
+      |> Map.put("case_cards", [
+        %{
+          "id" => "sealed-file",
+          "code" => "A",
+          "title" => "Sealed File",
+          "type" => "information",
+          "initially_known" => false
+        }
+      ])
+      |> Map.put("special_actors", [hidden_actor])
+      |> Map.put("special_rules", [
+        %{
+          "id" => "tail-arrives",
+          "title" => "A Tail Appears",
+          "text" => "At the start of Day 2, place the tail at the pier.",
+          "visibility" => "chisel",
+          "trigger" => "day_started",
+          "effect" => %{
+            "type" => "day_reveal",
+            "day" => 2,
+            "special_actor_updates" => [
+              %{
+                "actor_id" => "station-tail",
+                "visible" => true,
+                "active" => true,
+                "location_id" => "96"
+              }
+            ]
+          }
+        }
+      ])
+
+    assert :ok = Validator.validate(valid)
+    assert Enum.map(SpecialRules.day_rules(valid, 2), & &1["id"]) == ["tail-arrives"]
+
+    invalid_actor =
+      put_in(
+        valid,
+        [
+          "special_rules",
+          Access.at(0),
+          "effect",
+          "special_actor_updates",
+          Access.at(0),
+          "actor_id"
+        ],
+        "missing"
+      )
+
+    assert {:error, :invalid_special_rules} = Validator.validate(invalid_actor)
+
+    invalid_location =
+      put_in(
+        valid,
+        [
+          "special_rules",
+          Access.at(0),
+          "effect",
+          "special_actor_updates",
+          Access.at(0),
+          "location_id"
+        ],
+        "404"
+      )
+
+    assert {:error, :invalid_special_rules} = Validator.validate(invalid_location)
+
+    hidden_update =
+      put_in(
+        valid,
+        [
+          "special_rules",
+          Access.at(0),
+          "effect",
+          "special_actor_updates",
+          Access.at(0),
+          "visible"
+        ],
+        false
+      )
+
+    assert {:error, :invalid_special_rules} = Validator.validate(hidden_update)
+
+    malformed_update =
+      put_in(
+        valid,
+        ["special_rules", Access.at(0), "effect", "special_actor_updates"],
+        [nil]
+      )
+
+    assert {:error, :invalid_special_rules} = Validator.validate(malformed_update)
   end
 
   defp valid_case do

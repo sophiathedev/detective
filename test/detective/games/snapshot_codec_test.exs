@@ -65,7 +65,9 @@ defmodule Detective.Games.SnapshotCodecTest do
           role: "counter-surveillance lookout",
           kind: "counter_surveillance",
           location_id: "51",
+          visible: true,
           active: false,
+          interaction_disabled: true,
           blocks: ["search_location"],
           options: [
             %{
@@ -111,6 +113,8 @@ defmodule Detective.Games.SnapshotCodecTest do
     refute restored.players[player_id].solve_token_available
     assert restored.locations["51"].district_ids == ["central_la"]
     refute restored.special_actors["station-tail"].active
+    assert restored.special_actors["station-tail"].visible
+    assert restored.special_actors["station-tail"].interaction_disabled
     assert restored.special_actors["station-tail"].used_option_ids == ["buy-off"]
     assert restored.case_definition["solution"]["suspect_id"] == "secret"
     assert restored.public_case_card_ids == ["public-log"]
@@ -143,6 +147,41 @@ defmodule Detective.Games.SnapshotCodecTest do
 
     assert {:ok, restored} = SnapshotCodec.load(dumped)
     assert restored.special_actors == %{}
+  end
+
+  test "migrates schema version 5 actors as visible" do
+    state = %State{
+      players: %{},
+      locations: %{},
+      suspects: %{},
+      special_actors: %{
+        "tail" => %{
+          id: "tail",
+          name: "Tail",
+          role: "lookout",
+          kind: "counter_surveillance",
+          location_id: "51",
+          visible: true,
+          active: true,
+          interaction_disabled: false,
+          blocks: ["search_location"],
+          options: [],
+          used_option_ids: []
+        }
+      }
+    }
+
+    dumped =
+      state
+      |> SnapshotCodec.dump()
+      |> Map.put("schema_version", 5)
+      |> update_in(["special_actors", "tail"], fn actor ->
+        Map.drop(actor, ["visible", "interaction_disabled"])
+      end)
+
+    assert {:ok, restored} = SnapshotCodec.load(dumped)
+    assert restored.special_actors["tail"].visible
+    refute restored.special_actors["tail"].interaction_disabled
   end
 
   test "round-trips a pending interrogation with string keys" do

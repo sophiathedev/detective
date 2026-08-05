@@ -1254,6 +1254,15 @@
     gameChannel.on("day_advanced", (message) =>
       recordPublicEvent(message, "The investigation advanced one day."),
     )
+    gameChannel.on("special_rule_triggered", (message) => {
+      const actorChanged = message.payload.special_actor_updates?.length > 0
+      recordPublicEvent(
+        message,
+        actorChanged
+          ? "A case-specific figure entered or changed position on the map."
+          : "A case-specific rule changed the investigation.",
+      )
+    })
     gameChannel.on("accusation_opened", (message) =>
       recordAccusationEvent(message, "Time expired. The accusation phase is open."),
     )

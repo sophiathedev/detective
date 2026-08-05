@@ -380,6 +380,16 @@ describe("GameBoard", () => {
 
     const { rerender } = render(GameBoard, {
       ...baseProps,
+      specialActors: [],
+      interactableSpecialActorIds: ["station-tail"],
+      selectedSpecialActorId: "station-tail",
+      onSelectSpecialActor,
+    })
+
+    expect(screen.queryByTestId("special-actor-station-tail")).not.toBeInTheDocument()
+
+    await rerender({
+      ...baseProps,
       specialActors,
       interactableSpecialActorIds: ["station-tail"],
       selectedSpecialActorId: "station-tail",

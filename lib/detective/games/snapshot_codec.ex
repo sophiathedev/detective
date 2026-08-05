@@ -12,7 +12,7 @@ defmodule Detective.Games.SnapshotCodec do
   end
 
   def load(%{"schema_version" => schema_version} = data)
-      when schema_version in [1, 2, 3, 4, @schema_version] do
+      when schema_version in [1, 2, 3, 4, 5, @schema_version] do
     with {:ok, status} <- status(data["status"]),
          {:ok, phase} <- phase(data["phase"]),
          {:ok, paused_from_phase} <- optional_phase(data["paused_from_phase"]),
@@ -173,7 +173,10 @@ defmodule Detective.Games.SnapshotCodec do
          role when is_binary(role) <- actor["role"],
          kind when is_binary(kind) <- actor["kind"],
          location_id when is_binary(location_id) <- actor["location_id"],
+         visible when is_boolean(visible) <- Map.get(actor, "visible", true),
          active when is_boolean(active) <- actor["active"],
+         interaction_disabled when is_boolean(interaction_disabled) <-
+           Map.get(actor, "interaction_disabled", false),
          blocks when is_list(blocks) <- actor["blocks"],
          options when is_list(options) <- actor["options"],
          used_option_ids when is_list(used_option_ids) <- actor["used_option_ids"] do
@@ -184,7 +187,9 @@ defmodule Detective.Games.SnapshotCodec do
          role: role,
          kind: kind,
          location_id: location_id,
+         visible: visible,
          active: active,
+         interaction_disabled: interaction_disabled,
          blocks: blocks,
          options: Enum.map(options, &load_special_option/1),
          used_option_ids: used_option_ids

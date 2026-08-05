@@ -639,6 +639,107 @@ defmodule Detective.Games.EngineTest do
            end)
   end
 
+  test "day rules reveal and move dormant special actors without reviving resolved actors" do
+    lifecycle_rules = [
+      %{
+        "id" => "tail-arrives",
+        "title" => "A Tail Appears",
+        "text" => "At the start of Day 2, place the tail at headquarters.",
+        "visibility" => "chisel",
+        "trigger" => "day_started",
+        "effect" => %{
+          "type" => "day_reveal",
+          "day" => 2,
+          "special_actor_updates" => [
+            %{
+              "actor_id" => "station-tail",
+              "visible" => true,
+              "active" => true,
+              "location_id" => "51"
+            }
+          ]
+        }
+      },
+      %{
+        "id" => "tail-returns",
+        "title" => "The Tail Tries Again",
+        "text" => "At the start of Day 3, reactivate the tail if it remains unresolved.",
+        "visibility" => "chisel",
+        "trigger" => "day_started",
+        "effect" => %{
+          "type" => "day_reveal",
+          "day" => 3,
+          "special_actor_updates" => [
+            %{
+              "actor_id" => "station-tail",
+              "visible" => true,
+              "active" => true,
+              "location_id" => "51"
+            }
+          ]
+        }
+      }
+    ]
+
+    special_case =
+      special_actor_case_definition()
+      |> Map.put("max_days", 3)
+      |> put_in(["special_actors", Access.at(0), "location_id"], "96")
+      |> put_in(["special_actors", Access.at(0), "initially_visible"], false)
+      |> put_in(["special_actors", Access.at(0), "initially_active"], false)
+      |> Map.put("special_rules", lifecycle_rules)
+
+    assert {:ok, initial} = Engine.new(game(), players(), special_case)
+    refute Map.fetch!(initial.special_actors, "station-tail").visible
+    refute Jason.encode!(Public.render(initial)) =~ "Station Tail"
+
+    {:ok, first_placed, _events} =
+      apply_command(initial, "detective-1", :place, %{"location_id" => "51"})
+
+    assert "search_location" in Rules.available_actions(first_placed, user_id("detective-1"))
+
+    refute "interact_special_actor" in Rules.available_actions(
+             first_placed,
+             user_id("detective-1")
+           )
+
+    {:ok, second_turn, _events} = apply_command(first_placed, "detective-1", :end_turn)
+
+    {:ok, second_placed, _events} =
+      apply_command(second_turn, "detective-2", :place, %{"location_id" => "84"})
+
+    assert {:ok, day_two, events} = apply_command(second_placed, "detective-2", :end_turn)
+    arrival = Enum.find(events, &(&1.type == :special_rule_triggered))
+    [arrival_update] = arrival.public_payload.special_actor_updates
+
+    assert arrival_update.revealed
+    assert arrival_update.from_location_id == "96"
+    assert arrival_update.location_id == "51"
+    assert arrival_update.active
+    assert Map.fetch!(day_two.special_actors, "station-tail").visible
+    assert "interact_special_actor" in Rules.available_actions(day_two, user_id("detective-1"))
+    refute "search_location" in Rules.available_actions(day_two, user_id("detective-1"))
+
+    {:ok, resolved, _events} =
+      apply_command(day_two, "detective-1", :interact_special_actor, %{
+        "actor_id" => "station-tail",
+        "option_id" => "buy-off"
+      })
+
+    refute Map.fetch!(resolved.special_actors, "station-tail").active
+    assert Map.fetch!(resolved.special_actors, "station-tail").interaction_disabled
+
+    {:ok, second_day_turn, _events} = apply_command(resolved, "detective-1", :end_turn)
+    assert {:ok, day_three, events} = apply_command(second_day_turn, "detective-2", :end_turn)
+    return_event = Enum.find(events, &(&1.type == :special_rule_triggered))
+    [return_update] = return_event.public_payload.special_actor_updates
+
+    refute return_update.revealed
+    refute return_update.active
+    refute Map.fetch!(day_three.special_actors, "station-tail").active
+    assert Enum.sort(day_three.triggered_special_rule_ids) == ["tail-arrives", "tail-returns"]
+  end
+
   test "discovering a hidden suspect grants an immediate free question or decline" do
     hidden_case =
       case_definition()

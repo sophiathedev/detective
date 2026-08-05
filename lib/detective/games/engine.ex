@@ -1487,6 +1487,12 @@ defmodule Detective.Games.Engine do
       effect = rule["effect"]
       case_card_ids = effect["reveal_case_card_ids"] || []
       suspect_ids = effect["reveal_suspect_ids"] || []
+      actor_updates = effect["special_actor_updates"] || []
+
+      {special_actors, public_actor_updates} =
+        SpecialActors.apply_lifecycle_updates(next_state.special_actors, actor_updates)
+
+      next_state = %{next_state | special_actors: special_actors}
 
       {next_state, revealed_case_card_ids} = reveal_public_case_cards(next_state, case_card_ids)
       {next_state, revealed_suspect_ids} = reveal_public_suspects(next_state, suspect_ids)
@@ -1513,7 +1519,8 @@ defmodule Detective.Games.Engine do
           text: rule["text"],
           day: next_state.day,
           revealed_case_card_codes: case_card_codes(next_state, revealed_case_card_ids),
-          revealed_suspect_ids: revealed_suspect_ids
+          revealed_suspect_ids: revealed_suspect_ids,
+          special_actor_updates: public_actor_updates
         }
       }
 

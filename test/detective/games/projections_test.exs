@@ -141,6 +141,28 @@ defmodule Detective.Games.ProjectionsTest do
       end)
       |> Map.put("special_actors", [actor_definition])
 
+    hidden_case_definition =
+      case_definition
+      |> put_in(["special_actors", Access.at(0), "initially_visible"], false)
+      |> put_in(["special_actors", Access.at(0), "initially_active"], false)
+
+    hidden_state = %{
+      base
+      | case_definition: hidden_case_definition,
+        special_actors: SpecialActors.initialize(hidden_case_definition)
+    }
+
+    hidden_public = Public.render(hidden_state)
+    {:ok, hidden_detective} = Projections.for_user(hidden_state, detective_user_id())
+    {:ok, hidden_chisel} = Projections.for_user(hidden_state, chisel_user_id())
+
+    assert hidden_public.special_actors == []
+    refute Jason.encode!(hidden_public) =~ "Station Tail"
+    assert hidden_detective.private.special_actor_interactions == []
+
+    assert get_in(hidden_chisel.private.casebook, [:special_actors, Access.at(0), "name"]) ==
+             "Station Tail"
+
     state = %{
       base
       | case_definition: case_definition,
