@@ -194,6 +194,7 @@
       interrogationOptions,
       selectedSuspectId,
       selectedTopicId,
+      freeQuestionSuspectId: privateState.free_question_suspect_id ?? null,
       selectedSuspectLeverage,
       spendLeverage,
       selectedResponseId,
@@ -298,6 +299,13 @@
       mapSelection = null
       mapIntent = null
     }
+
+    if (nextState.role === "detective" && nextState.free_question_suspect_id) {
+      prepareQuestionSelection(
+        nextState.interrogation_options ?? [],
+        nextState.free_question_suspect_id,
+      )
+    }
   }
 
   function acceptEvent({ event_id, version }, seenEventIds) {
@@ -313,6 +321,13 @@
     if (!acceptEvent(message, seenPublicEventIds)) return false
 
     lastEvent = description
+    return true
+  }
+
+  function recordQuestionEvent(message, description) {
+    if (!recordPublicEvent(message, description)) return false
+
+    openDrawer("question")
     return true
   }
 
@@ -433,6 +448,7 @@
     if (action === "search_location" || action === "search_suspect") {
       openDrawer("search")
     } else if (action === "interrogate") {
+      prepareQuestionSelection()
       openDrawer("question")
     } else if (action === "accuse" || action === "submit_final_guess") {
       openDrawer("accusation")
@@ -529,6 +545,31 @@
     selectedTopicId =
       interrogationOptions.find((option) => option.suspect_id === suspectId)?.topics[0]?.id ?? null
     spendLeverage = false
+  }
+
+  function prepareQuestionSelection(options = interrogationOptions, preferredSuspectId = null) {
+    const current = options.find((option) => option.suspect_id === selectedSuspectId)
+    const preferred = options.find((option) => option.suspect_id === preferredSuspectId)
+    const interrogation = preferred ?? current ?? options[0]
+
+    if (!interrogation) {
+      selectedSuspectId = null
+      selectedTopicId = null
+      spendLeverage = false
+      return
+    }
+
+    const suspectChanged = selectedSuspectId !== interrogation.suspect_id
+    selectedSuspectId = interrogation.suspect_id
+
+    if (
+      suspectChanged ||
+      !(interrogation.topics ?? []).some((topic) => topic.id === selectedTopicId)
+    ) {
+      selectedTopicId = interrogation.topics[0]?.id ?? null
+    }
+
+    if (suspectChanged) spendLeverage = false
   }
 
   function openDrawer(page) {
@@ -719,34 +760,38 @@
       recordPublicEvent(message, "The immediate question was declined."),
     )
     gameChannel.on("question_allowed", (message) =>
-      recordPublicEvent(message, "The Chisel allowed the question to proceed."),
+      recordQuestionEvent(message, "The Chisel allowed the question to proceed."),
     )
     gameChannel.on("question_blocked", (message) =>
-      recordPublicEvent(message, "The Chisel sent a goon to block the question."),
+      recordQuestionEvent(message, "The Chisel sent a goon to block the question."),
     )
     gameChannel.on("question_abandoned", (message) =>
       recordPublicEvent(message, "The blocked question was abandoned."),
     )
     gameChannel.on("goon_bribed", (message) =>
-      recordPublicEvent(message, "The Detective paid the goon and restored the question."),
+      recordQuestionEvent(message, "The Detective paid the goon and restored the question."),
     )
     gameChannel.on("snitch_decision_recorded", (message) =>
       recordPublicEvent(message, "A facedown Snitch decision was filed."),
     )
     gameChannel.on("snitch_window_closed", (message) =>
-      recordPublicEvent(message, "All Snitch decisions were revealed."),
+      recordQuestionEvent(message, "All Snitch decisions were revealed."),
     )
     gameChannel.on("snitches_resolved", (message) =>
-      recordPublicEvent(message, "The Chisel resolved the revealed Snitch requests."),
+      recordQuestionEvent(message, "The Chisel resolved the revealed Snitch requests."),
     )
     gameChannel.on(
       "interrogation_started",
-      (message) => recordPublicEvent(message, "A suspect was called in for questioning."),
+      (message) => {
+        selectedResponseId = null
+        blockedSnitchPlayerIds = []
+        recordQuestionEvent(message, "A suspect was called in for questioning.")
+      },
     )
     gameChannel.on(
       "response_published",
       (message) =>
-        recordPublicEvent(message, "The suspect's statement was delivered under seal."),
+        recordQuestionEvent(message, "The suspect's statement was delivered under seal."),
     )
     gameChannel.on(
       "response_accepted",

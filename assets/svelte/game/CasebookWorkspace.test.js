@@ -50,6 +50,7 @@ const baseView = {
     interrogationOptions: [],
     selectedSuspectId: null,
     selectedTopicId: null,
+    freeQuestionSuspectId: null,
     selectedSuspectLeverage: 0,
     spendLeverage: false,
     selectedResponseId: null,
@@ -75,6 +76,57 @@ const baseView = {
 }
 
 describe("CasebookWorkspace", () => {
+  it("selects an interrogation subject directly from the Question folio", async () => {
+    const selectSuspect = vi.fn()
+    const view = {
+      ...baseView,
+      question: {
+        ...baseView.question,
+        interrogationOptions: [
+          {
+            suspect_id: "iona-pike",
+            suspect_name: "Iona Pike",
+            topics: [{ id: "signal-log", code: "C", title: "Altered Signal Log" }],
+          },
+        ],
+      },
+    }
+
+    render(CasebookWorkspace, {
+      page: "question",
+      view,
+      actions: { ...noActions, selectSuspect },
+    })
+
+    const subject = document.querySelector("#casebook-question-suspect-iona-pike")
+    expect(subject).toHaveTextContent("Iona Pike")
+
+    await fireEvent.click(subject)
+    expect(selectSuspect).toHaveBeenCalledWith("iona-pike")
+  })
+
+  it("marks an immediate discovered-suspect question as free", () => {
+    const interrogation = {
+      suspect_id: "iona-pike",
+      suspect_name: "Iona Pike",
+      topics: [{ id: "signal-log", code: "C", title: "Altered Signal Log" }],
+    }
+    const view = {
+      ...baseView,
+      question: {
+        ...baseView.question,
+        interrogationOptions: [interrogation],
+        selectedSuspectId: "iona-pike",
+        selectedTopicId: "signal-log",
+        freeQuestionSuspectId: "iona-pike",
+      },
+    }
+
+    render(CasebookWorkspace, { page: "question", view, actions: noActions })
+
+    expect(document.querySelector("#casebook-submit-interrogation")).toHaveTextContent("FREE")
+  })
+
   it("requires confirmation before searching the current location", async () => {
     const submitLocationSearch = vi.fn()
     const view = {

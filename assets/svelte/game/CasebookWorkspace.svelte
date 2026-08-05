@@ -151,6 +151,30 @@
         </div>
       {/if}
 
+      <fieldset id="interrogation-subjects" class="mt-4">
+        <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7b654d]">
+          Suspects at your location
+        </legend>
+        <div class="mt-2 grid gap-2 sm:grid-cols-2">
+          {#each question.interrogationOptions ?? [] as interrogation}
+            <button
+              id={`casebook-question-suspect-${interrogation.suspect_id}`}
+              type="button"
+              aria-pressed={question.selectedSuspectId === interrogation.suspect_id}
+              onclick={() => actions.selectSuspect?.(interrogation.suspect_id)}
+              class={`min-h-12 cursor-pointer border px-3 py-2 text-left transition active:translate-y-px ${question.selectedSuspectId === interrogation.suspect_id ? "border-[#963a31] bg-[#f1e2c4] ring-2 ring-[#a54235]" : "border-[#9f896c] bg-[#e4d6b8] hover:bg-[#ecdec1]"}`}
+            >
+              <span class="block font-serif text-sm font-semibold">
+                {interrogation.suspect_name}
+              </span>
+              <span class="mt-1 block font-mono text-[8px] uppercase tracking-[0.08em] text-[#705b45]">
+                {interrogation.topics?.length ?? 0} known case cards
+              </span>
+            </button>
+          {/each}
+        </div>
+      </fieldset>
+
       {#if selectedInterrogation}
         <div class="mt-4 grid gap-4 sm:grid-cols-[0.8fr_1.2fr]">
           <div class="border-l-2 border-[#9e4035] pl-3">
@@ -181,7 +205,7 @@
         {/if}
 
         <button id="casebook-submit-interrogation" type="button" disabled={!selectedTopic} onclick={() => actions.submitInterrogation?.()} class="mt-4 min-h-11 w-full cursor-pointer bg-[#30261f] px-4 text-left text-sm font-semibold text-[#f5e7c9] transition hover:bg-[#49372a] disabled:cursor-not-allowed disabled:opacity-40">
-          Question suspect <span class="float-right font-mono text-[10px]">{question.pendingPrivate?.free_question_suspect_id ? "FREE" : "1 AP"}</span>
+          Question suspect <span class="float-right font-mono text-[10px]">{question.freeQuestionSuspectId === question.selectedSuspectId ? "FREE" : "1 AP"}</span>
         </button>
       {:else}
         <p class="mt-4 border-l-2 border-[#9e4035] pl-3 text-sm leading-6 text-[#65523f]">Select an authorized suspect from the Search folio. You must share their location.</p>
