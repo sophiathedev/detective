@@ -336,13 +336,17 @@ defmodule Detective.Games do
   def start_game(%Scope{}, _game_id, _command_id, _expected_version, _opts),
     do: {:error, :invalid_command}
 
-  def game_projection(%Scope{user: user} = scope, game_id) do
-    with {:ok, lobby} <- get_lobby(scope, game_id),
-         :ok <- validate_playable_game(lobby),
-         {:ok, state} <- Session.get_state(lobby.id),
+  def game_projection(%Scope{user: user}, game_id) do
+    with {:ok, game_id} <- cast_game_id(game_id),
+         %{id: _id} <- membership_projection(game_id, user.id),
+         {:ok, state} <- Session.get_state(game_id),
          :ok <- validate_playable_state(state),
          {:ok, projection} <- Projections.for_user(state, user.id) do
       {:ok, projection}
+    else
+      :error -> {:error, :invalid_game_id}
+      nil -> {:error, :not_a_member}
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -621,9 +625,6 @@ defmodule Detective.Games do
 
   defp validate_version(%Game{current_version: version}, version), do: :ok
   defp validate_version(%Game{}, _expected_version), do: {:error, :stale_version}
-
-  defp validate_playable_game(%{status: status}) when status in ["active", "paused"], do: :ok
-  defp validate_playable_game(_lobby), do: {:error, :game_not_active}
 
   defp validate_playable_state(%State{status: status}) when status in [:active, :paused], do: :ok
   defp validate_playable_state(%State{}), do: {:error, :game_not_active}

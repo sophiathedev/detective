@@ -8,4 +8,6 @@ Source URL: https://vanrydergames.com/cdn/shop/files/GameBoard_FINAL_069e54c3-34
 
 This asset is used only in a public, non-commercial fan project. This is an unofficial fan project and is not affiliated with or endorsed by Van Ryder Games.
 
+The runtime WebP is a quality-95 delivery derivative of the recorded PNG source. The original PNG remains the provenance and fidelity reference.
+
 Before any future monetization, replace this asset or obtain the necessary permission from the rights holder.

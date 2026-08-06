@@ -648,6 +648,44 @@ defmodule Detective.Games.RuntimeTest do
              Games.game_projection(Scope.for_user(host), game.id)
   end
 
+  test "game projection authorizes membership with one database query" do
+    %{host: host, game: game, version: version} = ready_game()
+
+    assert {:ok, _result} =
+             Games.start_game(
+               Scope.for_user(host),
+               game.id,
+               Ecto.UUID.generate(),
+               version
+             )
+
+    {:ok, session_pid} = SessionSupervisor.ensure_session(game.id)
+    _state = :sys.get_state(session_pid)
+
+    handler_id = {__MODULE__, :projection_query_count, make_ref()}
+    test_pid = self()
+
+    :ok =
+      :telemetry.attach(
+        handler_id,
+        [:detective, :repo, :query],
+        fn _event, _measurements, _metadata, pid -> send(pid, :projection_repo_query) end,
+        test_pid
+      )
+
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+
+    assert {:ok, projection} = Games.game_projection(Scope.for_user(host), game.id)
+    assert projection.public.game_id == game.id
+    assert_receive :projection_repo_query
+    refute_receive :projection_repo_query
+
+    outsider = user_fixture()
+
+    assert {:error, :not_a_member} =
+             Games.game_projection(Scope.for_user(outsider), game.id)
+  end
+
   test "the multi-Detective Snitch phase persists, restores, and delivers the final response" do
     host = user_fixture()
     first = user_fixture()

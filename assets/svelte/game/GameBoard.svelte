@@ -237,7 +237,7 @@
 
     <image
       data-testid="official-board-image"
-      href="/images/maps/dcoa/game-board-final.png"
+      href="/images/maps/dcoa/game-board-final-v1.webp"
       width="1000"
       height="636"
       filter="url(#board-ink)"

@@ -134,7 +134,7 @@ describe("GameBoard", () => {
     expect(screen.getByTestId("game-map")).toHaveAttribute("viewBox", "0 0 1000 636")
     expect(screen.getByTestId("official-board-image")).toHaveAttribute(
       "href",
-      "/images/maps/dcoa/game-board-final.png",
+      "/images/maps/dcoa/game-board-final-v1.webp",
     )
     expect(screen.getByTestId("map-hotspot-48")).toHaveAttribute("data-selected", "true")
     expect(screen.getByTestId("map-hotspot-51")).toHaveAttribute("aria-busy", "true")

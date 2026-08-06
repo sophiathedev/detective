@@ -10,5 +10,15 @@
   "downloaded_at": "2026-08-04",
   "sha256": "9cb4b980b6b5a4567315aca2ab82e276f50dc403febcabd806e249672a74c61b",
   "width": 1000,
-  "height": 636
+  "height": 636,
+  "runtime_derivative": {
+    "path": "/images/maps/dcoa/game-board-final-v1.webp",
+    "format": "webp",
+    "quality": 95,
+    "encoder": "cwebp -m 6 -q 95 -sharp_yuv",
+    "sha256": "cf4312ced0454aa116b44044e50e0f9075e9f8fe9fe7868bfda845689c3eec87",
+    "bytes": 347252,
+    "width": 1000,
+    "height": 636
+  }
 }
