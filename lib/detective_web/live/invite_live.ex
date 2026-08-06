@@ -11,7 +11,7 @@ defmodule DetectiveWeb.InviteLive do
       {:ok, invite} ->
         {:ok,
          assign(socket,
-           page_title: "Game invitation",
+           page_title: gettext("Game invitation"),
            invite: invite,
            invite_token: token,
            error: nil
@@ -20,7 +20,7 @@ defmodule DetectiveWeb.InviteLive do
       {:error, reason} ->
         {:ok,
          assign(socket,
-           page_title: "Game invitation",
+           page_title: gettext("Game invitation"),
            invite: nil,
            invite_token: token,
            error: error_message(reason)
@@ -52,7 +52,7 @@ defmodule DetectiveWeb.InviteLive do
       <.svelte
         id="invite-frontend"
         name="Invite"
-        props={%{invite: @invite, error: @error}}
+        props={%{invite: @invite, error: @error, locale: @locale}}
         socket={@socket}
       />
     </Layouts.app>
@@ -69,9 +69,9 @@ defmodule DetectiveWeb.InviteLive do
               :invite_exhausted,
               :game_not_waiting
             ],
-       do: "This invitation is no longer available."
+       do: gettext("This invitation is no longer available.")
 
-  defp error_message(:room_full), do: "This room is full."
-  defp error_message(:removed_from_game), do: "You cannot join this room."
-  defp error_message(_reason), do: "Unable to join this room."
+  defp error_message(:room_full), do: gettext("This room is full.")
+  defp error_message(:removed_from_game), do: gettext("You cannot join this room.")
+  defp error_message(_reason), do: gettext("Unable to join this room.")
 end

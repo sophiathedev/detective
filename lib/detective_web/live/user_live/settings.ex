@@ -19,16 +19,16 @@ defmodule DetectiveWeb.UserLive.Settings do
           class="noir-paper-sheet mx-auto max-w-3xl p-6 sm:p-10"
         >
           <p class="font-mono text-xs uppercase tracking-[0.18em] text-[var(--noir-red-700)]">
-            Investigator record
+            {gettext("Investigator record")}
           </p>
           <h1
             id="settings-title"
             class="mt-3 font-serif text-4xl font-semibold text-[var(--noir-ink-900)]"
           >
-            Account settings
+            {gettext("Account settings")}
           </h1>
           <p class="mt-3 text-sm leading-6 text-[#66513c]">
-            Manage your public identity, private email address, and password.
+            {gettext("Manage your public identity, private email address, and password.")}
           </p>
 
           <.form
@@ -38,19 +38,19 @@ defmodule DetectiveWeb.UserLive.Settings do
             phx-change="validate_profile"
             class="mt-8 border-t border-[var(--noir-paper-500)] pt-7"
           >
-            <h2 class="font-serif text-xl font-semibold">Public identity</h2>
+            <h2 class="font-serif text-xl font-semibold">{gettext("Public identity")}</h2>
             <.input
               field={@profile_form[:display_name]}
               type="text"
-              label="Display name"
+              label={gettext("Display name")}
               autocomplete="name"
               required
             />
             <.button
               variant="primary"
-              phx-disable-with="Saving..."
+              phx-disable-with={gettext("Saving...")}
               class="noir-physical-button px-5 text-sm font-semibold"
-            >Save Profile</.button>
+            >{gettext("Save Profile")}</.button>
           </.form>
 
           <.form
@@ -60,20 +60,20 @@ defmodule DetectiveWeb.UserLive.Settings do
             phx-change="validate_email"
             class="mt-8 border-t border-[var(--noir-paper-500)] pt-7"
           >
-            <h2 class="font-serif text-xl font-semibold">Secure correspondence</h2>
+            <h2 class="font-serif text-xl font-semibold">{gettext("Secure correspondence")}</h2>
             <.input
               field={@email_form[:email]}
               type="email"
-              label="Email"
+              label={gettext("Email")}
               autocomplete="username"
               spellcheck="false"
               required
             />
             <.button
               variant="primary"
-              phx-disable-with="Changing..."
+              phx-disable-with={gettext("Changing...")}
               class="noir-physical-button px-5 text-sm font-semibold"
-            >Change Email</.button>
+            >{gettext("Change Email")}</.button>
           </.form>
 
           <.form
@@ -86,7 +86,7 @@ defmodule DetectiveWeb.UserLive.Settings do
             phx-trigger-action={@trigger_submit}
             class="mt-8 border-t border-[var(--noir-paper-500)] pt-7"
           >
-            <h2 class="font-serif text-xl font-semibold">Password cipher</h2>
+            <h2 class="font-serif text-xl font-semibold">{gettext("Password cipher")}</h2>
             <input
               name={@password_form[:email].name}
               type="hidden"
@@ -97,7 +97,7 @@ defmodule DetectiveWeb.UserLive.Settings do
             <.input
               field={@password_form[:password]}
               type="password"
-              label="New password"
+              label={gettext("New password")}
               autocomplete="new-password"
               spellcheck="false"
               required
@@ -105,16 +105,16 @@ defmodule DetectiveWeb.UserLive.Settings do
             <.input
               field={@password_form[:password_confirmation]}
               type="password"
-              label="Confirm new password"
+              label={gettext("Confirm new password")}
               autocomplete="new-password"
               spellcheck="false"
             />
             <.button
               variant="primary"
-              phx-disable-with="Saving..."
+              phx-disable-with={gettext("Saving...")}
               class="noir-physical-button px-5 text-sm font-semibold"
             >
-              Save Password
+              {gettext("Save Password")}
             </.button>
           </.form>
         </div>
@@ -128,10 +128,10 @@ defmodule DetectiveWeb.UserLive.Settings do
     socket =
       case Accounts.update_user_email(socket.assigns.current_scope.user, token) do
         {:ok, _user} ->
-          put_flash(socket, :info, "Email changed successfully.")
+          put_flash(socket, :info, gettext("Email changed successfully."))
 
         {:error, _} ->
-          put_flash(socket, :error, "Email change link is invalid or it has expired.")
+          put_flash(socket, :error, gettext("Email change link is invalid or it has expired."))
       end
 
     {:ok, push_navigate(socket, to: ~p"/users/settings")}
@@ -172,7 +172,7 @@ defmodule DetectiveWeb.UserLive.Settings do
          socket
          |> assign(:current_scope, Scope.for_user(user))
          |> assign(:profile_form, to_form(Accounts.change_user_profile(user)))
-         |> put_flash(:info, "Profile updated successfully.")}
+         |> put_flash(:info, gettext("Profile updated successfully."))}
 
       {:error, changeset} ->
         {:noreply, assign(socket, profile_form: to_form(changeset, action: :update))}
@@ -204,7 +204,7 @@ defmodule DetectiveWeb.UserLive.Settings do
           &url(~p"/users/settings/confirm-email/#{&1}")
         )
 
-        info = "A link to confirm your email change has been sent to the new address."
+        info = gettext("A link to confirm your email change has been sent to the new address.")
         {:noreply, socket |> put_flash(:info, info)}
 
       changeset ->

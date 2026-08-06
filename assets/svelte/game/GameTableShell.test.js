@@ -27,6 +27,7 @@ describe("GameTableShell", () => {
       contextStack: snippet("context"),
       actionRail: snippet("actions"),
       overlay: snippet("overlay"),
+      csrfToken: "test-csrf-token",
     })
 
     expect(document.querySelector("#game-table-shell.noir-game-table")).toBeInTheDocument()
@@ -52,6 +53,23 @@ describe("GameTableShell", () => {
     expect(document.querySelector("#game-account-log-out")).toHaveAttribute(
       "data-to",
       "/users/log-out",
+    )
+    expect(document.querySelector("#game-account-log-out")).toHaveAttribute(
+      "data-csrf",
+      "test-csrf-token",
+    )
+    expect(document.querySelector("#game-locale-en")).toHaveAttribute("aria-current", "true")
+    expect(document.querySelector("#game-locale-vi")).toHaveAttribute(
+      "data-method",
+      "post",
+    )
+    expect(document.querySelector("#game-locale-vi")).toHaveAttribute(
+      "data-csrf",
+      "test-csrf-token",
+    )
+    expect(document.querySelector("#game-locale-vi")).toHaveAttribute(
+      "data-to",
+      "/locale/vi?return_to=%2Fdashboard",
     )
   })
 

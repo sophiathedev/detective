@@ -1,0 +1,428 @@
+msgid ""
+msgstr ""
+"Language: vi\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: lib/detective_web/live/game_new_live.ex:127
+#, elixir-autogen, elixir-format
+msgid "%{title} (version %{version})"
+msgstr "%{title} (phiên bản %{version})"
+
+#: lib/detective_web/live/user_live/settings.ex:207
+#, elixir-autogen, elixir-format
+msgid "A link to confirm your email change has been sent to the new address."
+msgstr "Liên kết xác nhận đổi email đã được gửi đến địa chỉ mới."
+
+#: lib/detective_web/components/layouts/root.html.heex:18
+#, elixir-autogen, elixir-format
+msgid "Account"
+msgstr "Tài khoản"
+
+#: lib/detective_web/live/user_live/settings.ex:28
+#, elixir-autogen, elixir-format
+msgid "Account settings"
+msgstr "Cài đặt tài khoản"
+
+#: lib/detective_web/components/core_components.ex:391
+#, elixir-autogen, elixir-format
+msgid "Actions"
+msgstr "Hành động"
+
+#: lib/detective_web/live/user_live/registration.ex:29
+#, elixir-autogen, elixir-format
+msgid "Already registered?"
+msgstr "Đã đăng ký?"
+
+#: lib/detective_web/live/user_live/registration.ex:106
+#, elixir-autogen, elixir-format
+msgid "An email was sent to %{email}, please access it to confirm your account."
+msgstr "Email đã được gửi đến %{email}, vui lòng mở email để xác nhận tài khoản."
+
+#: lib/detective_web/components/layouts.ex:73
+#: lib/detective_web/components/layouts.ex:88
+#, elixir-autogen, elixir-format
+msgid "Attempting to reconnect"
+msgstr "Đang thử kết nối lại"
+
+#: lib/detective_web/live/game_live.ex:12
+#, elixir-autogen, elixir-format
+msgid "Casebook"
+msgstr "Sổ vụ án"
+
+#: lib/detective_web/live/user_live/settings.ex:74
+#, elixir-autogen, elixir-format
+msgid "Changing..."
+msgstr "Đang thay đổi..."
+
+#: lib/detective_web/live/game_new_live.ex:75
+#, elixir-autogen, elixir-format
+msgid "Choose a valid invitation expiry."
+msgstr "Hãy chọn thời hạn thư mời hợp lệ."
+
+#: lib/detective_web/live/user_live/confirmation.ex:54
+#, elixir-autogen, elixir-format
+msgid "Confirm and log in only this time"
+msgstr "Xác nhận và chỉ đăng nhập lần này"
+
+#: lib/detective_web/live/user_live/confirmation.ex:48
+#, elixir-autogen, elixir-format
+msgid "Confirm and stay logged in"
+msgstr "Xác nhận và duy trì đăng nhập"
+
+#: lib/detective_web/live/user_live/settings.ex:108
+#, elixir-autogen, elixir-format
+msgid "Confirm new password"
+msgstr "Xác nhận mật khẩu mới"
+
+#: lib/detective_web/live/user_live/confirmation.ex:28
+#, elixir-autogen, elixir-format
+msgid "Confirm this sealed link to finish opening your investigator record."
+msgstr "Xác nhận liên kết niêm phong này để hoàn tất hồ sơ điều tra viên."
+
+#: lib/detective_web/live/user_live/confirmation.ex:45
+#: lib/detective_web/live/user_live/confirmation.ex:51
+#, elixir-autogen, elixir-format
+msgid "Confirming..."
+msgstr "Đang xác nhận..."
+
+#: lib/detective_web/live/user_live/registration.ex:68
+#, elixir-autogen, elixir-format
+msgid "Create an account"
+msgstr "Tạo tài khoản"
+
+#: lib/detective_web/live/game_new_live.ex:18
+#, elixir-autogen, elixir-format
+msgid "Create game"
+msgstr "Tạo ván chơi"
+
+#: lib/detective_web/live/user_live/registration.ex:65
+#, elixir-autogen, elixir-format
+msgid "Creating account..."
+msgstr "Đang tạo tài khoản..."
+
+#: lib/detective_web/components/layouts/root.html.heex:71
+#: lib/detective_web/live/dashboard_live.ex:27
+#, elixir-autogen, elixir-format
+msgid "Dashboard"
+msgstr "Tủ hồ sơ"
+
+#: lib/detective_web/live/user_live/registration.ex:49
+#: lib/detective_web/live/user_live/settings.ex:45
+#, elixir-autogen, elixir-format
+msgid "Display name"
+msgstr "Tên hiển thị"
+
+#: lib/detective_web/live/user_live/login.ex:59
+#: lib/detective_web/live/user_live/login.ex:87
+#: lib/detective_web/live/user_live/registration.ex:57
+#: lib/detective_web/live/user_live/settings.ex:67
+#, elixir-autogen, elixir-format
+msgid "Email"
+msgstr "Email"
+
+#: lib/detective_web/live/user_live/settings.ex:134
+#, elixir-autogen, elixir-format
+msgid "Email change link is invalid or it has expired."
+msgstr "Liên kết đổi email không hợp lệ hoặc đã hết hạn."
+
+#: lib/detective_web/live/user_live/settings.ex:131
+#, elixir-autogen, elixir-format
+msgid "Email changed successfully."
+msgstr "Đã đổi email thành công."
+
+#: lib/detective_web/live/invite_live.ex:14
+#: lib/detective_web/live/invite_live.ex:23
+#, elixir-autogen, elixir-format
+msgid "Game invitation"
+msgstr "Thư mời ván chơi"
+
+#: lib/detective_web/live/user_live/login.ex:13
+#, elixir-autogen, elixir-format
+msgid "Identity file"
+msgstr "Hồ sơ định danh"
+
+#: lib/detective_web/live/user_live/confirmation.ex:19
+#, elixir-autogen, elixir-format
+msgid "Identity verification"
+msgstr "Xác minh danh tính"
+
+#: lib/detective_web/live/user_live/login.ex:142
+#, elixir-autogen, elixir-format
+msgid "If your email is in our system, you will receive instructions for logging in shortly."
+msgstr "Nếu email có trong hệ thống, bạn sẽ sớm nhận được hướng dẫn đăng nhập."
+
+#: lib/detective_web/controllers/user_session_controller.ex:43
+#, elixir-autogen, elixir-format
+msgid "Invalid email or password"
+msgstr "Email hoặc mật khẩu không hợp lệ"
+
+#: lib/detective_web/live/user_live/settings.ex:22
+#, elixir-autogen, elixir-format
+msgid "Investigator record"
+msgstr "Hồ sơ điều tra viên"
+
+#: lib/detective_web/live/user_live/confirmation.ex:83
+#, elixir-autogen, elixir-format
+msgid "Keep me logged in on this device"
+msgstr "Duy trì đăng nhập trên thiết bị này"
+
+#: lib/detective_web/components/layouts/root.html.heex:30
+#, elixir-autogen, elixir-format
+msgid "Language"
+msgstr "Ngôn ngữ"
+
+#: lib/detective_web/components/layouts/root.html.heex:91
+#: lib/detective_web/live/user_live/confirmation.ex:74
+#: lib/detective_web/live/user_live/login.ex:19
+#: lib/detective_web/live/user_live/registration.ex:34
+#, elixir-autogen, elixir-format
+msgid "Log in"
+msgstr "Đăng nhập"
+
+#: lib/detective_web/live/user_live/login.ex:105
+#, elixir-autogen, elixir-format
+msgid "Log in and stay logged in"
+msgstr "Đăng nhập và duy trì phiên"
+
+#: lib/detective_web/live/user_live/login.ex:108
+#, elixir-autogen, elixir-format
+msgid "Log in only this time"
+msgstr "Chỉ đăng nhập lần này"
+
+#: lib/detective_web/live/user_live/login.ex:66
+#, elixir-autogen, elixir-format
+msgid "Log in with email"
+msgstr "Đăng nhập bằng email"
+
+#: lib/detective_web/live/user_live/confirmation.ex:89
+#, elixir-autogen, elixir-format
+msgid "Log me in only this time"
+msgstr "Chỉ đăng nhập lần này"
+
+#: lib/detective_web/components/layouts/root.html.heex:81
+#, elixir-autogen, elixir-format
+msgid "Log out"
+msgstr "Đăng xuất"
+
+#: lib/detective_web/controllers/user_session_controller.ex:64
+#, elixir-autogen, elixir-format
+msgid "Logged out successfully."
+msgstr "Đã đăng xuất thành công."
+
+#: lib/detective_web/live/user_live/confirmation.ex:71
+#: lib/detective_web/live/user_live/confirmation.ex:80
+#: lib/detective_web/live/user_live/confirmation.ex:86
+#, elixir-autogen, elixir-format
+msgid "Logging in..."
+msgstr "Đang đăng nhập..."
+
+#: lib/detective_web/live/user_live/confirmation.ex:116
+#, elixir-autogen, elixir-format
+msgid "Magic link is invalid or it has expired."
+msgstr "Liên kết đăng nhập không hợp lệ hoặc đã hết hạn."
+
+#: lib/detective_web/live/user_live/settings.ex:31
+#, elixir-autogen, elixir-format
+msgid "Manage your public identity, private email address, and password."
+msgstr "Quản lý danh tính công khai, địa chỉ email riêng và mật khẩu của bạn."
+
+#: lib/detective_web/live/user_live/registration.ex:20
+#, elixir-autogen, elixir-format
+msgid "New investigator record"
+msgstr "Hồ sơ điều tra viên mới"
+
+#: lib/detective_web/live/user_live/settings.ex:100
+#, elixir-autogen, elixir-format
+msgid "New password"
+msgstr "Mật khẩu mới"
+
+#: lib/detective_web/live/user_live/login.ex:95
+#, elixir-autogen, elixir-format
+msgid "Password"
+msgstr "Mật khẩu"
+
+#: lib/detective_web/live/user_live/settings.ex:89
+#, elixir-autogen, elixir-format
+msgid "Password cipher"
+msgstr "Mật mã truy cập"
+
+#: lib/detective_web/controllers/user_session_controller.ex:59
+#, elixir-autogen, elixir-format
+msgid "Password updated successfully!"
+msgstr "Đã cập nhật mật khẩu thành công!"
+
+#: lib/detective_web/live/user_live/settings.ex:175
+#, elixir-autogen, elixir-format
+msgid "Profile updated successfully."
+msgstr "Đã cập nhật hồ sơ thành công."
+
+#: lib/detective_web/live/user_live/settings.ex:41
+#, elixir-autogen, elixir-format
+msgid "Public identity"
+msgstr "Danh tính công khai"
+
+#: lib/detective_web/components/layouts/root.html.heex:87
+#, elixir-autogen, elixir-format
+msgid "Register"
+msgstr "Đăng ký"
+
+#: lib/detective_web/live/user_live/registration.ex:26
+#, elixir-autogen, elixir-format
+msgid "Register an investigator"
+msgstr "Đăng ký điều tra viên"
+
+#: lib/detective_web/live/user_live/settings.ex:51
+#: lib/detective_web/live/user_live/settings.ex:114
+#, elixir-autogen, elixir-format
+msgid "Saving..."
+msgstr "Đang lưu..."
+
+#: lib/detective_web/live/user_live/settings.ex:63
+#, elixir-autogen, elixir-format
+msgid "Secure correspondence"
+msgstr "Liên lạc bảo mật"
+
+#: lib/detective_web/components/layouts/root.html.heex:75
+#, elixir-autogen, elixir-format
+msgid "Settings"
+msgstr "Cài đặt"
+
+#: lib/detective_web/live/user_live/login.ex:29
+#, elixir-autogen, elixir-format
+msgid "Sign up"
+msgstr "Lập hồ sơ"
+
+#: lib/detective_web/components/layouts.ex:80
+#, elixir-autogen, elixir-format
+msgid "Something went wrong!"
+msgstr "Đã xảy ra lỗi!"
+
+#: lib/detective_web/live/game_new_live.ex:68
+#, elixir-autogen, elixir-format
+msgid "That case is no longer available. Choose another published case."
+msgstr "Vụ án đó không còn khả dụng. Hãy chọn một vụ án đã phát hành khác."
+
+#: lib/detective_web/controllers/user_session_controller.ex:27
+#, elixir-autogen, elixir-format
+msgid "The link is invalid or it has expired."
+msgstr "Liên kết không hợp lệ hoặc đã hết hạn."
+
+#: lib/detective_web/live/game_live.ex:21
+#, elixir-autogen, elixir-format
+msgid "This casebook is unavailable."
+msgstr "Sổ vụ án này không khả dụng."
+
+#: lib/detective_web/live/invite_live.ex:72
+#, elixir-autogen, elixir-format
+msgid "This invitation is no longer available."
+msgstr "Thư mời này không còn khả dụng."
+
+#: lib/detective_web/live/invite_live.ex:74
+#, elixir-autogen, elixir-format
+msgid "This room is full."
+msgstr "Phòng này đã đầy."
+
+#: lib/detective_web/live/lobby_live.ex:19
+#, elixir-autogen, elixir-format
+msgid "This room is unavailable."
+msgstr "Phòng này không khả dụng."
+
+#: lib/detective_web/live/user_live/confirmation.ex:98
+#, elixir-autogen, elixir-format
+msgid "Tip: If you prefer passwords, you can enable them in the user settings."
+msgstr "Mẹo: Nếu muốn dùng mật khẩu, bạn có thể bật trong phần cài đặt tài khoản."
+
+#: lib/detective_web/live/user_live/login.ex:41
+#, elixir-autogen, elixir-format
+msgid "To see sent emails, visit"
+msgstr "Để xem email đã gửi, hãy mở"
+
+#: lib/detective_web/live/invite_live.ex:76
+#, elixir-autogen, elixir-format
+msgid "Unable to join this room."
+msgstr "Không thể tham gia phòng này."
+
+#: lib/detective_web/controllers/user_session_controller.ex:8
+#, elixir-autogen, elixir-format
+msgid "User confirmed successfully."
+msgstr "Đã xác nhận người dùng thành công."
+
+#: lib/detective_web/components/layouts.ex:65
+#, elixir-autogen, elixir-format
+msgid "We can't find the internet"
+msgstr "Không tìm thấy kết nối mạng"
+
+#: lib/detective_web/live/user_live/confirmation.ex:25
+#, elixir-autogen, elixir-format
+msgid "Welcome %{email}"
+msgstr "Chào mừng %{email}"
+
+#: lib/detective_web/controllers/user_session_controller.ex:12
+#, elixir-autogen, elixir-format
+msgid "Welcome back!"
+msgstr "Chào mừng trở lại!"
+
+#: lib/detective_web/live/user_live/login.ex:39
+#, elixir-autogen, elixir-format
+msgid "You are running the local mail adapter."
+msgstr "Bạn đang dùng bộ chuyển thư cục bộ."
+
+#: lib/detective_web/live/invite_live.ex:75
+#, elixir-autogen, elixir-format
+msgid "You cannot join this room."
+msgstr "Bạn không thể tham gia phòng này."
+
+#: lib/detective_web/live/user_live/login.ex:23
+#, elixir-autogen, elixir-format
+msgid "You need to reauthenticate to perform sensitive actions on your account."
+msgstr "Bạn cần xác thực lại để thực hiện thao tác nhạy cảm trên tài khoản."
+
+#: lib/detective_web/live/user_live/registration.ex:72
+#, elixir-autogen, elixir-format
+msgid "Your display name is public inside a room. Your email remains account-only."
+msgstr "Tên hiển thị của bạn được công khai trong phòng. Email chỉ dùng cho tài khoản."
+
+#: lib/detective_web/components/core_components.ex:77
+#, elixir-autogen, elixir-format
+msgid "close"
+msgstr "đóng"
+
+#: lib/detective_web/live/user_live/login.ex:29
+#, elixir-autogen, elixir-format
+msgid "for an account now."
+msgstr "ngay."
+
+#: lib/detective_web/live/user_live/login.ex:72
+#, elixir-autogen, elixir-format
+msgid "or"
+msgstr "hoặc"
+
+#: lib/detective_web/live/user_live/login.ex:42
+#, elixir-autogen, elixir-format
+msgid "the mailbox page"
+msgstr "trang hộp thư"
+
+#: lib/detective_web/live/user_live/registration.ex:36
+#, elixir-autogen, elixir-format
+msgid "to reopen your file."
+msgstr "để mở lại hồ sơ của bạn."
+
+#: lib/detective_web/live/user_live/login.ex:25
+#, elixir-autogen, elixir-format
+msgid "Don't have an account?"
+msgstr "Chưa có hồ sơ điều tra viên?"
+
+#: lib/detective_web/live/user_live/settings.ex:76
+#, elixir-autogen, elixir-format
+msgid "Change Email"
+msgstr "Đổi email"
+
+#: lib/detective_web/live/user_live/settings.ex:117
+#, elixir-autogen, elixir-format
+msgid "Save Password"
+msgstr "Lưu mật khẩu"
+
+#: lib/detective_web/live/user_live/settings.ex:53
+#, elixir-autogen, elixir-format
+msgid "Save Profile"
+msgstr "Lưu hồ sơ"

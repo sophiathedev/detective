@@ -17,7 +17,7 @@ defmodule DetectiveWeb.HomeLive do
       <.svelte
         id="home-frontend"
         name="Home"
-        props={%{signed_in: @signed_in}}
+        props={%{signed_in: @signed_in, locale: @locale}}
         socket={@socket}
       />
     </Layouts.app>

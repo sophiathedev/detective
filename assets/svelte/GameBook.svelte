@@ -11,8 +11,19 @@
   import PauseCurtain from "./game/PauseCurtain.svelte"
   import { buildImmediateActionPrompt } from "./game/actionPrompts"
   import { caseCardCodeFromPrivateEvent } from "./game/caseCardFocus"
+  import { directMapLocationIds, directMapMovementType } from "./game/mapMovement"
+  import { initializeI18n } from "./i18n"
 
-  let { game_id, user_id, initial_public, initial_private } = $props()
+  let {
+    game_id,
+    user_id,
+    initial_public,
+    initial_private,
+    csrf_token = "",
+    locale = "en",
+    return_path = `/games/${game_id}`,
+  } = $props()
+  const { t } = initializeI18n(() => locale)
 
   const initialPublic = () => initial_public
   const initialPrivate = () => initial_private
@@ -48,7 +59,7 @@
   let publicProjectionVersion = $state(null)
   let privateProjectionVersion = $state(null)
   let resynchronizingAfterStale = $state(false)
-  let lastEvent = $state("Casebook synchronized.")
+  let lastEvent = $state(t("Casebook synchronized."))
   let mapIntent = $state(null)
   let lastTravel = $state(null)
   let onlinePlayerIds = $state([])
@@ -62,17 +73,17 @@
   const seenPrivateEventIds = new Set()
 
   const detectiveDrawerPages = [
-    { id: "search", label: "Search" },
-    { id: "question", label: "Question" },
-    { id: "evidence", label: "Evidence" },
-    { id: "bribes", label: "Bribes" },
-    { id: "accusation", label: "Accusation" },
-    { id: "history", label: "History" },
+    { id: "search", label: t("Search") },
+    { id: "question", label: t("Question") },
+    { id: "evidence", label: t("Evidence") },
+    { id: "bribes", label: t("Bribes") },
+    { id: "accusation", label: t("Accusation") },
+    { id: "history", label: t("History") },
   ]
   const chiselDrawerPages = [
-    { id: "question", label: "Response" },
-    { id: "chisel", label: "Private Case" },
-    { id: "history", label: "History" },
+    { id: "question", label: t("Response") },
+    { id: "chisel", label: t("Private case") },
+    { id: "history", label: t("History") },
   ]
   const fieldActionTypes = ["search_location", "analyze", "kickback", "bribe_officer"]
 
@@ -88,14 +99,11 @@
   )
   let moveLocationIds = $derived(new Set(privateState.valid_move_location_ids ?? []))
   let placementLocationIds = $derived(new Set(privateState.placement_location_ids ?? []))
-  let effectiveLegalLocationIds = $derived(
-    activeAction === "place"
-      ? [...placementLocationIds]
-      : activeAction === "move"
-        ? [...moveLocationIds]
-        : [],
-  )
   let availableActions = $derived(new Set(privateState.available_actions ?? []))
+  let mapMovementType = $derived(directMapMovementType(activeAction, availableActions))
+  let effectiveLegalLocationIds = $derived(
+    directMapLocationIds(mapMovementType, placementLocationIds, moveLocationIds),
+  )
   let availableFieldActionTypes = $derived(
     fieldActionTypes.filter((action) => availableActions.has(action)),
   )
@@ -103,10 +111,10 @@
     privateState.role === "chisel" ? chiselDrawerPages : detectiveDrawerPages,
   )
   let drawerTitle = $derived(
-    drawerPages.find((page) => page.id === drawerPage)?.label ?? "Casebook",
+    drawerPages.find((page) => page.id === drawerPage)?.label ?? t("Casebook"),
   )
   let drawerFolioLabel = $derived(
-    privateState.role === "chisel" ? "Chisel private casebook" : "Detective field folio",
+    privateState.role === "chisel" ? t("Chisel private casebook") : t("Detective field folio"),
   )
   let projectionsSynchronized = $derived(
     publicProjectionReady &&
@@ -250,27 +258,25 @@
   let pauseReason = $derived(
     publicState.pause?.reason ??
       (offlinePlayers.length > 0
-        ? `${offlinePlayers.map((player) => player.display_name).join(", ")} disconnected.`
-        : "Waiting for every investigator to return."),
+        ? t("{names} disconnected.", { names: offlinePlayers.map((player) => player.display_name).join(", ") })
+        : t("Waiting for every investigator to return.")),
   )
   let mapStatus = $derived(
     privateState.role !== "detective"
-      ? "Field map · only the active Detective can issue movement commands."
+      ? t("Field map · only the active Detective can dispatch a car.")
       : mapIntent
-      ? `${mapIntent.type === "place" ? "Placing" : "Moving to"} ${locationName(mapIntent.locationId)}…`
+      ? mapIntent.type === "place"
+        ? t("Starting from {location}…", { location: locationName(mapIntent.locationId) })
+        : t("Driving to {location}…", { location: locationName(mapIntent.locationId) })
       : mapSelection
-        ? `${mapSelection.location.name} selected · confirm on the dispatch slip.`
+        ? t("{location} selected · confirm on the dispatch slip.", { location: mapSelection.location.name })
         : mapSpecialActorSelection
-          ? `${mapSpecialActorSelection.actor.name} selected · choose a case-specific interaction.`
-        : activeAction === "place"
-        ? "Placement mode · choose one highlighted Police Station."
-        : activeAction === "move"
-          ? "Move mode · choose one highlighted location in the current district."
-          : availableActions.has("place")
-            ? "Choose Place below before selecting a Police Station."
-            : availableActions.has("move")
-              ? "Choose Move below before selecting a destination."
-              : "No movement command is currently authorized.",
+          ? t("{actor} selected · choose a case-specific interaction.", { actor: mapSpecialActorSelection.actor.name })
+          : mapMovementType === "place"
+            ? t("Choose a highlighted precinct as your starting point.")
+            : mapMovementType === "move"
+              ? t("Click a highlighted destination to move within the current district.")
+              : t("No movement order is currently authorized."),
   )
   let casebookView = $derived.by(() => ({
     role: privateState.role,
@@ -487,7 +493,7 @@
   function recordPublicEvent(message, description) {
     if (!acceptEvent(message, seenPublicEventIds)) return false
 
-    lastEvent = description
+    lastEvent = t(description)
     return true
   }
 
@@ -550,7 +556,7 @@
     if (commandPending || !controlsReady) return
 
     if (
-      activeAction === "place" &&
+      mapMovementType === "place" &&
       placementLocationIds.has(location.id) &&
       availableActions.has("place")
     ) {
@@ -559,7 +565,7 @@
       mapSuspectSelectionId = null
       mapSpecialActorSelectionId = null
     } else if (
-      activeAction === "move" &&
+      mapMovementType === "move" &&
       moveLocationIds.has(location.id) &&
       availableActions.has("move")
     ) {
@@ -763,7 +769,7 @@
       .receive("timeout", () => {
         commandPending = false
         retryCommand = command
-        commandError = "Command unconfirmed. Retry uses the same command ID."
+          commandError = t("Command unconfirmed. Retry uses the same command ID.")
       })
   }
 
@@ -775,6 +781,7 @@
     return buildImmediateActionPrompt(action, {
       actionsRemaining: ownPlayer?.actions_remaining ?? 0,
       playerCount: publicState.players.length,
+      t,
     })
   }
 
@@ -821,7 +828,7 @@
       not_your_turn: "Only the active Detective can act.",
       wrong_role: "This action belongs to a Detective.",
       wrong_phase: "This action is sealed during the current case phase.",
-      placement_required: "Place your token at a Police Station first.",
+      placement_required: "Choose a starting Police Station first.",
       invalid_location: "That location is not part of the active board catalog.",
       police_station_required: "Bribe Officer is available only at a Police Station.",
       destination_outside_district: "That location is outside the current district.",
@@ -872,7 +879,7 @@
       players_offline: "Every player must reconnect before the Chisel resumes.",
     }
 
-    return messages[code] ?? "The server rejected this action."
+    return t(messages[code] ?? "The server rejected this action.")
   }
 
   function locationName(locationId) {
@@ -901,7 +908,7 @@
     if (!resynchronizingAfterStale || !controlsReady) return
 
     resynchronizingAfterStale = false
-    commandError = "Game state changed; map resynchronized"
+    commandError = t("Game state changed; map resynchronized")
   })
 
   function selectSuspect(suspectId) {
@@ -1056,8 +1063,8 @@
     connectionState = nextConnectionState
     commandError =
       nextConnectionState === "unauthorized"
-        ? "This account is no longer authorized for the case channel."
-        : "Connection lost. Waiting for fresh public and private case files."
+        ? t("This account is no longer authorized for the case channel.")
+        : t("Connection lost. Waiting for fresh public and private case files.")
     connectionSnapshotReceived = false
     onlinePlayerIds = []
     offlineDeadlines = {}
@@ -1224,13 +1231,13 @@
     gameChannel.on("detective_bribed", (message) =>
       recordPublicEvent(
         message,
-        `A Detective bought access to Case ${message.payload.case_card_code}.`,
+        t("A Detective bought access to Case {code}.", { code: message.payload.case_card_code }),
       ),
     )
     gameChannel.on("officer_bribed", (message) =>
       recordPublicEvent(
         message,
-        `A desk officer opened Case ${message.payload.case_card_code}.`,
+        t("A desk officer opened Case {code}.", { code: message.payload.case_card_code }),
       ),
     )
     gameChannel.on("snitch_decision_recorded", (message) =>
@@ -1322,7 +1329,7 @@
           : "Search complete. The private result is filed in your notebook."
         openDrawer(payload.free_question_suspect_id ? "question" : "evidence")
       } else if (payload.type === "bribe_result") {
-        lastEvent = `Case ${payload.case_card.code} entered your private evidence folio.`
+        lastEvent = t("Case {code} entered your private evidence folio.", { code: payload.case_card.code })
         openDrawer("evidence")
       } else if (payload.type === "special_actor_result") {
         lastEvent =
@@ -1331,7 +1338,7 @@
             : "The special interaction was resolved."
         if (payload.case_cards?.length > 0) openDrawer("evidence")
       } else if (payload.type === "scratch_updated" && payload.received) {
-        lastEvent = `You received $${payload.received} Scratch from another Detective.`
+        lastEvent = t("You received ${amount} Scratch from another Detective.", { amount: payload.received })
       } else if (payload.type === "snitch_choice_recorded") {
         lastEvent = payload.snitch
           ? "Your Snitch marker is facedown. Other players cannot see the choice yet."
@@ -1345,7 +1352,7 @@
       } else if (payload.type === "accusation_result") {
         lastEvent = payload.solved
           ? "Your accusation solved all three parts of the case."
-          : `${payload.correct_count} of 3 accusation elements were correct.`
+          : t("{count} of 3 accusation elements were correct.", { count: payload.correct_count })
         openDrawer("accusation")
       } else if (payload.type === "final_guess_recorded") {
         lastEvent = "Your final guess is sealed until every Detective submits."
@@ -1388,6 +1395,8 @@
     activeDetectiveName={activeDetective?.display_name ?? null}
     {connectionState}
     version={publicState.version}
+    returnPath={return_path}
+    csrfToken={csrf_token}
   >
     {#snippet detectiveRail()}
       <DetectiveRail

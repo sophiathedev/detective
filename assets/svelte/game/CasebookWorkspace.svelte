@@ -1,5 +1,8 @@
 <script>
   import { tick } from "svelte"
+  import { useI18n } from "../i18n"
+
+  const { t } = useI18n()
 
   let { page = "history", view, actions = {} } = $props()
 
@@ -76,7 +79,7 @@
   }
 
   function readableIdentifier(value) {
-    if (!value) return "Not filed"
+    if (!value) return t("Not filed")
 
     return String(value)
       .split(/[-_]/)
@@ -144,19 +147,19 @@
   <section id="casebook-action-page" class="casebook-workspace-page p-4 sm:p-5" aria-labelledby="casebook-search-heading">
     <div class="flex flex-wrap items-start justify-between gap-4 border-b border-[#a38b6e] pb-4">
       <div>
-        <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-[#8c3f33]">Action ledger</p>
+        <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-[#8c3f33]">{t("Action ledger")}</p>
         <h2 id="casebook-search-heading" class="mt-1 font-serif text-2xl font-semibold text-[#2e241c]">
-          {view.activeDetective?.display_name ?? "Field search"}
+          {view.activeDetective?.display_name ?? t("Field search")}
         </h2>
         <p class="mt-1 text-sm text-[#695642]">
           {view.role === "detective" && view.ownPlayer?.id === view.activeDetective?.id
-            ? "Your turn. Choose an authorized subject, then file the Search command."
-            : "Observing the active Detective's turn."}
+            ? t("Your turn. Choose an authorized subject, then file the Search command.")
+            : t("Observing the active Detective's turn.")}
         </p>
       </div>
       {#if view.role === "detective"}
         <dl class="text-right">
-          <dt class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#80694f]">Actions</dt>
+          <dt class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#80694f]">{t("Actions")}</dt>
           <dd class="mt-1 font-mono text-lg font-semibold">{view.ownPlayer?.actions_remaining ?? 0}</dd>
         </dl>
       {/if}
@@ -171,17 +174,16 @@
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">
-              Current location
+              {t("Current location")}
             </p>
             <h3
               id="current-location-search-heading"
               class="mt-1 font-serif text-lg font-semibold text-[#2e241c]"
             >
-              {search.currentLocation?.name ?? "Placement required"}
+              {search.currentLocation?.name ?? t("Placement required")}
             </h3>
             <p class="mt-1 max-w-xl text-xs leading-5 text-[#695642]">
-              Search card text remains private. Revealed Case cards enter your casebook; taken
-              evidence returns faceup after three Day advances.
+              {t("Search card text remains private. Revealed Case cards enter your casebook; taken evidence returns faceup after three Day advances.")}
             </p>
           </div>
           <span class="border border-[#806749] px-2 py-1 font-mono text-[9px] uppercase text-[#725e48]">
@@ -196,16 +198,16 @@
           onclick={() => actions.submitLocationSearch?.()}
           class="mt-3 min-h-11 w-full cursor-pointer bg-[#30261f] px-4 text-left text-sm font-semibold text-[#f5e7c9] transition hover:bg-[#49372a] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Search {search.currentLocation?.name ?? "current location"}
+          {t("Search {location}", { location: search.currentLocation?.name ?? t("current location") })}
           <span class="float-right font-mono text-[10px]">
-            {availableActions.has("search_location") ? "CONFIRM" : "UNAVAILABLE"}
+            {availableActions.has("search_location") ? t("CONFIRM") : t("UNAVAILABLE")}
           </span>
         </button>
       </section>
     {/if}
 
     <fieldset id="casebook-search-subjects" class="mt-5">
-      <legend class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#80694f]">Known persons</legend>
+      <legend class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#80694f]">{t("Known persons")}</legend>
       <div class="mt-2 grid gap-2 sm:grid-cols-2">
         {#each search.suspects ?? [] as suspect}
           {@const authorized = (search.searchableSuspectIds ?? []).includes(suspect.id) || (search.interrogatableSuspectIds ?? []).includes(suspect.id)}
@@ -219,11 +221,11 @@
           >
             <span class="block font-serif text-sm font-semibold">{suspect.name}</span>
             <span class="mt-1 block font-mono text-[8px] uppercase tracking-[0.08em] text-[#705b45]">
-              {suspect.occupation ?? "Person of interest"}{suspect.location_name ? ` · ${suspect.location_name}` : ""}
+              {suspect.occupation ?? t("Person of interest")}{suspect.location_name ? ` · ${suspect.location_name}` : ""}
             </span>
           </button>
         {:else}
-          <p class="casebook-empty-page">No known subject can be searched yet.</p>
+          <p class="casebook-empty-page">{t("No known subject can be searched yet.")}</p>
         {/each}
       </div>
     </fieldset>
@@ -234,7 +236,7 @@
       disabled={!availableActions.has("search_suspect") || !(search.searchableSuspectIds ?? []).includes(search.selectedSuspectId)}
       onclick={() => actions.submitSuspectSearch?.()}
       class="mt-4 min-h-11 w-full cursor-pointer bg-[#30261f] px-4 text-left text-sm font-semibold text-[#f5e7c9] transition hover:bg-[#49372a] disabled:cursor-not-allowed disabled:opacity-40"
-    >Search selected suspect <span class="float-right font-mono text-[10px]">1 AP</span></button>
+    >{t("Search selected suspect")} <span class="float-right font-mono text-[10px]">1 AP</span></button>
   </section>
 
 {:else if page === "question"}
@@ -245,26 +247,26 @@
   >
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">ARC interview desk</p>
-        <h3 id="interrogation-heading" class="mt-1 font-serif text-xl font-semibold">Suspect statement</h3>
+        <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">{t("ARC interview desk")}</p>
+        <h3 id="interrogation-heading" class="mt-1 font-serif text-xl font-semibold">{t("Suspect statement")}</h3>
       </div>
       <p id="interrogation-status" class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]" aria-live="polite">
-        {view.phase?.replaceAll("_", " ")}
+        {t(view.phase)?.replaceAll("_", " ")}
       </p>
     </div>
 
     {#if view.phase === "detective_turn" && availableActions.has("interrogate")}
       {#if question.latestStatement}
         <div id="challenge-result" class="mt-4 border-l-4 border-[#8c3f33] bg-[#eadbbc] p-4" aria-live="polite">
-          <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7d6650]">Latest private note · {question.latestStatement.topic_code}</p>
+          <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7d6650]">{t("Latest private note · {code}", { code: question.latestStatement.topic_code })}</p>
           <p class="mt-2 font-serif text-sm italic leading-6">“{question.latestStatement.response_text}”</p>
-          <p class="mt-2 font-mono text-[9px] uppercase tracking-[0.1em] text-[#8c3f33]">{question.latestStatement.resolution.replaceAll("_", " ")}</p>
+          <p class="mt-2 font-mono text-[9px] uppercase tracking-[0.1em] text-[#8c3f33]">{t(question.latestStatement.resolution).replaceAll("_", " ")}</p>
         </div>
       {/if}
 
       <fieldset id="interrogation-subjects" class="mt-4">
         <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7b654d]">
-          Suspects at your location
+          {t("Suspects at your location")}
         </legend>
         <div class="mt-2 grid gap-2 sm:grid-cols-2">
           {#each question.interrogationOptions ?? [] as interrogation}
@@ -279,7 +281,7 @@
                 {interrogation.suspect_name}
               </span>
               <span class="mt-1 block font-mono text-[8px] uppercase tracking-[0.08em] text-[#705b45]">
-                {interrogation.topics?.length ?? 0} known case cards
+                {t("{count} known case cards", { count: interrogation.topics?.length ?? 0 })}
               </span>
             </button>
           {/each}
@@ -289,13 +291,13 @@
       {#if selectedInterrogation}
         <div class="mt-4 grid gap-4 sm:grid-cols-[0.8fr_1.2fr]">
           <div class="border-l-2 border-[#9e4035] pl-3">
-            <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7b654d]">Subject</p>
+            <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7b654d]">{t("Subject")}</p>
             <p class="mt-1 font-serif text-lg font-semibold">{selectedInterrogation.suspect_name}</p>
-            <p class="mt-2 text-xs leading-5 text-[#695642]">Choose one known case card. Free-form questions are not legal commands.</p>
+            <p class="mt-2 text-xs leading-5 text-[#695642]">{t("Choose one known case card. Free-form questions are not legal commands.")}</p>
           </div>
 
           <fieldset id="interrogation-topics">
-            <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7b654d]">Known topics</legend>
+            <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7b654d]">{t("Known topics")}</legend>
             <div class="mt-2 grid gap-2">
               {#each selectedInterrogation.topics ?? [] as topic}
                 <label id={`interrogate-topic-${topic.id}`} class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 transition ${question.selectedTopicId === topic.id ? "border-[#963a31] bg-[#f1e2c4]" : "border-[#9f896c] bg-[#e4d6b8] hover:bg-[#ecdec1]"}`}>
@@ -311,39 +313,39 @@
         {#if question.selectedSuspectLeverage > 0}
           <label class="mt-4 flex min-h-11 cursor-pointer items-center gap-3 border-t border-[#a48b6c] pt-3 text-xs">
             <input type="checkbox" checked={question.spendLeverage} onchange={(event) => actions.setSpendLeverage?.(event.currentTarget.checked)} class="accent-[#963a31]" />
-            Spend 1 leverage over this suspect to force the most useful response.
+            {t("Spend 1 leverage over this suspect to force the most useful response.")}
           </label>
         {/if}
 
         <button id="casebook-submit-interrogation" type="button" disabled={!selectedTopic} onclick={() => actions.submitInterrogation?.()} class="mt-4 min-h-11 w-full cursor-pointer bg-[#30261f] px-4 text-left text-sm font-semibold text-[#f5e7c9] transition hover:bg-[#49372a] disabled:cursor-not-allowed disabled:opacity-40">
-          Question suspect <span class="float-right font-mono text-[10px]">{question.freeQuestionSuspectId === question.selectedSuspectId ? "FREE" : "1 AP"}</span>
+          {t("Question suspect")} <span class="float-right font-mono text-[10px]">{question.freeQuestionSuspectId === question.selectedSuspectId ? t("FREE") : "1 AP"}</span>
         </button>
       {:else}
-        <p class="mt-4 border-l-2 border-[#9e4035] pl-3 text-sm leading-6 text-[#65523f]">Select an authorized suspect from the Search folio. You must share their location.</p>
+        <p class="mt-4 border-l-2 border-[#9e4035] pl-3 text-sm leading-6 text-[#65523f]">{t("Select an authorized suspect from the Search folio. You must share their location.")}</p>
       {/if}
 
     {:else if question.pendingPublic?.stage === "awaiting_chisel_block"}
       {#if view.role === "chisel" && view.chisel?.pendingInterrogation}
         <div id="chisel-block-decision" class="mt-4 border-l-4 border-[#71372f] bg-[#d3c19f] p-4">
-          <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">Chisel leverage window</p>
-          <p class="mt-2 text-sm leading-6 text-[#5f4b39]">{view.chisel.pendingInterrogation.detective.display_name} asks {view.chisel.pendingInterrogation.suspect.name} about case card {view.chisel.pendingInterrogation.topic.code}.</p>
+          <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">{t("Chisel leverage window")}</p>
+          <p class="mt-2 text-sm leading-6 text-[#5f4b39]">{t("{detective} asks {suspect} about case card {code}.", { detective: view.chisel.pendingInterrogation.detective.display_name, suspect: view.chisel.pendingInterrogation.suspect.name, code: view.chisel.pendingInterrogation.topic.code })}</p>
           <div class="mt-3 grid gap-2 sm:grid-cols-2">
-            <button id="casebook-allow-question" type="button" disabled={!availableActions.has("allow_question")} onclick={() => actions.allowQuestion?.()} class="min-h-11 cursor-pointer border-2 border-[#344a40] bg-[#d6d2b5] px-3 text-sm font-semibold text-[#263c34] disabled:cursor-not-allowed disabled:opacity-40">Allow question</button>
-            <button id="casebook-block-question" type="button" disabled={!availableActions.has("block_question")} onclick={() => actions.blockQuestion?.()} class="min-h-11 cursor-pointer border-2 border-[#9b3d34] bg-[#e1c5a9] px-3 text-sm font-semibold text-[#812f29] disabled:cursor-not-allowed disabled:opacity-40">Spend matching leverage to block</button>
+            <button id="casebook-allow-question" type="button" disabled={!availableActions.has("allow_question")} onclick={() => actions.allowQuestion?.()} class="min-h-11 cursor-pointer border-2 border-[#344a40] bg-[#d6d2b5] px-3 text-sm font-semibold text-[#263c34] disabled:cursor-not-allowed disabled:opacity-40">{t("Allow question")}</button>
+            <button id="casebook-block-question" type="button" disabled={!availableActions.has("block_question")} onclick={() => actions.blockQuestion?.()} class="min-h-11 cursor-pointer border-2 border-[#9b3d34] bg-[#e1c5a9] px-3 text-sm font-semibold text-[#812f29] disabled:cursor-not-allowed disabled:opacity-40">{t("Spend matching leverage to block")}</button>
           </div>
         </div>
       {:else}
-        <p class="casebook-empty-page">Question under review · waiting for the Chisel's leverage decision.</p>
+        <p class="casebook-empty-page">{t("Question under review · waiting for the Chisel's leverage decision.")}</p>
       {/if}
 
     {:else if question.pendingPublic?.stage === "question_blocked"}
       <div id="blocked-question-card" class="mt-4 border-l-4 border-[#9b3d34] bg-[#e1c5a9] p-4">
-        <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#812f29]">Question blocked</p>
-        <p class="mt-2 text-sm leading-6 text-[#5f4b39]">The action remains spent. The questioning Detective may abandon the question or pay $2 Scratch to bribe the goon.</p>
+        <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#812f29]">{t("Question blocked")}</p>
+        <p class="mt-2 text-sm leading-6 text-[#5f4b39]">{t("The action remains spent. The questioning Detective may abandon the question or pay $2 Scratch to bribe the goon.")}</p>
         {#if availableActions.has("accept_question_block") || availableActions.has("bribe_goon")}
           <div class="mt-3 grid gap-2 sm:grid-cols-2">
-            <button id="casebook-accept-question-block" type="button" disabled={!availableActions.has("accept_question_block")} onclick={() => actions.acceptQuestionBlock?.()} class="min-h-11 cursor-pointer border border-[#796349] bg-[#d7c7aa] px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40">Abandon question</button>
-            <button id="casebook-bribe-goon" type="button" disabled={!availableActions.has("bribe_goon")} onclick={() => actions.bribeGoon?.()} class="min-h-11 cursor-pointer bg-[#8f372f] px-3 text-sm font-semibold text-[#fff0d6] disabled:cursor-not-allowed disabled:opacity-40">Pay $2 and proceed</button>
+            <button id="casebook-accept-question-block" type="button" disabled={!availableActions.has("accept_question_block")} onclick={() => actions.acceptQuestionBlock?.()} class="min-h-11 cursor-pointer border border-[#796349] bg-[#d7c7aa] px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40">{t("Abandon question")}</button>
+            <button id="casebook-bribe-goon" type="button" disabled={!availableActions.has("bribe_goon")} onclick={() => actions.bribeGoon?.()} class="min-h-11 cursor-pointer bg-[#8f372f] px-3 text-sm font-semibold text-[#fff0d6] disabled:cursor-not-allowed disabled:opacity-40">{t("Pay $2 and proceed")}</button>
           </div>
         {/if}
       </div>
@@ -351,89 +353,89 @@
     {:else if question.pendingPublic?.stage === "awaiting_snitches"}
       <div id="snitch-window" class="mt-4 border-y border-[#8e765b] bg-[#d3c19f] p-4">
         <div class="flex items-center justify-between gap-3">
-          <div><p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#812f29]">Facedown informants</p><p class="mt-1 font-serif text-lg font-semibold">Snitch window</p></div>
-          <p class="font-mono text-[9px] uppercase tracking-[0.1em] text-[#725e48]">{question.pendingPublic.snitch_decisions_recorded}/{question.pendingPublic.snitch_decisions_required} filed</p>
+          <div><p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#812f29]">{t("Facedown informants")}</p><p class="mt-1 font-serif text-lg font-semibold">{t("Snitch window")}</p></div>
+          <p class="font-mono text-[9px] uppercase tracking-[0.1em] text-[#725e48]">{t("{current}/{required} filed", { current: question.pendingPublic.snitch_decisions_recorded, required: question.pendingPublic.snitch_decisions_required })}</p>
         </div>
         {#if availableActions.has("choose_snitch") || availableActions.has("decline_snitch")}
-          <p class="mt-3 text-sm leading-6 text-[#5f4b39]">Your choice remains hidden until every eligible Detective files a marker. An allowed Snitch costs $3 only after the final response.</p>
+          <p class="mt-3 text-sm leading-6 text-[#5f4b39]">{t("Your choice remains hidden until every eligible Detective files a marker. An allowed Snitch costs $3 only after the final response.")}</p>
           <div class="mt-3 grid grid-cols-2 gap-2">
-            <button id="casebook-decline-snitch" type="button" disabled={!availableActions.has("decline_snitch")} onclick={() => actions.declineSnitch?.()} class="min-h-11 cursor-pointer border border-[#796349] bg-[#d7c7aa] px-3 text-sm font-semibold disabled:opacity-40">Pass</button>
-            <button id="casebook-choose-snitch" type="button" disabled={!availableActions.has("choose_snitch")} onclick={() => actions.chooseSnitch?.()} class="min-h-11 cursor-pointer bg-[#30261f] px-3 text-sm font-semibold text-[#f5e7c9] disabled:opacity-40">Place Snitch facedown</button>
+            <button id="casebook-decline-snitch" type="button" disabled={!availableActions.has("decline_snitch")} onclick={() => actions.declineSnitch?.()} class="min-h-11 cursor-pointer border border-[#796349] bg-[#d7c7aa] px-3 text-sm font-semibold disabled:opacity-40">{t("Pass")}</button>
+            <button id="casebook-choose-snitch" type="button" disabled={!availableActions.has("choose_snitch")} onclick={() => actions.chooseSnitch?.()} class="min-h-11 cursor-pointer bg-[#30261f] px-3 text-sm font-semibold text-[#f5e7c9] disabled:opacity-40">{t("Place Snitch facedown")}</button>
           </div>
         {:else}
-          <p class="mt-3 text-sm leading-6 text-[#5f4b39]">Waiting for all eligible Detectives to lock their private choice.</p>
+          <p class="mt-3 text-sm leading-6 text-[#5f4b39]">{t("Waiting for all eligible Detectives to lock their private choice.")}</p>
         {/if}
       </div>
 
     {:else if question.pendingPublic?.stage === "awaiting_chisel_snitch_block"}
       {#if view.role === "chisel" && view.chisel?.pendingInterrogation}
         <div id="chisel-snitch-blocks" class="mt-4 border-l-4 border-[#71372f] bg-[#d3c19f] p-4">
-          <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">Revealed Snitch markers</p>
-          <p class="mt-2 text-sm leading-6 text-[#5f4b39]">Spend one matching leverage marker for each informant you want to block.</p>
+          <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">{t("Revealed Snitch markers")}</p>
+          <p class="mt-2 text-sm leading-6 text-[#5f4b39]">{t("Spend one matching leverage marker for each informant you want to block.")}</p>
           <fieldset class="mt-3 grid gap-2">
-            <legend class="sr-only">Choose Snitches to block</legend>
+            <legend class="sr-only">{t("Choose Snitches to block")}</legend>
             {#each view.chisel.pendingInterrogation.snitch_requests ?? [] as request}
               <label id={`snitch-block-${request.player_id}`} class="flex min-h-11 cursor-pointer items-center justify-between gap-3 border border-[#8e765b] bg-[#e5d6b8] px-3 py-2">
                 <span class="text-sm font-semibold">{request.display_name}</span>
                 <span class="flex items-center gap-2 font-mono text-[9px] uppercase text-[#725e48]">
-                  {request.can_block ? "block" : "no leverage"}
+                  {request.can_block ? t("block") : t("no leverage")}
                   <input type="checkbox" checked={(question.blockedSnitchPlayerIds ?? []).includes(request.player_id)} disabled={!request.can_block} onchange={(event) => toggleBlockedPlayer(request.player_id, event.currentTarget.checked)} class="accent-[#963a31]" />
                 </span>
               </label>
             {/each}
           </fieldset>
-          <button id="casebook-resolve-snitches" type="button" disabled={!availableActions.has("resolve_snitches")} onclick={() => actions.submitSnitchResolution?.()} class="mt-3 min-h-11 w-full cursor-pointer bg-[#8f372f] px-4 text-sm font-semibold text-[#fff0d6] disabled:opacity-40">Resolve Snitches and open response deck</button>
+          <button id="casebook-resolve-snitches" type="button" disabled={!availableActions.has("resolve_snitches")} onclick={() => actions.submitSnitchResolution?.()} class="mt-3 min-h-11 w-full cursor-pointer bg-[#8f372f] px-4 text-sm font-semibold text-[#fff0d6] disabled:opacity-40">{t("Resolve Snitches and open response deck")}</button>
         </div>
       {:else}
-        <p class="casebook-empty-page">Snitch markers revealed · waiting for the Chisel.</p>
+        <p class="casebook-empty-page">{t("Snitch markers revealed · waiting for the Chisel.")}</p>
       {/if}
 
     {:else if question.pendingPublic?.stage === "awaiting_chisel_response"}
       {#if view.role === "chisel" && view.chisel?.pendingInterrogation}
         <div id="chisel-response-deck" class="mt-4">
-          <p class="text-sm leading-6 text-[#5f4b39]">{view.chisel.pendingInterrogation.detective.display_name} asks {view.chisel.pendingInterrogation.suspect.name} about case card {view.chisel.pendingInterrogation.topic.code}.</p>
+          <p class="text-sm leading-6 text-[#5f4b39]">{t("{detective} asks {suspect} about case card {code}.", { detective: view.chisel.pendingInterrogation.detective.display_name, suspect: view.chisel.pendingInterrogation.suspect.name, code: view.chisel.pendingInterrogation.topic.code })}</p>
           <fieldset class="mt-3">
-            <legend class="sr-only">Choose the suspect response</legend>
+            <legend class="sr-only">{t("Choose the suspect response")}</legend>
             <div class="grid gap-2">
               {#each view.chisel.pendingInterrogation.response_options ?? [] as response}
                 <label id={`chisel-response-${response.id}`} class={`cursor-pointer border-l-4 px-3 py-3 transition ${question.selectedResponseId === response.id ? "bg-[#f3e4c5]" : "bg-[#d2c09f] hover:bg-[#dfcead]"} ${response.type === "most_useful" ? "border-[#2f4b42]" : "border-[#9d3d34]"}`}>
-                  <span class="flex items-center justify-between gap-3"><span class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#6f5944]">{response.type.replaceAll("_", " ")}</span><input type="radio" name="chisel-response" value={response.id} checked={question.selectedResponseId === response.id} onchange={() => actions.selectResponse?.(response.id)} class="accent-[#963a31]" /></span>
+                  <span class="flex items-center justify-between gap-3"><span class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#6f5944]">{t(response.type).replaceAll("_", " ")}</span><input type="radio" name="chisel-response" value={response.id} checked={question.selectedResponseId === response.id} onchange={() => actions.selectResponse?.(response.id)} class="accent-[#963a31]" /></span>
                   <span class="mt-2 block font-serif text-sm leading-6">{response.text}</span>
                 </label>
               {/each}
             </div>
           </fieldset>
-          <button id="casebook-submit-response" type="button" disabled={!question.selectedResponseId} onclick={() => actions.submitResponse?.()} class="mt-3 min-h-11 w-full cursor-pointer bg-[#8f372f] px-4 text-sm font-semibold text-[#fff0d6] disabled:opacity-40">Seal and deliver response</button>
+          <button id="casebook-submit-response" type="button" disabled={!question.selectedResponseId} onclick={() => actions.submitResponse?.()} class="mt-3 min-h-11 w-full cursor-pointer bg-[#8f372f] px-4 text-sm font-semibold text-[#fff0d6] disabled:opacity-40">{t("Seal and deliver response")}</button>
         </div>
       {:else}
-        <p class="casebook-empty-page">Statement requested · waiting for the Chisel to seal a response.</p>
+        <p class="casebook-empty-page">{t("Statement requested · waiting for the Chisel to seal a response.")}</p>
       {/if}
 
     {:else if question.pendingPublic?.stage === "awaiting_detective_decision"}
       <div id="published-response-card" class="relative mt-4 border border-[#806749] bg-[#efe0c0] p-4" tabindex="-1">
-        <span class="absolute right-3 top-3 font-mono text-[9px] uppercase tracking-[0.12em] text-[#963a31]">Statement · {question.pendingPublic.topic_code}</span>
+        <span class="absolute right-3 top-3 font-mono text-[9px] uppercase tracking-[0.12em] text-[#963a31]">{t("Statement · {code}", { code: question.pendingPublic.topic_code })}</span>
         {#if view.role === "detective" && question.pendingPrivate?.response_text}
           <p class="max-w-xl pr-20 font-serif text-base italic leading-7">“{question.pendingPrivate.response_text}”</p>
         {:else if view.role === "chisel" && view.chisel?.pendingInterrogation?.selected_response}
           <p class="max-w-xl pr-20 font-serif text-base italic leading-7">“{view.chisel.pendingInterrogation.selected_response.text}”</p>
         {:else}
-          <p class="max-w-xl pr-20 font-serif text-base italic leading-7 text-[#76624c]">The statement is sealed for the questioning Detective.</p>
+          <p class="max-w-xl pr-20 font-serif text-base italic leading-7 text-[#76624c]">{t("The statement is sealed for the questioning Detective.")}</p>
         {/if}
       </div>
       {#if availableActions.has("accept_response") || availableActions.has("challenge_response")}
         <div class="mt-3 grid grid-cols-2 gap-2">
-          <button id="casebook-accept-response" type="button" disabled={!availableActions.has("accept_response")} onclick={() => actions.acceptResponse?.()} class="min-h-12 cursor-pointer border-2 border-[#344a40] bg-[#d6d2b5] font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#263c34] disabled:opacity-40">Accept statement</button>
-          <button id="casebook-challenge-response" type="button" disabled={!availableActions.has("challenge_response")} onclick={() => actions.challengeResponse?.()} class="min-h-12 cursor-pointer border-2 border-[#9b3d34] bg-[#e1c5a9] font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#812f29] disabled:opacity-40">Challenge · stake 1</button>
+          <button id="casebook-accept-response" type="button" disabled={!availableActions.has("accept_response")} onclick={() => actions.acceptResponse?.()} class="min-h-12 cursor-pointer border-2 border-[#344a40] bg-[#d6d2b5] font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#263c34] disabled:opacity-40">{t("Accept statement")}</button>
+          <button id="casebook-challenge-response" type="button" disabled={!availableActions.has("challenge_response")} onclick={() => actions.challengeResponse?.()} class="min-h-12 cursor-pointer border-2 border-[#9b3d34] bg-[#e1c5a9] font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#812f29] disabled:opacity-40">{t("Challenge · stake 1")}</button>
         </div>
       {/if}
     {:else if question.latestStatement}
       <div id="challenge-result" class="mt-4 border-l-4 border-[#8c3f33] bg-[#eadbbc] p-4" aria-live="polite">
-        <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7d6650]">Latest private note · {question.latestStatement.topic_code}</p>
+        <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#7d6650]">{t("Latest private note · {code}", { code: question.latestStatement.topic_code })}</p>
         <p class="mt-2 font-serif text-sm italic leading-6">“{question.latestStatement.response_text}”</p>
-        <p class="mt-2 font-mono text-[9px] uppercase tracking-[0.1em] text-[#8c3f33]">{question.latestStatement.resolution.replaceAll("_", " ")}</p>
+        <p class="mt-2 font-mono text-[9px] uppercase tracking-[0.1em] text-[#8c3f33]">{t(question.latestStatement.resolution).replaceAll("_", " ")}</p>
       </div>
     {:else}
-      <p class="casebook-empty-page">Move to a suspect, choose a known case card, and spend one action to question them.</p>
+      <p class="casebook-empty-page">{t("Move to a suspect, choose a known case card, and spend one action to question them.")}</p>
     {/if}
   </section>
 
@@ -441,8 +443,8 @@
   {#if view.role === "detective"}
     <section id="private-evidence-dossier" class="casebook-workspace-page border-y border-[#91785c] bg-[#d4c3a3] p-4 sm:p-5" aria-labelledby="evidence-dossier-heading">
       <div class="flex flex-wrap items-end justify-between gap-3">
-        <div><p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Private folio</p><h3 id="evidence-dossier-heading" class="mt-1 font-serif text-xl font-semibold">Search notes and evidence</h3></div>
-        <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#705b45]">{evidence.heldEvidence?.length ?? 0} held / {evidence.knownCaseCards?.length ?? 0} known</p>
+        <div><p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">{t("Private folio")}</p><h3 id="evidence-dossier-heading" class="mt-1 font-serif text-xl font-semibold">{t("Search notes and evidence")}</h3></div>
+        <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#705b45]">{t("{held} held / {known} known", { held: evidence.heldEvidence?.length ?? 0, known: evidence.knownCaseCards?.length ?? 0 })}</p>
       </div>
       <div id="accessible-case-card-index" class="mt-4 grid gap-2 sm:grid-cols-3">
         {#each evidence.caseCards ?? [] as card}
@@ -452,13 +454,13 @@
             data-selected={evidence.selectedCaseCardCode === card.code}
             aria-current={evidence.selectedCaseCardCode === card.code ? "true" : undefined}
             aria-pressed={evidence.selectedCaseCardCode === card.code}
-            aria-label={`Focus Case ${card.code}: ${card.title} on the board`}
+            aria-label={t("Focus Case {code}: {title} on the board", { code: card.code, title: card.title })}
             class={`group scroll-mt-6 min-h-24 w-full cursor-pointer border px-3 py-2 text-left transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8c3f33] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8c3f33] active:translate-y-px motion-reduce:transition-none ${evidence.selectedCaseCardCode === card.code ? "border-[#8c3f33] bg-[#f1e2c4] ring-2 ring-[#a54235]" : "border-[#8b7257] bg-[#e7d6b5]"}`}
             onclick={() => selectEvidenceCaseCard(card)}
           >
             <div class="flex items-center justify-between gap-3">
-              <span class="font-mono text-[10px] font-semibold text-[#8c3f33]">Case {card.code}</span>
-              <span class="font-mono text-[8px] uppercase tracking-[0.1em] text-[#725e48]">{card.visibility}</span>
+              <span class="font-mono text-[10px] font-semibold text-[#8c3f33]">{t("Case {code}", { code: card.code })}</span>
+              <span class="font-mono text-[8px] uppercase tracking-[0.1em] text-[#725e48]">{t(card.visibility)}</span>
             </div>
             <h4 class="mt-1 font-serif text-sm font-semibold">{card.title}</h4>
             {#if card.description}
@@ -466,7 +468,7 @@
             {/if}
           </button>
         {:else}
-          <p class="casebook-empty-page sm:col-span-3">No Case card content is available to this Detective.</p>
+          <p class="casebook-empty-page sm:col-span-3">{t("No Case card content is available to this Detective.")}</p>
         {/each}
       </div>
       <div class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1.1fr)_minmax(12rem,0.9fr)]">
@@ -479,10 +481,10 @@
             >
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">
-                  Day {note.day} / {note.target_type.replaceAll("_", " ")}
+                  {t("Day {day} / {target}", { day: note.day, target: t(note.target_type).replaceAll("_", " ") })}
                 </p>
                 <span class="font-mono text-[8px] uppercase tracking-[0.1em] text-[#8c3f33]">
-                  {index === 0 ? "latest filing" : "archived"}
+                  {index === 0 ? t("latest filing") : t("archived")}
                 </span>
               </div>
               <p class="mt-2 font-serif text-sm italic leading-6">“{note.text}”</p>
@@ -499,12 +501,12 @@
                           aria-pressed={evidence.selectedCaseCardCode === card.code}
                           class="w-full cursor-pointer border-l-2 border-[#8b7257] bg-[#dfcead] px-2 py-1.5 text-left font-mono text-[9px] uppercase tracking-[0.08em] text-[#6b5844] transition duration-200 hover:-translate-y-px hover:border-[#8c3f33] hover:bg-[#eadbbc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8c3f33] active:translate-y-px motion-reduce:transition-none"
                           onclick={() => selectEvidenceCaseCard(card)}
-                        >Revealed · Case {card.code} · {card.title}</button>
+                        >{t("Revealed · Case {code} · {title}", { code: card.code, title: card.title })}</button>
                       {:else}
                         <span
                           data-inert-case-card={cardId}
                           class="block border-l-2 border-[#9e8a70] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.08em] text-[#6b5844]"
-                        >Revealed · {cardId}</span>
+                        >{t("Revealed · {card}", { card: cardId })}</span>
                       {/if}
                     </li>
                   {/each}
@@ -523,12 +525,12 @@
                           aria-pressed={evidence.selectedCaseCardCode === card.code}
                           class="w-full cursor-pointer border-l-2 border-[#8c3f33] bg-[#e6d2b4] px-2 py-1.5 text-left font-mono text-[9px] uppercase tracking-[0.08em] text-[#8c3f33] transition duration-200 hover:-translate-y-px hover:bg-[#f0dfc2] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8c3f33] active:translate-y-px motion-reduce:transition-none"
                           onclick={() => selectEvidenceCaseCard(card)}
-                        >Evidence held · Case {card.code} · {card.title}</button>
+                        >{t("Evidence held · Case {code} · {title}", { code: card.code, title: card.title })}</button>
                       {:else}
                         <span
                           data-inert-case-card={cardId}
                           class="block border-l-2 border-[#8c3f33] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.08em] text-[#8c3f33]"
-                        >Evidence held · {cardId}</span>
+                        >{t("Evidence held · {card}", { card: cardId })}</span>
                       {/if}
                     </li>
                   {/each}
@@ -536,7 +538,7 @@
               {/if}
             </article>
           {:else}
-            <p class="casebook-empty-page">No private Search card has been filed.</p>
+            <p class="casebook-empty-page">{t("No private Search card has been filed.")}</p>
           {/each}
         </div>
         <div id="held-evidence-list" class="grid content-start gap-2">
@@ -547,13 +549,13 @@
               aria-pressed={evidence.selectedCaseCardCode === card.code}
               class={`w-full cursor-pointer border px-3 py-2 text-left transition duration-200 hover:-translate-y-0.5 hover:border-[#8c3f33] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8c3f33] active:translate-y-px motion-reduce:transition-none ${evidence.selectedCaseCardCode === card.code ? "border-[#8c3f33] bg-[#f1e2c4]" : "border-[#8b7257] bg-[#efe0c0]"}`}
               onclick={() => selectEvidenceCaseCard(card)}
-            ><div class="flex items-center justify-between gap-3"><span class="font-mono text-[10px] font-semibold text-[#8c3f33]">{card.code}</span><span class="font-mono text-[8px] uppercase tracking-[0.1em] text-[#725e48]">held evidence</span></div><h4 class="mt-1 font-serif text-sm font-semibold">{card.title}</h4>{#if card.description}<p class="mt-1 text-[11px] leading-4 text-[#695642]">{card.description}</p>{/if}</button>
-          {:else}<p class="casebook-empty-page">No Case card is currently held as evidence.</p>{/each}
+            ><div class="flex items-center justify-between gap-3"><span class="font-mono text-[10px] font-semibold text-[#8c3f33]">{card.code}</span><span class="font-mono text-[8px] uppercase tracking-[0.1em] text-[#725e48]">{t("held evidence")}</span></div><h4 class="mt-1 font-serif text-sm font-semibold">{card.title}</h4>{#if card.description}<p class="mt-1 text-[11px] leading-4 text-[#695642]">{card.description}</p>{/if}</button>
+          {:else}<p class="casebook-empty-page">{t("No Case card is currently held as evidence.")}</p>{/each}
         </div>
       </div>
     </section>
   {:else}
-    <p id="evidence-private-seal" class="casebook-empty-page">Detective evidence stays sealed on each private user channel.</p>
+    <p id="evidence-private-seal" class="casebook-empty-page">{t("Detective evidence stays sealed on each private user channel.")}</p>
   {/if}
 
 {:else if page === "bribes"}
@@ -561,60 +563,60 @@
     <section id="bribe-folio" class="casebook-workspace-page border-y border-[#91785c] bg-[#d4c3a3] p-4 sm:p-5" aria-labelledby="bribe-folio-heading">
       <div class="flex flex-wrap items-start justify-between gap-3 border-b border-[#9d8669] pb-4">
         <div>
-          <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Knowledge exchange</p>
-          <h3 id="bribe-folio-heading" class="mt-1 font-serif text-xl font-semibold">Sealed Case card access</h3>
-          <p class="mt-2 max-w-2xl text-xs leading-5 text-[#695642]">Bribes cost Scratch, never an Action. Card codes and knowledge markers are visible; card content stays sealed until payment succeeds.</p>
+          <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">{t("Knowledge exchange")}</p>
+          <h3 id="bribe-folio-heading" class="mt-1 font-serif text-xl font-semibold">{t("Sealed Case card access")}</h3>
+          <p class="mt-2 max-w-2xl text-xs leading-5 text-[#695642]">{t("Bribes cost Scratch, never an Action. Card codes and knowledge markers are visible; card content stays sealed until payment succeeds.")}</p>
         </div>
-        <span class="border border-[#806749] px-2 py-1 font-mono text-[9px] uppercase text-[#725e48]">${bribes.scratch ?? 0} Scratch</span>
+        <span class="border border-[#806749] px-2 py-1 font-mono text-[9px] uppercase text-[#725e48]">{t("${amount} Scratch", { amount: bribes.scratch ?? 0 })}</span>
       </div>
 
-      <div class="mt-4 grid grid-cols-2 gap-2" role="group" aria-label="Bribe source">
-        <button id="bribe-mode-detective" type="button" aria-pressed={bribes.mode !== "officer"} onclick={() => setBribeMode("detective")} class={`min-h-11 cursor-pointer border px-3 text-sm font-semibold ${bribes.mode !== "officer" ? "border-[#8c3f33] bg-[#eadbbc]" : "border-[#9d8669] bg-[#e4d6b8]"}`}>Detective / $2</button>
-        <button id="bribe-mode-officer" type="button" aria-pressed={bribes.mode === "officer"} onclick={() => setBribeMode("officer")} class={`min-h-11 cursor-pointer border px-3 text-sm font-semibold ${bribes.mode === "officer" ? "border-[#8c3f33] bg-[#eadbbc]" : "border-[#9d8669] bg-[#e4d6b8]"}`}>Desk officer / $3</button>
+      <div class="mt-4 grid grid-cols-2 gap-2" role="group" aria-label={t("Bribe source")}>
+        <button id="bribe-mode-detective" type="button" aria-pressed={bribes.mode !== "officer"} onclick={() => setBribeMode("detective")} class={`min-h-11 cursor-pointer border px-3 text-sm font-semibold ${bribes.mode !== "officer" ? "border-[#8c3f33] bg-[#eadbbc]" : "border-[#9d8669] bg-[#e4d6b8]"}`}>{t("Detective / $2")}</button>
+        <button id="bribe-mode-officer" type="button" aria-pressed={bribes.mode === "officer"} onclick={() => setBribeMode("officer")} class={`min-h-11 cursor-pointer border px-3 text-sm font-semibold ${bribes.mode === "officer" ? "border-[#8c3f33] bg-[#eadbbc]" : "border-[#9d8669] bg-[#e4d6b8]"}`}>{t("Desk officer / $3")}</button>
       </div>
 
       {#if bribes.mode === "officer"}
         <div class="mt-4 border-l-4 border-[#315046] bg-[#ded2b4] p-4">
-          <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#315046]">Police Station only</p>
-          <p class="mt-2 text-xs leading-5 text-[#695642]">Pay the general supply to inspect any unknown Case card another Detective knows.</p>
+          <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#315046]">{t("Police Station only")}</p>
+          <p class="mt-2 text-xs leading-5 text-[#695642]">{t("Pay the general supply to inspect any unknown Case card another Detective knows.")}</p>
         </div>
 
         <fieldset id="officer-bribe-cards" class="mt-4">
-          <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">Knowledge markers on file</legend>
+          <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">{t("Knowledge markers on file")}</legend>
           <div class="mt-2 grid gap-2 sm:grid-cols-2">
             {#each bribes.options?.officer_case_cards ?? [] as card}
               <button id={`bribe-case-card-${card.id}`} type="button" aria-pressed={bribes.selectedCardId === card.id} onclick={() => setBribeCard(card.id)} class={`min-h-12 cursor-pointer border px-3 py-2 text-left ${bribes.selectedCardId === card.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}>
-                <span class="block font-serif text-sm font-semibold">Case {card.code}</span>
-                <span class="mt-1 block font-mono text-[8px] uppercase tracking-[0.08em] text-[#705b45]">Known by {(card.known_by ?? []).map((holder) => holder.display_name).join(" / ")}</span>
+                <span class="block font-serif text-sm font-semibold">{t("Case {code}", { code: card.code })}</span>
+                <span class="mt-1 block font-mono text-[8px] uppercase tracking-[0.08em] text-[#705b45]">{t("Known by {names}", { names: (card.known_by ?? []).map((holder) => holder.display_name).join(" / ") })}</span>
               </button>
             {:else}
-              <p class="casebook-empty-page">No unknown Case card is held by another Detective.</p>
+              <p class="casebook-empty-page">{t("No unknown Case card is held by another Detective.")}</p>
             {/each}
           </div>
         </fieldset>
       {:else}
         <fieldset id="detective-bribe-targets" class="mt-4">
-          <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">Detectives at your location</legend>
+          <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">{t("Detectives at your location")}</legend>
           <div class="mt-2 grid gap-2 sm:grid-cols-2">
             {#each bribes.options?.detective_targets ?? [] as detective}
               <button id={`bribe-detective-${detective.player_id}`} type="button" aria-pressed={bribes.selectedTargetId === detective.player_id} onclick={() => setBribeTarget(detective.player_id)} class={`min-h-12 cursor-pointer border px-3 py-2 text-left ${bribes.selectedTargetId === detective.player_id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}>
                 <span class="block font-serif text-sm font-semibold">{detective.display_name}</span>
-                <span class="mt-1 block font-mono text-[8px] uppercase tracking-[0.08em] text-[#705b45]">{detective.case_cards?.length ?? 0} sealed markers</span>
+                <span class="mt-1 block font-mono text-[8px] uppercase tracking-[0.08em] text-[#705b45]">{t("{count} sealed markers", { count: detective.case_cards?.length ?? 0 })}</span>
               </button>
             {:else}
-              <p class="casebook-empty-page">No co-located Detective holds an unknown Case card.</p>
+              <p class="casebook-empty-page">{t("No co-located Detective holds an unknown Case card.")}</p>
             {/each}
           </div>
         </fieldset>
 
         {#if selectedBribeTarget}
           <fieldset id="detective-bribe-cards" class="mt-4">
-            <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">Choose one marker from {selectedBribeTarget.display_name}</legend>
+            <legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">{t("Choose one marker from {name}", { name: selectedBribeTarget.display_name })}</legend>
             <div class="mt-2 grid gap-2 sm:grid-cols-3">
               {#each selectedBribeTarget.case_cards ?? [] as card}
                 <button id={`bribe-case-card-${card.id}`} type="button" aria-pressed={bribes.selectedCardId === card.id} onclick={() => setBribeCard(card.id)} class={`min-h-12 cursor-pointer border px-3 py-2 text-left ${bribes.selectedCardId === card.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}>
-                  <span class="block font-serif text-sm font-semibold">Case {card.code}</span>
-                  <span class="mt-1 block font-mono text-[8px] uppercase tracking-[0.08em] text-[#705b45]">Content sealed</span>
+                  <span class="block font-serif text-sm font-semibold">{t("Case {code}", { code: card.code })}</span>
+                  <span class="mt-1 block font-mono text-[8px] uppercase tracking-[0.08em] text-[#705b45]">{t("Content sealed")}</span>
                 </button>
               {/each}
             </div>
@@ -624,45 +626,45 @@
 
       {#if bribeConfirming}
         <div id="bribe-confirmation" class="mt-4 border-2 border-[#8c3f33] bg-[#eadbbc] p-4" role="alert">
-          <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#8c3f33]">Payment authorization</p>
-          <p class="mt-2 font-serif text-base font-semibold">Case {selectedBribeCard?.code} / {bribes.mode === "officer" ? "Desk officer" : selectedBribeTarget?.display_name}</p>
-          <p class="mt-2 text-xs leading-5 text-[#695642]">Confirm ${bribes.mode === "officer" ? 3 : 2} Scratch. The server will reveal the card only after validating location, funds, and knowledge ownership.</p>
+          <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#8c3f33]">{t("Payment authorization")}</p>
+          <p class="mt-2 font-serif text-base font-semibold">{t("Case {code} / {source}", { code: selectedBribeCard?.code, source: bribes.mode === "officer" ? t("Desk officer") : selectedBribeTarget?.display_name })}</p>
+          <p class="mt-2 text-xs leading-5 text-[#695642]">{t("Confirm ${amount} Scratch. The server will reveal the card only after validating location, funds, and knowledge ownership.", { amount: bribes.mode === "officer" ? 3 : 2 })}</p>
           <div class="mt-3 grid grid-cols-2 gap-2">
-            <button id="casebook-cancel-bribe" type="button" onclick={() => (bribeConfirming = false)} class="min-h-11 cursor-pointer border border-[#796349] bg-[#d7c7aa] px-3 text-sm font-semibold">Cancel payment</button>
-            <button id="casebook-confirm-bribe" type="button" onclick={confirmBribe} class="min-h-11 cursor-pointer bg-[#8f372f] px-3 text-sm font-semibold text-[#fff0d6]">Pay and inspect</button>
+            <button id="casebook-cancel-bribe" type="button" onclick={() => (bribeConfirming = false)} class="min-h-11 cursor-pointer border border-[#796349] bg-[#d7c7aa] px-3 text-sm font-semibold">{t("Cancel payment")}</button>
+            <button id="casebook-confirm-bribe" type="button" onclick={confirmBribe} class="min-h-11 cursor-pointer bg-[#8f372f] px-3 text-sm font-semibold text-[#fff0d6]">{t("Pay and inspect")}</button>
           </div>
         </div>
       {:else}
-        <button id="casebook-submit-bribe" type="button" disabled={!bribeCommandAvailable || !selectedBribeCard || (bribes.mode !== "officer" && !selectedBribeTarget)} onclick={() => (bribeConfirming = true)} class="mt-4 min-h-12 w-full cursor-pointer bg-[#30261f] px-4 text-left text-sm font-semibold text-[#f5e7c9] disabled:cursor-not-allowed disabled:opacity-40">Review bribe <span class="float-right font-mono text-[10px]">${bribes.mode === "officer" ? 3 : 2}</span></button>
+        <button id="casebook-submit-bribe" type="button" disabled={!bribeCommandAvailable || !selectedBribeCard || (bribes.mode !== "officer" && !selectedBribeTarget)} onclick={() => (bribeConfirming = true)} class="mt-4 min-h-12 w-full cursor-pointer bg-[#30261f] px-4 text-left text-sm font-semibold text-[#f5e7c9] disabled:cursor-not-allowed disabled:opacity-40">{t("Review bribe")} <span class="float-right font-mono text-[10px]">${bribes.mode === "officer" ? 3 : 2}</span></button>
       {/if}
     </section>
   {:else}
-    <p class="casebook-empty-page">Bribe records are private to each Detective.</p>
+    <p class="casebook-empty-page">{t("Bribe records are private to each Detective.")}</p>
   {/if}
 
 {:else if page === "accusation"}
   {#if view.result}
     <section id="case-closed-result" class="casebook-workspace-page border-2 border-[#71372f] bg-[#eadbbc] p-4 sm:p-5" aria-labelledby="case-result-heading">
-      <div class="flex flex-wrap items-start justify-between gap-4 border-b border-[#9d8669] pb-4"><div><p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Case closed</p><h3 id="case-result-heading" class="mt-1 font-serif text-2xl font-semibold">The sealed solution</h3></div><p class="font-mono text-[10px] uppercase tracking-[0.12em] text-[#71372f]">Winner: {view.result.winner.role}</p></div>
-      <dl class="mt-4 grid gap-3 sm:grid-cols-3"><div class="border-l-2 border-[#71372f] pl-3"><dt class="font-mono text-[9px] uppercase text-[#725e48]">Suspect</dt><dd class="mt-1 font-serif text-base font-semibold">{view.result.solution.suspect_name}</dd></div><div class="border-l-2 border-[#71372f] pl-3"><dt class="font-mono text-[9px] uppercase text-[#725e48]">Weapon</dt><dd class="mt-1 font-serif text-base font-semibold">{view.result.solution.weapon_label}</dd></div><div class="border-l-2 border-[#71372f] pl-3"><dt class="font-mono text-[9px] uppercase text-[#725e48]">Motive</dt><dd class="mt-1 font-serif text-base font-semibold">{view.result.solution.motive_label}</dd></div></dl>
+      <div class="flex flex-wrap items-start justify-between gap-4 border-b border-[#9d8669] pb-4"><div><p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">{t("Case closed")}</p><h3 id="case-result-heading" class="mt-1 font-serif text-2xl font-semibold">{t("The sealed solution")}</h3></div><p class="font-mono text-[10px] uppercase tracking-[0.12em] text-[#71372f]">{t("Winner: {role}", { role: t(view.result.winner.role) })}</p></div>
+      <dl class="mt-4 grid gap-3 sm:grid-cols-3"><div class="border-l-2 border-[#71372f] pl-3"><dt class="font-mono text-[9px] uppercase text-[#725e48]">{t("Suspect")}</dt><dd class="mt-1 font-serif text-base font-semibold">{view.result.solution.suspect_name}</dd></div><div class="border-l-2 border-[#71372f] pl-3"><dt class="font-mono text-[9px] uppercase text-[#725e48]">{t("Weapon")}</dt><dd class="mt-1 font-serif text-base font-semibold">{view.result.solution.weapon_label}</dd></div><div class="border-l-2 border-[#71372f] pl-3"><dt class="font-mono text-[9px] uppercase text-[#725e48]">{t("Motive")}</dt><dd class="mt-1 font-serif text-base font-semibold">{view.result.solution.motive_label}</dd></div></dl>
       {#if view.result.epilogue}<p class="mt-4 max-w-3xl font-serif text-sm italic leading-6 text-[#4f3e30]">{view.result.epilogue}</p>{/if}
     </section>
   {:else if view.role === "detective" && (accusation.options?.motives?.length ?? 0) > 0 && (availableActions.has("accuse") || availableActions.has("submit_final_guess") || accusation.solveAttempt || accusation.finalGuess || view.phase === "accusation")}
     <section id="accusation-sheet" class="casebook-workspace-page border-2 border-[#71372f] bg-[#d7c6a6] p-4 sm:p-5" aria-labelledby="accusation-heading">
-      <div class="flex flex-wrap items-start justify-between gap-3"><div><p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Sealed deduction</p><h3 id="accusation-heading" class="mt-1 font-serif text-xl font-semibold">Suspect, weapon, motive</h3></div><span class="border border-[#8c3f33] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.1em] text-[#8c3f33]">{view.phase === "accusation" ? "final guess" : "solve token"}</span></div>
+      <div class="flex flex-wrap items-start justify-between gap-3"><div><p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">{t("Sealed deduction")}</p><h3 id="accusation-heading" class="mt-1 font-serif text-xl font-semibold">{t("Suspect, weapon, motive")}</h3></div><span class="border border-[#8c3f33] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.1em] text-[#8c3f33]">{view.phase === "accusation" ? t("final guess") : t("solve token")}</span></div>
 
       {#if view.phase === "accusation"}
         <section id="final-guess-progress" class="mt-4 border-y border-[#9d8669] py-3" aria-labelledby="final-guess-progress-heading" aria-live="polite">
           <div class="flex items-center justify-between gap-3">
-            <h4 id="final-guess-progress-heading" class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">Sealed envelopes</h4>
-            <span class="font-mono text-[9px] font-semibold uppercase text-[#8c3f33]">{finalGuessFiledCount} / {view.detectives?.length ?? 0} filed</span>
+            <h4 id="final-guess-progress-heading" class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">{t("Sealed envelopes")}</h4>
+            <span class="font-mono text-[9px] font-semibold uppercase text-[#8c3f33]">{t("{current} / {total} filed", { current: finalGuessFiledCount, total: view.detectives?.length ?? 0 })}</span>
           </div>
           <ul class="mt-2 grid gap-2 sm:grid-cols-2">
             {#each view.detectives ?? [] as detective}
               <li id={`final-guess-player-${detective.id}`} class="flex min-h-10 items-center justify-between border border-[#9d8669] bg-[#e4d6b8] px-3 text-sm">
                 <span class="font-serif font-semibold">{detective.display_name}</span>
                 <span class={`font-mono text-[9px] font-semibold uppercase tracking-[0.1em] ${detective.final_guess_submitted ? "text-[#315046]" : "text-[#8c3f33]"}`}>
-                  {detective.final_guess_submitted ? "FILED" : "PENDING"}
+                  {detective.final_guess_submitted ? t("FILED") : t("PENDING")}
                 </span>
               </li>
             {/each}
@@ -670,55 +672,55 @@
         </section>
       {/if}
 
-      {#if accusation.solveAttempt}<p id="solve-attempt-result" class="mt-3 border-l-4 border-[#8c3f33] bg-[#eadbbc] p-3 text-sm font-semibold">{accusation.solveAttempt.correct_count} of 3 elements were correct. The token is spent; your turn continues.</p>{/if}
+      {#if accusation.solveAttempt}<p id="solve-attempt-result" class="mt-3 border-l-4 border-[#8c3f33] bg-[#eadbbc] p-3 text-sm font-semibold">{t("{count} of 3 elements were correct. The token is spent; your turn continues.", { count: accusation.solveAttempt.correct_count })}</p>{/if}
       {#if accusation.finalGuess && view.phase === "accusation"}
-        <p id="final-guess-sealed" class="mt-3 border border-dashed border-[#8e765b] p-4 text-center font-serif text-sm italic">Your final guess is sealed. Waiting for the remaining Detectives.</p>
+        <p id="final-guess-sealed" class="mt-3 border border-dashed border-[#8e765b] p-4 text-center font-serif text-sm italic">{t("Your final guess is sealed. Waiting for the remaining Detectives.")}</p>
       {:else}
         <div class="mt-4 grid gap-4 lg:grid-cols-3">
-          <fieldset id="accusation-suspects"><legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">1 / Suspect</legend><div class="mt-2 grid gap-2">{#each accusation.options?.suspects ?? [] as suspect}<label class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 ${accusation.selectedSuspectId === suspect.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}><input type="radio" name="accusation-suspect" value={suspect.id} checked={accusation.selectedSuspectId === suspect.id} onchange={() => setAccusationSelection(actions.setAccusationSuspect, suspect.id)} class="accent-[#963a31]" /><span class="text-sm font-semibold">{suspect.name}</span></label>{/each}</div></fieldset>
-          <fieldset id="accusation-weapons"><legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">2 / Known weapon</legend><div class="mt-2 grid gap-2">{#each accusation.options?.weapons ?? [] as weapon}<label class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 ${accusation.selectedWeaponId === weapon.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}><input type="radio" name="accusation-weapon" value={weapon.id} checked={accusation.selectedWeaponId === weapon.id} onchange={() => setAccusationSelection(actions.setAccusationWeapon, weapon.id)} class="accent-[#963a31]" /><span class="text-sm font-semibold">{weapon.label}</span></label>{/each}</div></fieldset>
-          <fieldset id="accusation-motives"><legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">3 / Motive</legend><div class="mt-2 grid gap-2">{#each accusation.options?.motives ?? [] as motive}<label class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 ${accusation.selectedMotiveId === motive.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}><input type="radio" name="accusation-motive" value={motive.id} checked={accusation.selectedMotiveId === motive.id} onchange={() => setAccusationSelection(actions.setAccusationMotive, motive.id)} class="accent-[#963a31]" /><span class="text-sm font-semibold">{motive.label}</span></label>{/each}</div></fieldset>
+          <fieldset id="accusation-suspects"><legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">{t("1 / Suspect")}</legend><div class="mt-2 grid gap-2">{#each accusation.options?.suspects ?? [] as suspect}<label class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 ${accusation.selectedSuspectId === suspect.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}><input type="radio" name="accusation-suspect" value={suspect.id} checked={accusation.selectedSuspectId === suspect.id} onchange={() => setAccusationSelection(actions.setAccusationSuspect, suspect.id)} class="accent-[#963a31]" /><span class="text-sm font-semibold">{suspect.name}</span></label>{/each}</div></fieldset>
+          <fieldset id="accusation-weapons"><legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">{t("2 / Known weapon")}</legend><div class="mt-2 grid gap-2">{#each accusation.options?.weapons ?? [] as weapon}<label class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 ${accusation.selectedWeaponId === weapon.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}><input type="radio" name="accusation-weapon" value={weapon.id} checked={accusation.selectedWeaponId === weapon.id} onchange={() => setAccusationSelection(actions.setAccusationWeapon, weapon.id)} class="accent-[#963a31]" /><span class="text-sm font-semibold">{weapon.label}</span></label>{/each}</div></fieldset>
+          <fieldset id="accusation-motives"><legend class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#725e48]">{t("3 / Motive")}</legend><div class="mt-2 grid gap-2">{#each accusation.options?.motives ?? [] as motive}<label class={`flex min-h-11 cursor-pointer items-center gap-3 border px-3 py-2 ${accusation.selectedMotiveId === motive.id ? "border-[#8c3f33] bg-[#f0dfbd]" : "border-[#9d8669] bg-[#e4d6b8]"}`}><input type="radio" name="accusation-motive" value={motive.id} checked={accusation.selectedMotiveId === motive.id} onchange={() => setAccusationSelection(actions.setAccusationMotive, motive.id)} class="accent-[#963a31]" /><span class="text-sm font-semibold">{motive.label}</span></label>{/each}</div></fieldset>
         </div>
 
         {#if accusationConfirming}
           <div id="accusation-confirmation" class="mt-4 border-2 border-[#8c3f33] bg-[#eadbbc] p-4" role="alert">
-            <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#8c3f33]">Final seal check</p>
+            <p class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#8c3f33]">{t("Final seal check")}</p>
             <p class="mt-2 font-serif text-base font-semibold">
               {selectedAccusationSuspect?.name} / {selectedAccusationWeapon?.label} / {selectedAccusationMotive?.label}
             </p>
             <p class="mt-2 text-xs leading-5 text-[#695642]">
               {view.phase === "accusation"
-                ? "This envelope cannot be changed after filing. Its contents stay private until every Detective submits."
-                : "This spends your only Solve token. An incorrect accusation reveals only how many elements matched."}
+                ? t("This envelope cannot be changed after filing. Its contents stay private until every Detective submits.")
+                : t("This spends your only Solve token. An incorrect accusation reveals only how many elements matched.")}
             </p>
             <div class="mt-3 grid grid-cols-2 gap-2">
-              <button id="casebook-cancel-accusation" type="button" onclick={() => (accusationConfirming = false)} class="min-h-11 cursor-pointer border border-[#796349] bg-[#d7c7aa] px-3 text-sm font-semibold">Revise deduction</button>
-              <button id="casebook-confirm-accusation" type="button" onclick={confirmAccusation} class="min-h-11 cursor-pointer bg-[#8f372f] px-3 text-sm font-semibold text-[#fff0d6]">{view.phase === "accusation" ? "File sealed guess" : "Spend Solve token"}</button>
+              <button id="casebook-cancel-accusation" type="button" onclick={() => (accusationConfirming = false)} class="min-h-11 cursor-pointer border border-[#796349] bg-[#d7c7aa] px-3 text-sm font-semibold">{t("Revise deduction")}</button>
+              <button id="casebook-confirm-accusation" type="button" onclick={confirmAccusation} class="min-h-11 cursor-pointer bg-[#8f372f] px-3 text-sm font-semibold text-[#fff0d6]">{view.phase === "accusation" ? t("File sealed guess") : t("Spend Solve token")}</button>
             </div>
           </div>
         {:else}
-          <button id="casebook-submit-accusation" type="button" disabled={(!availableActions.has("accuse") && !availableActions.has("submit_final_guess")) || !selectedAccusationSuspect || !selectedAccusationWeapon || !selectedAccusationMotive} onclick={() => (accusationConfirming = true)} class="mt-4 min-h-12 w-full cursor-pointer bg-[#8f372f] px-4 text-sm font-semibold text-[#fff0d6] disabled:cursor-not-allowed disabled:opacity-40">{view.phase === "accusation" ? "Review final guess" : "Review Solve accusation"}</button>
+          <button id="casebook-submit-accusation" type="button" disabled={(!availableActions.has("accuse") && !availableActions.has("submit_final_guess")) || !selectedAccusationSuspect || !selectedAccusationWeapon || !selectedAccusationMotive} onclick={() => (accusationConfirming = true)} class="mt-4 min-h-12 w-full cursor-pointer bg-[#8f372f] px-4 text-sm font-semibold text-[#fff0d6] disabled:cursor-not-allowed disabled:opacity-40">{view.phase === "accusation" ? t("Review final guess") : t("Review Solve accusation")}</button>
         {/if}
 
-        {#if view.phase !== "accusation"}<p class="mt-2 text-xs leading-5 text-[#695642]">A Solve accusation is legal only at the beginning of your turn, before any action is spent.</p>{/if}
+        {#if view.phase !== "accusation"}<p class="mt-2 text-xs leading-5 text-[#695642]">{t("A Solve accusation is legal only at the beginning of your turn, before any action is spent.")}</p>{/if}
       {/if}
     </section>
   {:else}
-    <p id="accusation-unavailable" class="casebook-empty-page">No accusation sheet is authorized yet. The server opens this folio when a Solve attempt or final guess is legal.</p>
+    <p id="accusation-unavailable" class="casebook-empty-page">{t("No accusation sheet is authorized yet. The server opens this folio when a Solve attempt or final guess is legal.")}</p>
   {/if}
 
 {:else if page === "history"}
   <div class="grid gap-4">
     {#if (view.specialRules?.length ?? 0) > 0}
       <section id="case-special-rules" class="casebook-workspace-page border-2 border-[#75503b] bg-[#d8c7a7] p-4 sm:p-5" aria-labelledby="case-special-rules-heading">
-        <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Case directives · override standing orders</p>
-        <h3 id="case-special-rules-heading" class="mt-1 font-serif text-xl font-semibold">Special rules</h3>
+        <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">{t("Case directives · override standing orders")}</p>
+        <h3 id="case-special-rules-heading" class="mt-1 font-serif text-xl font-semibold">{t("Special rules")}</h3>
         <ul class="mt-4 grid gap-3">
           {#each view.specialRules as rule}
             <li id={`case-special-rule-${rule.id}`} class="border-l-4 border-[#754238] bg-[#e4d6b8] px-4 py-3">
               <div class="flex flex-wrap items-start justify-between gap-2">
                 <h4 class="font-serif text-base font-semibold">{rule.title}</h4>
-                <span class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#765d47]">{rule.triggered ? "IN EFFECT" : rule.trigger.replaceAll("_", " ")}</span>
+                <span class="font-mono text-[9px] uppercase tracking-[0.12em] text-[#765d47]">{rule.triggered ? t("IN EFFECT") : t(rule.trigger).replaceAll("_", " ")}</span>
               </div>
               <p class="mt-2 text-sm leading-6 text-[#4f3e30]">{rule.text}</p>
             </li>
@@ -728,14 +730,14 @@
     {/if}
 
     <section id="public-case-history" class="casebook-history-page" aria-labelledby="public-history-heading">
-    <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">Public event ledger</p>
-    <h3 id="public-history-heading" class="mt-1 font-serif text-xl font-semibold">Investigation history</h3>
-    <p class="mt-2 border-l-2 border-[#8c3f33] pl-3 text-sm leading-6 text-[#4f3e30]" aria-live="polite">{history.lastEvent}</p>
+    <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">{t("Public event ledger")}</p>
+    <h3 id="public-history-heading" class="mt-1 font-serif text-xl font-semibold">{t("Investigation history")}</h3>
+    <p class="mt-2 border-l-2 border-[#8c3f33] pl-3 text-sm leading-6 text-[#4f3e30]" aria-live="polite">{t(history.lastEvent)}</p>
     <ol id="public-history-list" class="mt-4 grid gap-2">
-      {#each history.entries ?? [] as entry, index}<li id={`public-history-${index}`} class="casebook-history-entry"><span>{entry.type.replaceAll("_", " ")}</span><span>{entry.actorName}</span></li>{:else}<li class="casebook-empty-page">No public action has been filed yet.</li>{/each}
+      {#each history.entries ?? [] as entry, index}<li id={`public-history-${index}`} class="casebook-history-entry"><span>{t(entry.type).replaceAll("_", " ")}</span><span>{entry.actorName}</span></li>{:else}<li class="casebook-empty-page">{t("No public action has been filed yet.")}</li>{/each}
     </ol>
     {#if history.commandError && !history.commandStatus}
-      <div id="game-command-error" class="mt-4 border-l-2 border-[#a54235] bg-[#e1cfad] p-3 text-xs leading-5" role="alert"><p>{history.commandError}</p>{#if history.retryAvailable}<button type="button" onclick={() => actions.retryCommand?.()} class="mt-2 cursor-pointer font-semibold text-[#8e352d] underline underline-offset-2">Retry command</button>{/if}</div>
+      <div id="game-command-error" class="mt-4 border-l-2 border-[#a54235] bg-[#e1cfad] p-3 text-xs leading-5" role="alert"><p>{t(history.commandError)}</p>{#if history.retryAvailable}<button type="button" onclick={() => actions.retryCommand?.()} class="mt-2 cursor-pointer font-semibold text-[#8e352d] underline underline-offset-2">{t("Retry command")}</button>{/if}</div>
     {/if}
     </section>
   </div>
@@ -744,15 +746,15 @@
   {@const privateCasebook = view.chisel.casebook ?? {}}
   <section id="chisel-casebook-page" class="casebook-workspace-page bg-[#cab99a] p-4 sm:p-5" aria-labelledby="chisel-heading">
     <div class="flex items-center gap-3">
-      <svg class="size-14 shrink-0 border border-[#533b2d] bg-[#231b17]" viewBox="0 0 64 64" role="img" aria-label="Original Chisel portrait token"><rect width="64" height="64" fill="#352720" /><path d="M12 25h40L44 12H21Z" fill="#111315" /><path d="M20 23c0 15 3 24 12 24s13-9 13-24Z" fill="#b18a68" /><path d="M18 64c2-14 7-20 14-20s14 6 16 20Z" fill="#7b3029" /><path d="M25 29h5m5 0h5" stroke="#1e1815" stroke-width="2" /></svg>
-      <div class="min-w-0"><p class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7e3029]">Chisel · private case handler</p><h2 id="chisel-heading" class="break-words font-serif text-base font-semibold leading-tight">{view.chisel.identity?.display_name ?? "Unassigned"}</h2><p class="mt-1 font-mono text-[9px] uppercase text-[#715d47]">No turn · reacts to Detective actions</p></div>
+      <svg class="size-14 shrink-0 border border-[#533b2d] bg-[#231b17]" viewBox="0 0 64 64" role="img" aria-label={t("Original Chisel portrait token")}><rect width="64" height="64" fill="#352720" /><path d="M12 25h40L44 12H21Z" fill="#111315" /><path d="M20 23c0 15 3 24 12 24s13-9 13-24Z" fill="#b18a68" /><path d="M18 64c2-14 7-20 14-20s14 6 16 20Z" fill="#7b3029" /><path d="M25 29h5m5 0h5" stroke="#1e1815" stroke-width="2" /></svg>
+      <div class="min-w-0"><p class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7e3029]">{t("Chisel · private case handler")}</p><h2 id="chisel-heading" class="break-words font-serif text-base font-semibold leading-tight">{view.chisel.identity?.display_name ?? t("Unassigned")}</h2><p class="mt-1 font-mono text-[9px] uppercase text-[#715d47]">{t("No turn · reacts to Detective actions")}</p></div>
     </div>
     <div class="mt-5 border-y border-[#9d8669] py-4">
-      <p class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7e3029]">Private casebook</p>
-      <p class="mt-2 font-serif text-sm italic leading-6 text-[#4e3d2f]">{view.chisel.casebook?.briefing ?? "No private briefing filed."}</p>
+      <p class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7e3029]">{t("Private casebook")}</p>
+      <p class="mt-2 font-serif text-sm italic leading-6 text-[#4e3d2f]">{view.chisel.casebook?.briefing ?? t("No private briefing filed.")}</p>
       {#if (view.chisel.casebook?.special_rules?.length ?? 0) > 0}
         <section id="chisel-special-rules" class="mt-4 border border-[#76523e] bg-[#d9c8a8] p-3" aria-labelledby="chisel-special-rules-heading">
-          <h3 id="chisel-special-rules-heading" class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7e3029]">Special handling</h3>
+          <h3 id="chisel-special-rules-heading" class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7e3029]">{t("Special handling")}</h3>
           <ul class="mt-2 grid gap-2">
             {#each view.chisel.casebook.special_rules as rule}
               <li id={`chisel-special-rule-${rule.id}`} class="border-l-2 border-[#7e3029] pl-3">
@@ -764,15 +766,15 @@
         </section>
       {/if}
       <section class="mt-5 border-l-4 border-[#7e3029] bg-[#dfcfad] px-4 py-3" aria-labelledby="sealed-solution-heading">
-        <p class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7e3029]">Chisel eyes only</p>
-        <h3 id="sealed-solution-heading" class="mt-1 font-serif text-lg font-semibold">Sealed solution</h3>
+        <p class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7e3029]">{t("Chisel eyes only")}</p>
+        <h3 id="sealed-solution-heading" class="mt-1 font-serif text-lg font-semibold">{t("Sealed solution")}</h3>
         <dl class="mt-3 grid gap-2 text-xs sm:grid-cols-3">
-          <div><dt class="text-[#715d47]">Suspect</dt><dd class="mt-1 font-serif text-sm font-semibold">{chiselSuspectName(privateCasebook)}</dd></div>
-          <div><dt class="text-[#715d47]">Weapon</dt><dd class="mt-1 font-serif text-sm font-semibold">{chiselOptionLabel(privateCasebook, "weapons", "weapon_id")}</dd></div>
-          <div><dt class="text-[#715d47]">Motive</dt><dd class="mt-1 font-serif text-sm font-semibold">{chiselOptionLabel(privateCasebook, "motives", "motive_id")}</dd></div>
+          <div><dt class="text-[#715d47]">{t("Suspect")}</dt><dd class="mt-1 font-serif text-sm font-semibold">{chiselSuspectName(privateCasebook)}</dd></div>
+          <div><dt class="text-[#715d47]">{t("Weapon")}</dt><dd class="mt-1 font-serif text-sm font-semibold">{chiselOptionLabel(privateCasebook, "weapons", "weapon_id")}</dd></div>
+          <div><dt class="text-[#715d47]">{t("Motive")}</dt><dd class="mt-1 font-serif text-sm font-semibold">{chiselOptionLabel(privateCasebook, "motives", "motive_id")}</dd></div>
         </dl>
       </section>
-      <dl class="mt-4 grid gap-2 text-xs sm:grid-cols-2"><div class="flex justify-between gap-3"><dt class="text-[#715d47]">Leverage held</dt><dd class="font-mono font-semibold">{Object.values(view.chisel.leverageByDetective ?? {}).reduce((sum, value) => sum + value, 0)}</dd></div><div class="flex justify-between gap-3"><dt class="text-[#715d47]">Pending response</dt><dd class="font-mono font-semibold">{view.chisel.pendingInterrogation ? "OPEN" : "NONE"}</dd></div></dl>
+      <dl class="mt-4 grid gap-2 text-xs sm:grid-cols-2"><div class="flex justify-between gap-3"><dt class="text-[#715d47]">{t("Leverage held")}</dt><dd class="font-mono font-semibold">{Object.values(view.chisel.leverageByDetective ?? {}).reduce((sum, value) => sum + value, 0)}</dd></div><div class="flex justify-between gap-3"><dt class="text-[#715d47]">{t("Pending response")}</dt><dd class="font-mono font-semibold">{view.chisel.pendingInterrogation ? t("OPEN") : t("NONE")}</dd></div></dl>
     </div>
   </section>
 {/if}

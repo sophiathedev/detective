@@ -30,8 +30,14 @@ defmodule DetectiveWeb.UserAuthTest do
     end
 
     test "clears everything previously stored in the session", %{conn: conn, user: user} do
-      conn = conn |> put_session(:to_be_removed, "value") |> UserAuth.log_in_user(user)
+      conn =
+        conn
+        |> put_session(:to_be_removed, "value")
+        |> put_session(:locale, "vi")
+        |> UserAuth.log_in_user(user)
+
       refute get_session(conn, :to_be_removed)
+      assert get_session(conn, :locale) == "vi"
     end
 
     test "keeps session when re-authenticating", %{conn: conn, user: user} do
@@ -113,11 +119,13 @@ defmodule DetectiveWeb.UserAuthTest do
       conn =
         conn
         |> put_session(:user_token, user_token)
+        |> put_session(:locale, "vi")
         |> put_req_cookie(@remember_me_cookie, user_token)
         |> fetch_cookies()
         |> UserAuth.log_out_user()
 
       refute get_session(conn, :user_token)
+      assert get_session(conn, :locale) == "vi"
       refute conn.cookies[@remember_me_cookie]
       assert %{max_age: 0} = conn.resp_cookies[@remember_me_cookie]
       assert redirected_to(conn) == ~p"/"

@@ -15,7 +15,7 @@ defmodule DetectiveWeb.GameNewLive do
 
     {:ok,
      assign(socket,
-       page_title: "Create game",
+       page_title: gettext("Create game"),
        form: form,
        invite_hours: @default_invite_hours,
        case_options: case_options(Cases.list_published_versions()),
@@ -64,14 +64,15 @@ defmodule DetectiveWeb.GameNewLive do
       {:error, :case_version_not_published} ->
         {:noreply,
          assign(socket,
-           global_error: "That case is no longer available. Choose another published case."
+           global_error:
+             gettext("That case is no longer available. Choose another published case.")
          )}
 
       {:error, :invalid_invite_expiry} ->
         {:noreply,
          assign(socket,
            invite_hours: invite_hours(game_params),
-           global_error: "Choose a valid invitation expiry."
+           global_error: gettext("Choose a valid invitation expiry.")
          )}
     end
   end
@@ -88,7 +89,8 @@ defmodule DetectiveWeb.GameNewLive do
             form: serialize_form(@form, @invite_hours),
             case_options: @case_options,
             global_error: @global_error,
-            created_room: @created_room
+            created_room: @created_room,
+            locale: @locale
           }
         }
         socket={@socket}
@@ -121,7 +123,11 @@ defmodule DetectiveWeb.GameNewLive do
     Enum.map(case_versions, fn version ->
       %{
         value: version.id,
-        label: "#{version.case_file.title} (version #{version.version})",
+        label:
+          gettext("%{title} (version %{version})",
+            title: version.case_file.title,
+            version: version.version
+          ),
         description: version.case_file.description
       }
     end)

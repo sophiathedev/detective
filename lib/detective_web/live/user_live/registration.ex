@@ -17,23 +17,23 @@ defmodule DetectiveWeb.UserLive.Registration do
           class="noir-paper-sheet mx-auto max-w-lg p-6 sm:p-10"
         >
           <p class="font-mono text-xs uppercase tracking-[0.18em] text-[var(--noir-red-700)]">
-            New investigator record
+            {gettext("New investigator record")}
           </p>
           <h1
             id="registration-title"
             class="mt-3 font-serif text-4xl font-semibold text-[var(--noir-ink-900)]"
           >
-            Register an investigator
+            {gettext("Register an investigator")}
           </h1>
           <p class="mt-3 text-sm leading-6 text-[#66513c]">
-            Already registered?
+            {gettext("Already registered?")}
             <.link
               navigate={~p"/users/log-in"}
               class="font-semibold text-[var(--noir-red-700)] hover:underline"
             >
-              Log in
+              {gettext("Log in")}
             </.link>
-            to reopen your file.
+            {gettext("to reopen your file.")}
           </p>
 
           <.form
@@ -46,7 +46,7 @@ defmodule DetectiveWeb.UserLive.Registration do
             <.input
               field={@form[:display_name]}
               type="text"
-              label="Display name"
+              label={gettext("Display name")}
               autocomplete="name"
               required
               phx-mounted={JS.focus()}
@@ -54,7 +54,7 @@ defmodule DetectiveWeb.UserLive.Registration do
             <.input
               field={@form[:email]}
               type="email"
-              label="Email"
+              label={gettext("Email")}
               autocomplete="username"
               spellcheck="false"
               required
@@ -62,14 +62,14 @@ defmodule DetectiveWeb.UserLive.Registration do
 
             <.button
               variant="primary"
-              phx-disable-with="Creating account..."
+              phx-disable-with={gettext("Creating account...")}
               class="noir-physical-button w-full px-4 text-sm font-semibold"
             >
-              Create an account
+              {gettext("Create an account")}
             </.button>
           </.form>
           <p class="mt-6 border-t border-[var(--noir-paper-500)] pt-5 text-xs leading-5 text-[#705a42]">
-            Your display name is public inside a room. Your email remains account-only.
+            {gettext("Your display name is public inside a room. Your email remains account-only.")}
           </p>
         </div>
       </section>
@@ -103,7 +103,10 @@ defmodule DetectiveWeb.UserLive.Registration do
          socket
          |> put_flash(
            :info,
-           "An email was sent to #{user.email}, please access it to confirm your account."
+           gettext(
+             "An email was sent to %{email}, please access it to confirm your account.",
+             email: user.email
+           )
          )
          |> push_navigate(to: ~p"/users/log-in")}
 

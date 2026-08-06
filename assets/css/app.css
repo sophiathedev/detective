@@ -440,6 +440,39 @@ body:has(#game-pause-curtain) .noir-game-phase {
   color: #d87569;
 }
 
+.noir-game-table-locale {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  margin: 0.35rem 0.5rem 0.3rem;
+  border: 1px solid rgb(194 163 95 / 0.32);
+  background: rgb(194 163 95 / 0.18);
+}
+
+.noir-game-table-locale a {
+  padding: 0.38rem;
+  background: rgb(8 7 6 / 0.88);
+  color: #8f7959;
+  font-size: 0.52rem;
+  letter-spacing: 0.12em;
+  text-align: center;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.noir-game-table-locale a:hover {
+  color: var(--noir-paper-100);
+}
+
+.noir-game-table-locale a[aria-current="true"] {
+  background: #d8c7a5;
+  color: var(--noir-ink-900);
+}
+
+.noir-game-table-locale a:focus-visible {
+  outline: 3px solid var(--noir-focus);
+  outline-offset: -3px;
+}
+
 .noir-game-detective-rail {
   position: absolute;
   z-index: 30;

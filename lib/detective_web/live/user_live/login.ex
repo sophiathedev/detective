@@ -10,23 +10,23 @@ defmodule DetectiveWeb.UserLive.Login do
       <section class="noir-auth-desk px-4 py-12 sm:px-6 sm:py-20" aria-labelledby="login-title">
         <div id="auth-login-sheet" class="noir-paper-sheet mx-auto max-w-lg p-6 sm:p-10">
           <p class="font-mono text-xs uppercase tracking-[0.18em] text-[var(--noir-red-700)]">
-            Identity file
+            {gettext("Identity file")}
           </p>
           <h1
             id="login-title"
             class="mt-3 font-serif text-4xl font-semibold text-[var(--noir-ink-900)]"
           >
-            Log in
+            {gettext("Log in")}
           </h1>
           <p class="mt-3 text-sm leading-6 text-[#66513c]">
             <%= if @current_scope do %>
-              You need to reauthenticate to perform sensitive actions on your account.
+              {gettext("You need to reauthenticate to perform sensitive actions on your account.")}
             <% else %>
-              Don't have an account? <.link
+              {gettext("Don't have an account?")} <.link
                 navigate={~p"/users/register"}
                 class="font-semibold text-[var(--noir-red-700)] hover:underline"
                 phx-no-format
-              >Sign up</.link> for an account now.
+              >{gettext("Sign up")}</.link> {gettext("for an account now.")}
             <% end %>
           </p>
 
@@ -36,9 +36,10 @@ defmodule DetectiveWeb.UserLive.Login do
           >
             <.icon name="hero-information-circle" class="size-5 shrink-0" />
             <div>
-              <p>You are running the local mail adapter.</p>
+              <p>{gettext("You are running the local mail adapter.")}</p>
               <p>
-                To see sent emails, visit <.link href="/dev/mailbox" class="underline">the mailbox page</.link>.
+                {gettext("To see sent emails, visit")}
+                <.link href="/dev/mailbox" class="underline">{gettext("the mailbox page")}</.link>.
               </p>
             </div>
           </div>
@@ -55,20 +56,20 @@ defmodule DetectiveWeb.UserLive.Login do
               field={@form[:email]}
               id="login_form_magic_email"
               type="email"
-              label="Email"
+              label={gettext("Email")}
               autocomplete="username"
               spellcheck="false"
               required
               phx-mounted={JS.focus()}
             />
             <.button variant="primary" class="noir-physical-button w-full px-4 text-sm font-semibold">
-              Log in with email <span aria-hidden="true">→</span>
+              {gettext("Log in with email")} <span aria-hidden="true">→</span>
             </.button>
           </.form>
 
           <div class="my-6 flex items-center gap-3 font-mono text-xs uppercase tracking-[0.2em] text-[#715a42]">
             <span class="h-px flex-1 bg-[var(--noir-paper-500)]"></span>
-            or <span class="h-px flex-1 bg-[var(--noir-paper-500)]"></span>
+            {gettext("or")} <span class="h-px flex-1 bg-[var(--noir-paper-500)]"></span>
           </div>
 
           <.form
@@ -83,7 +84,7 @@ defmodule DetectiveWeb.UserLive.Login do
               field={@form[:email]}
               id="login_form_password_email"
               type="email"
-              label="Email"
+              label={gettext("Email")}
               autocomplete="username"
               spellcheck="false"
               required
@@ -91,7 +92,7 @@ defmodule DetectiveWeb.UserLive.Login do
             <.input
               field={@form[:password]}
               type="password"
-              label="Password"
+              label={gettext("Password")}
               autocomplete="current-password"
               spellcheck="false"
             />
@@ -101,10 +102,10 @@ defmodule DetectiveWeb.UserLive.Login do
               name={@form[:remember_me].name}
               value="true"
             >
-              Log in and stay logged in <span aria-hidden="true">→</span>
+              {gettext("Log in and stay logged in")} <span aria-hidden="true">→</span>
             </.button>
             <.button class="mt-2 w-full border border-[var(--noir-ink-900)] bg-transparent px-4 py-2.5 text-sm font-semibold text-[var(--noir-ink-900)] transition hover:bg-[var(--noir-ink-900)] hover:text-[var(--noir-paper-100)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--noir-red-700)]">
-              Log in only this time
+              {gettext("Log in only this time")}
             </.button>
           </.form>
         </div>
@@ -138,7 +139,9 @@ defmodule DetectiveWeb.UserLive.Login do
     end
 
     info =
-      "If your email is in our system, you will receive instructions for logging in shortly."
+      gettext(
+        "If your email is in our system, you will receive instructions for logging in shortly."
+      )
 
     {:noreply,
      socket

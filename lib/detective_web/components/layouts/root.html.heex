@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang={@locale}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -15,7 +15,7 @@
   <body class="min-h-screen bg-[var(--noir-ebony-950)] font-sans text-stone-100 antialiased">
     <nav
       id="account-navigation"
-      aria-label="Account"
+      aria-label={gettext("Account")}
       class="noir-wood-nav relative z-20 flex min-h-14 items-center justify-end gap-4 px-4 text-sm text-stone-300 sm:px-6 lg:px-8"
     >
       <.link
@@ -24,6 +24,43 @@
       >
         DETECTIVE
       </.link>
+      <div
+        id="locale-switcher"
+        role="group"
+        aria-label={gettext("Language")}
+        class="flex items-center rounded-sm border border-[var(--noir-gold-700)]/70 bg-black/20 p-0.5 font-mono text-[0.65rem] font-semibold tracking-[0.12em]"
+      >
+        <.link
+          id="locale-en"
+          href={~p"/locale/en?#{[return_to: @conn.request_path]}"}
+          method="post"
+          aria-current={if(@locale == "en", do: "true", else: nil)}
+          class={[
+            "min-w-8 px-2 py-1 text-center transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--noir-focus)]",
+            if(@locale == "en",
+              do: "bg-[var(--noir-paper-100)] text-[var(--noir-ink-900)]",
+              else: "text-stone-400 hover:text-[var(--noir-gold-500)]"
+            )
+          ]}
+        >
+          EN
+        </.link>
+        <.link
+          id="locale-vi"
+          href={~p"/locale/vi?#{[return_to: @conn.request_path]}"}
+          method="post"
+          aria-current={if(@locale == "vi", do: "true", else: nil)}
+          class={[
+            "min-w-8 px-2 py-1 text-center transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--noir-focus)]",
+            if(@locale == "vi",
+              do: "bg-[var(--noir-paper-100)] text-[var(--noir-ink-900)]",
+              else: "text-stone-400 hover:text-[var(--noir-gold-500)]"
+            )
+          ]}
+        >
+          VI
+        </.link>
+      </div>
       <%= if @current_scope do %>
         <span class="hidden font-medium text-stone-200 sm:inline">
           {@current_scope.user.display_name}
@@ -31,27 +68,27 @@
         <.link
           href={~p"/dashboard"}
           class="transition hover:text-[var(--noir-gold-500)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--noir-focus)]"
-        >Dashboard</.link>
+        >{gettext("Dashboard")}</.link>
         <.link
           href={~p"/users/settings"}
           class="transition hover:text-[var(--noir-gold-500)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--noir-focus)]"
-        >Settings</.link>
+        >{gettext("Settings")}</.link>
         <.link
           href={~p"/users/log-out"}
           method="delete"
           class="transition hover:text-[var(--noir-gold-500)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--noir-focus)]"
         >
-          Log out
+          {gettext("Log out")}
         </.link>
       <% else %>
         <.link
           href={~p"/users/register"}
           class="transition hover:text-[var(--noir-gold-500)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--noir-focus)]"
-        >Register</.link>
+        >{gettext("Register")}</.link>
         <.link
           href={~p"/users/log-in"}
           class="transition hover:text-[var(--noir-gold-500)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--noir-focus)]"
-        >Log in</.link>
+        >{gettext("Log in")}</.link>
       <% end %>
     </nav>
     {@inner_content}

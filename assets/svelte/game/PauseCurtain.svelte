@@ -1,5 +1,8 @@
 <script>
   import { onDestroy } from "svelte"
+  import { useI18n } from "../i18n"
+
+  const { t } = useI18n()
 
   let {
     active = false,
@@ -53,16 +56,16 @@
   function pauseDescription(pauseReason, absentPlayers) {
     if (pauseReason === "player_disconnected") {
       if (absentPlayers.length === 0) {
-        return "Everyone is back at the table. The Chisel may reopen the case."
+        return t("Everyone is back at the table. The Chisel may reopen the case.")
       }
 
       const names = absentPlayers.map((player) => player.display_name).join(", ")
-      return `${names} left the table. The case stays sealed until they return.`
+      return t("{names} left the table. The case stays sealed until they return.", { names })
     }
 
     if (typeof pauseReason === "string" && !pauseReason.includes("_")) return pauseReason
 
-    return "Play is paused while the table reconnects."
+    return t("Play is paused while the table reconnects.")
   }
 
   $effect(() => {
@@ -99,34 +102,34 @@
       tabindex="-1"
       bind:this={pauseDocument}
     >
-      <p class="game-pause-kicker">Case sealed</p>
+      <p class="game-pause-kicker">{t("Case sealed")}</p>
       <h2 id="game-pause-heading" class="mt-2 font-serif text-3xl font-semibold tracking-[-0.025em] sm:text-4xl">
-        Case paused
+        {t("Case paused")}
       </h2>
       <p id="game-pause-description" class="mt-3 font-serif text-base italic leading-7">
         {pauseDescription(reason, offlinePlayers)}
       </p>
 
       <div class="game-pause-ledger">
-        <span>Connection ledger</span>
-        <strong>{offlinePlayers.length === 0 ? "All investigators present" : `${offlinePlayers.length} absent`}</strong>
+        <span>{t("Connection ledger")}</span>
+        <strong>{offlinePlayers.length === 0 ? t("All investigators present") : t("{count} absent", { count: offlinePlayers.length })}</strong>
       </div>
 
-      <ul id="paused-player-list" class="noir-paused-player-list" aria-label="Offline players">
+      <ul id="paused-player-list" class="noir-paused-player-list" aria-label={t("Offline players")}>
         {#each offlinePlayers as player (player.id)}
           <li><span aria-hidden="true"></span>{player.display_name}</li>
         {:else}
-          <li class="noir-paused-player-list-empty">No investigator currently marked offline.</li>
+          <li class="noir-paused-player-list-empty">{t("No investigator currently marked offline.")}</li>
         {/each}
       </ul>
 
       <p class="game-pause-provenance">
-        No clues, actions, or Day advances are filed while the case is sealed.
+        {t("No clues, actions, or Day advances are filed while the case is sealed.")}
       </p>
 
       {#if commandError}
         <div id="game-pause-command-error" class="game-pause-command-error" role="alert">
-          <p>{commandError}</p>
+          <p>{t(commandError)}</p>
         </div>
       {/if}
 
@@ -136,9 +139,9 @@
           type="button"
           disabled={commandPending}
           onclick={onResume}
-        >{commandPending ? "Reopening case…" : "Resume game"}</button>
+        >{commandPending ? t("Reopening case…") : t("Resume game")}</button>
       {:else}
-        <p class="noir-pause-waiting">The Chisel will reopen the case when every player is back.</p>
+        <p class="noir-pause-waiting">{t("The Chisel will reopen the case when every player is back.")}</p>
       {/if}
     </div>
   </div>

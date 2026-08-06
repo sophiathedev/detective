@@ -1,4 +1,8 @@
 <script>
+  import { useI18n } from "../i18n"
+
+  const { t } = useI18n()
+
   let {
     slots = [],
     players = [],
@@ -24,7 +28,7 @@
 
   function detectiveLabel(playerId) {
     const player = detective(playerId)
-    return player ? `D${player.seat} ${player.display_name}` : "Unknown Detective"
+    return player ? `D${player.seat} ${player.display_name}` : t("Unknown Detective")
   }
 
   function visibleKnowledgePlayerIds(slot) {
@@ -36,7 +40,7 @@
   }
 
   function slotLabel(slot) {
-    if (slot.status === "faceup") return `Case ${slot.code} faceup: ${slot.title}`
+    if (slot.status === "faceup") return t("Case {code} faceup: {title}", { code: slot.code, title: slot.title })
 
     const knowledge = visibleKnowledgePlayerIds(slot)
       .map(detectiveLabel)
@@ -45,13 +49,13 @@
     if (slot.status === "removed") {
       const holder = detectiveLabel(slot.evidence_holder_player_id)
       const release = slot.evidence_release_day
-        ? ` Returns faceup on Day ${slot.evidence_release_day}.`
-        : " No automatic return is scheduled."
+        ? t(" Returns faceup on Day {day}.", { day: slot.evidence_release_day })
+        : t(" No automatic return is scheduled.")
 
-      return `Case ${slot.code} evidence removed by ${holder}.${release} Known by ${knowledge || holder}.`
+      return t("Case {code} evidence removed by {holder}.{release} Known by {knowledge}.", { code: slot.code, holder, release, knowledge: knowledge || holder })
     }
 
-    return `Case ${slot.code} facedown.${knowledge ? ` Known by ${knowledge}.` : ""}`
+    return t("Case {code} facedown.{knowledge}", { code: slot.code, knowledge: knowledge ? t(" Known by {knowledge}.", { knowledge }) : "" })
   }
 
   function selectCaseCard(slot) {
@@ -69,11 +73,11 @@
     </div>
   {:else if slot.status === "removed"}
     <div class="noir-case-card-face noir-case-card-removed">
-      <span>Evidence</span>
+      <span>{t("Evidence")}</span>
       <strong>{slot.code}</strong>
-      <p>Removed</p>
+      <p>{t("Removed")}</p>
       <small>
-        {slot.evidence_release_day ? `Day ${slot.evidence_release_day}` : "Held"}
+        {slot.evidence_release_day ? t("Day {day}", { day: slot.evidence_release_day }) : t("Held")}
       </small>
     </div>
   {:else}
@@ -86,7 +90,7 @@
 <section
   id="case-card-rail"
   class="noir-case-card-rail"
-  aria-label="Case cards and public knowledge markers"
+  aria-label={t("Case cards and public knowledge markers")}
 >
   <ol class="noir-case-card-grid">
     {#each slots as slot (slot.code)}
@@ -107,7 +111,7 @@
             class:noir-case-card-action-selected={selectedCaseCardCode === slot.code}
             class="noir-case-card-action"
             aria-pressed={selectedCaseCardCode === slot.code}
-            aria-label={`${slotLabel(slot)} Open evidence folio.`}
+            aria-label={t("{label} Open evidence folio.", { label: slotLabel(slot) })}
             onclick={() => selectCaseCard(slot)}
           >
             {@render cardFace(slot)}

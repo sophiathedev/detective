@@ -16,16 +16,16 @@ defmodule DetectiveWeb.UserLive.Confirmation do
           class="noir-paper-sheet mx-auto max-w-lg p-6 sm:p-10"
         >
           <p class="font-mono text-xs uppercase tracking-[0.18em] text-[var(--noir-red-700)]">
-            Identity verification
+            {gettext("Identity verification")}
           </p>
           <h1
             id="confirmation-title"
             class="mt-3 font-serif text-3xl font-semibold text-[var(--noir-ink-900)]"
           >
-            Welcome {@user.email}
+            {gettext("Welcome %{email}", email: @user.email)}
           </h1>
           <p class="mt-3 text-sm leading-6 text-[#66513c]">
-            Confirm this sealed link to finish opening your investigator record.
+            {gettext("Confirm this sealed link to finish opening your investigator record.")}
           </p>
 
           <.form
@@ -42,16 +42,16 @@ defmodule DetectiveWeb.UserLive.Confirmation do
             <.button
               name={@form[:remember_me].name}
               value="true"
-              phx-disable-with="Confirming..."
+              phx-disable-with={gettext("Confirming...")}
               class="noir-physical-button w-full px-4 text-sm font-semibold"
             >
-              Confirm and stay logged in
+              {gettext("Confirm and stay logged in")}
             </.button>
             <.button
-              phx-disable-with="Confirming..."
+              phx-disable-with={gettext("Confirming...")}
               class="mt-2 w-full border border-[var(--noir-ink-900)] bg-transparent px-4 py-2.5 text-sm font-semibold text-[var(--noir-ink-900)] transition hover:bg-[var(--noir-ink-900)] hover:text-[var(--noir-paper-100)]"
             >
-              Confirm and log in only this time
+              {gettext("Confirm and log in only this time")}
             </.button>
           </.form>
 
@@ -68,25 +68,25 @@ defmodule DetectiveWeb.UserLive.Confirmation do
             <input type="hidden" name={@form[:token].name} value={@form[:token].value} />
             <%= if @current_scope do %>
               <.button
-                phx-disable-with="Logging in..."
+                phx-disable-with={gettext("Logging in...")}
                 class="noir-physical-button w-full px-4 text-sm font-semibold"
               >
-                Log in
+                {gettext("Log in")}
               </.button>
             <% else %>
               <.button
                 name={@form[:remember_me].name}
                 value="true"
-                phx-disable-with="Logging in..."
+                phx-disable-with={gettext("Logging in...")}
                 class="noir-physical-button w-full px-4 text-sm font-semibold"
               >
-                Keep me logged in on this device
+                {gettext("Keep me logged in on this device")}
               </.button>
               <.button
-                phx-disable-with="Logging in..."
+                phx-disable-with={gettext("Logging in...")}
                 class="mt-2 w-full border border-[var(--noir-ink-900)] bg-transparent px-4 py-2.5 text-sm font-semibold text-[var(--noir-ink-900)] transition hover:bg-[var(--noir-ink-900)] hover:text-[var(--noir-paper-100)]"
               >
-                Log me in only this time
+                {gettext("Log me in only this time")}
               </.button>
             <% end %>
           </.form>
@@ -95,7 +95,7 @@ defmodule DetectiveWeb.UserLive.Confirmation do
             :if={!@user.confirmed_at}
             class="mt-8 border-l-2 border-[var(--noir-red-500)] bg-[#d8c7a5] px-4 py-3 text-sm text-[var(--noir-ink-900)]"
           >
-            Tip: If you prefer passwords, you can enable them in the user settings.
+            {gettext("Tip: If you prefer passwords, you can enable them in the user settings.")}
           </p>
         </div>
       </section>
@@ -113,7 +113,7 @@ defmodule DetectiveWeb.UserLive.Confirmation do
     else
       {:ok,
        socket
-       |> put_flash(:error, "Magic link is invalid or it has expired.")
+       |> put_flash(:error, gettext("Magic link is invalid or it has expired."))
        |> push_navigate(to: ~p"/users/log-in")}
     end
   end

@@ -2,8 +2,10 @@
   import PaperSheet from "./ui/PaperSheet.svelte"
   import StatusStamp from "./ui/StatusStamp.svelte"
   import WoodFrame from "./ui/WoodFrame.svelte"
+  import { initializeI18n } from "./i18n"
 
-  let { invite = null, error = null } = $props()
+  let { invite = null, error = null, locale = "en" } = $props()
+  const { t } = initializeI18n(() => locale)
 </script>
 
 <div id="invite-shell" class="min-h-[calc(100dvh-3.5rem)] px-4 py-10 text-stone-100 sm:px-6 sm:py-16">
@@ -20,8 +22,8 @@
       </div>
 
       <div class="absolute inset-x-8 top-10 border border-[var(--noir-gold-700)] bg-[var(--noir-ebony-800)] p-5 sm:top-14">
-        <p class="font-mono text-[0.65rem] uppercase tracking-[0.2em] text-[var(--noir-gold-500)]">City dispatch</p>
-        <p class="mt-2 font-serif text-xl text-stone-200">Private delivery · recipient only</p>
+        <p class="font-mono text-[0.65rem] uppercase tracking-[0.2em] text-[var(--noir-gold-500)]">{t("City dispatch")}</p>
+        <p class="mt-2 font-serif text-xl text-stone-200">{t("Private delivery · recipient only")}</p>
       </div>
 
       <svg
@@ -45,7 +47,7 @@
     >
       {#if invite}
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <StatusStamp tone="sealed">Official summons</StatusStamp>
+          <StatusStamp tone="sealed">{t("Official summons")}</StatusStamp>
           <span class="font-mono text-xs font-semibold tracking-[0.16em] text-[var(--noir-red-700)]">{invite.room_code}</span>
         </div>
 
@@ -56,23 +58,23 @@
 
         <dl id="invite-room-details" class="mt-8 divide-y divide-[var(--noir-paper-500)] border-y border-[var(--noir-paper-500)] text-sm">
           <div class="flex justify-between gap-6 py-4">
-            <dt class="font-mono text-xs uppercase tracking-[0.1em] text-[#806b50]">Chisel</dt>
+            <dt class="font-mono text-xs uppercase tracking-[0.1em] text-[#806b50]">{t("Chisel")}</dt>
             <dd class="text-right font-semibold">{invite.host_name}</dd>
           </div>
           <div class="flex justify-between gap-6 py-4">
-            <dt class="font-mono text-xs uppercase tracking-[0.1em] text-[#806b50]">Detectives</dt>
+            <dt class="font-mono text-xs uppercase tracking-[0.1em] text-[#806b50]">{t("Detectives")}</dt>
             <dd class="font-mono font-semibold">{invite.detective_count}/{invite.max_detectives}</dd>
           </div>
           <div class="flex justify-between gap-6 py-4">
-            <dt class="font-mono text-xs uppercase tracking-[0.1em] text-[#806b50]">Places left</dt>
+            <dt class="font-mono text-xs uppercase tracking-[0.1em] text-[#806b50]">{t("Places left")}</dt>
             <dd class="font-mono font-semibold">{invite.places_left}</dd>
           </div>
         </dl>
 
         {#if error}
           <div class="mt-6 flex items-start gap-3">
-            <StatusStamp tone="danger">Unable</StatusStamp>
-            <p id="invite-error" role="alert" class="text-sm leading-6 text-[var(--noir-red-700)]">{error}</p>
+            <StatusStamp tone="danger">{t("Unable")}</StatusStamp>
+            <p id="invite-error" role="alert" class="text-sm leading-6 text-[var(--noir-red-700)]">{t(error)}</p>
           </div>
         {/if}
 
@@ -80,24 +82,24 @@
           id="accept-game-invite"
           type="button"
           phx-click="accept_invite"
-          aria-label="Accept case invitation"
+          aria-label={t("Accept case invitation")}
           class="mt-8 inline-flex min-h-12 cursor-pointer items-center justify-center bg-[var(--noir-red-700)] px-5 py-3 text-sm font-semibold text-[var(--noir-paper-100)] shadow-[0_0.3rem_0_#35100d] transition hover:bg-[var(--noir-red-500)] active:translate-y-0.5 active:shadow-[0_0.1rem_0_#35100d] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[var(--noir-focus)]"
         >
-          {invite.membership_status === "active" ? "Return to room" : "Join as detective"}
+          {invite.membership_status === "active" ? t("Return to room") : t("Join as detective")}
         </button>
-        <p class="mt-3 text-xs leading-5 text-[#705a42]">Membership is recorded only after you confirm this summons.</p>
+        <p class="mt-3 text-xs leading-5 text-[#705a42]">{t("Membership is recorded only after you confirm this summons.")}</p>
       {:else}
-        <StatusStamp tone="danger">Invitation closed</StatusStamp>
-        <h1 id="invite-title" class="mt-6 font-serif text-4xl font-semibold tracking-tight">This file is closed.</h1>
+        <StatusStamp tone="danger">{t("Invitation closed")}</StatusStamp>
+        <h1 id="invite-title" class="mt-6 font-serif text-4xl font-semibold tracking-tight">{t("This file is closed.")}</h1>
         <p id="invite-error" role="alert" class="mt-5 text-sm leading-6 text-[var(--noir-red-700)]">
-          {error ?? "This invitation cannot be used."}
+          {t(error ?? "This invitation cannot be used.")}
         </p>
         <a
           id="invite-back-dashboard"
           href="/dashboard"
           class="noir-physical-button mt-8 inline-flex w-fit items-center justify-center px-5 text-sm font-semibold"
         >
-          Back to dashboard
+          {t("Back to dashboard")}
         </a>
       {/if}
     </PaperSheet>

@@ -2,8 +2,10 @@
   import PaperSheet from "./ui/PaperSheet.svelte"
   import StatusStamp from "./ui/StatusStamp.svelte"
   import WoodFrame from "./ui/WoodFrame.svelte"
+  import { initializeI18n } from "./i18n"
 
-  let { signed_in = false } = $props()
+  let { signed_in = false, locale = "en" } = $props()
+  const { t } = initializeI18n(() => locale)
 </script>
 
 <div id="home-svelte" class="relative min-h-[calc(100dvh-3.5rem)] overflow-hidden px-4 py-8 sm:px-6 sm:py-12 lg:px-10">
@@ -27,15 +29,15 @@
       </div>
 
       <div class="relative max-w-4xl">
-        <StatusStamp tone="sealed">Case file 1940-LA</StatusStamp>
+        <StatusStamp tone="sealed">{t("Case file 1940-LA")}</StatusStamp>
         <p class="mt-7 font-mono text-xs uppercase tracking-[0.24em] text-[var(--noir-gold-500)]">
-          Los Angeles · Midnight detail
+          {t("Los Angeles · Midnight detail")}
         </p>
         <h1 id="home-case-title" class="mt-4 max-w-4xl font-serif text-5xl font-semibold leading-[0.93] tracking-[-0.055em] text-[var(--noir-paper-100)] sm:text-7xl lg:text-[6.7rem]">
-          Every witness has a story.
+          {t("Every witness has a story.")}
         </h1>
         <p class="mt-7 max-w-2xl font-serif text-lg leading-8 text-stone-300 sm:text-xl">
-          Detectives chase contradictions across the city. The Chisel guards the truth, shapes every testimony, and lets the evidence decide who was listening.
+          {t("Detectives chase contradictions across the city. The Chisel guards the truth, shapes every testimony, and lets the evidence decide who was listening.")}
         </p>
       </div>
     </section>
@@ -48,33 +50,33 @@
     >
       <div>
         <p class="font-mono text-[0.65rem] uppercase tracking-[0.2em] text-[var(--noir-red-700)]">
-          Assignment brief
+          {t("Assignment brief")}
         </p>
         <h2 id="home-brief-title" class="mt-3 font-serif text-3xl font-semibold leading-tight">
-          Enter the investigation
+          {t("Enter the investigation")}
         </h2>
         <div class="mt-5 h-px bg-[var(--noir-paper-500)]"></div>
 
-        <ol class="mt-7 space-y-6" aria-label="How a case unfolds">
+        <ol class="mt-7 space-y-6" aria-label={t("How a case unfolds")}>
           <li class="grid grid-cols-[2rem_1fr] gap-3">
             <span class="font-mono text-sm font-semibold text-[var(--noir-red-700)]">01</span>
             <div>
-              <h3 class="font-serif text-lg font-semibold">Assemble the room</h3>
-              <p class="mt-1 text-sm leading-6 text-[#5d4936]">One Chisel invites up to four Detectives into a private case.</p>
+              <h3 class="font-serif text-lg font-semibold">{t("Assemble the room")}</h3>
+              <p class="mt-1 text-sm leading-6 text-[#5d4936]">{t("One Chisel invites up to four Detectives into a private case.")}</p>
             </div>
           </li>
           <li class="grid grid-cols-[2rem_1fr] gap-3">
             <span class="font-mono text-sm font-semibold text-[var(--noir-red-700)]">02</span>
             <div>
-              <h3 class="font-serif text-lg font-semibold">Read the city</h3>
-              <p class="mt-1 text-sm leading-6 text-[#5d4936]">Move, search, and interrogate while the server enforces every turn.</p>
+              <h3 class="font-serif text-lg font-semibold">{t("Read the city")}</h3>
+              <p class="mt-1 text-sm leading-6 text-[#5d4936]">{t("Move, search, and interrogate while the server enforces every turn.")}</p>
             </div>
           </li>
           <li class="grid grid-cols-[2rem_1fr] gap-3">
             <span class="font-mono text-sm font-semibold text-[var(--noir-red-700)]">03</span>
             <div>
-              <h3 class="font-serif text-lg font-semibold">Challenge the lie</h3>
-              <p class="mt-1 text-sm leading-6 text-[#5d4936]">Commit to a theory before the case closes around you.</p>
+              <h3 class="font-serif text-lg font-semibold">{t("Challenge the lie")}</h3>
+              <p class="mt-1 text-sm leading-6 text-[#5d4936]">{t("Commit to a theory before the case closes around you.")}</p>
             </div>
           </li>
         </ol>
@@ -83,20 +85,20 @@
       <div class="mt-10 border-t border-[var(--noir-paper-500)] pt-6">
         {#if signed_in}
           <a href="/dashboard" class="noir-physical-button inline-flex w-full items-center justify-center px-5 text-sm font-semibold">
-            Open case cabinet
+            {t("Open case cabinet")}
           </a>
         {:else}
           <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
             <a href="/users/register" class="noir-physical-button inline-flex items-center justify-center px-5 text-sm font-semibold">
-              Open an account
+              {t("Open an account")}
             </a>
             <a href="/users/log-in" class="inline-flex min-h-11 items-center justify-center border border-[var(--noir-ink-900)] px-5 text-sm font-semibold text-[var(--noir-ink-900)] transition hover:bg-[var(--noir-ink-900)] hover:text-[var(--noir-paper-100)] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[var(--noir-red-700)]">
-              Log in
+              {t("Log in")}
             </a>
           </div>
         {/if}
         <p class="mt-5 text-xs leading-5 text-[#705a42]">
-          Non-commercial fan project. Not affiliated with Van Ryder Games or the original publishers.
+          {t("Non-commercial fan project. Not affiliated with Van Ryder Games or the original publishers.")}
         </p>
       </div>
     </PaperSheet>

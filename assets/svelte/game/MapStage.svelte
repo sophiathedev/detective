@@ -1,5 +1,8 @@
 <script>
   import GameBoard from "./GameBoard.svelte"
+  import { useI18n } from "../i18n"
+
+  const { t } = useI18n()
 
   let {
     locations = [],
@@ -48,19 +51,19 @@
     {status}
   </div>
 
-  <div class="noir-map-zoom-controls" aria-label="Map zoom controls">
+  <div class="noir-map-zoom-controls" aria-label={t("Map zoom controls")}>
     <button
       type="button"
-      aria-label="Zoom out"
+      aria-label={t("Zoom out")}
       disabled={zoomIndex === 0}
       onclick={() => (zoomIndex -= 1)}
     >−</button>
-    <button type="button" aria-label="Reset map zoom" onclick={() => (zoomIndex = 0)}>
+    <button type="button" aria-label={t("Reset map zoom")} onclick={() => (zoomIndex = 0)}>
       {Math.round(zoom * 100)}%
     </button>
     <button
       type="button"
-      aria-label="Zoom in"
+      aria-label={t("Zoom in")}
       disabled={zoomIndex === zoomLevels.length - 1}
       onclick={() => (zoomIndex += 1)}
     >+</button>
@@ -102,6 +105,6 @@
   </div>
 
   <p id="board-attribution" class="noir-board-attribution">
-    Board artwork © Van Ryder Games / Vincent Dutrait. Unofficial non-commercial fan project; not affiliated with or endorsed by the publisher.
+    {t("Board artwork © Van Ryder Games / Vincent Dutrait. Unofficial non-commercial fan project; not affiliated with or endorsed by the publisher.")}
   </p>
 </section>

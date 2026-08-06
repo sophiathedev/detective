@@ -16,7 +16,7 @@ defmodule DetectiveWeb.LobbyLive do
       {:error, _reason} ->
         {:ok,
          socket
-         |> put_flash(:error, "This room is unavailable.")
+         |> put_flash(:error, gettext("This room is unavailable."))
          |> redirect(to: ~p"/dashboard")}
     end
   end
@@ -28,7 +28,7 @@ defmodule DetectiveWeb.LobbyLive do
       <.svelte
         id="lobby-frontend"
         name="Lobby"
-        props={%{lobby: @lobby}}
+        props={%{lobby: @lobby, locale: @locale}}
         socket={@socket}
       />
     </Layouts.app>

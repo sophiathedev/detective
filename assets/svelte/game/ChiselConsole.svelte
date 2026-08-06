@@ -1,5 +1,8 @@
 <script>
   import PortraitToken from "../ui/PortraitToken.svelte"
+  import { useI18n } from "../i18n"
+
+  const { t } = useI18n()
 
   let {
     chisel = null,
@@ -19,8 +22,8 @@
   aria-labelledby="chisel-console-title"
 >
   <header class="noir-chisel-console-header">
-    <p>Chisel console</p>
-    <span class:noir-connection-online={online} class="noir-connection-label">{connectionLabel}</span>
+    <p>{t("Chisel console")}</p>
+    <span class:noir-connection-online={online} class="noir-connection-label">{t(connectionLabel)}</span>
   </header>
 
   {#if chisel}
@@ -31,7 +34,7 @@
           {chisel.display_name}
         </h2>
         <p class="mt-1 font-mono text-[0.55rem] uppercase tracking-[0.14em] text-[#a98d63]">
-          Keeper of the casebook
+          {t("Keeper of the casebook")}
         </p>
       </div>
     </div>
@@ -39,16 +42,16 @@
     {#if isCurrentChisel}
       <div class="noir-chisel-private-ledger">
         <p class="noir-chisel-response-state">
-          {pendingInterrogation ? "Question waiting" : "Waiting for a question"}
+          {pendingInterrogation ? t("Question waiting") : t("Waiting for a question")}
         </p>
-        <p class="noir-chisel-leverage-label">Leverage markers</p>
+        <p class="noir-chisel-leverage-label">{t("Leverage markers")}</p>
         <dl>
           {#each detectiveSlots as detective, index}
             <div>
               <dt>D{detective.seat ?? index + 1}</dt>
               <dd
                 role="img"
-                aria-label={`${leverageByDetective[detective.id] ?? 0} leverage held for Detective ${detective.seat ?? index + 1}`}
+                aria-label={t("{count} leverage held for Detective {seat}", { count: leverageByDetective[detective.id] ?? 0, seat: detective.seat ?? index + 1 })}
               >
                 <span class="noir-leverage-marker" aria-hidden="true">L</span>
                 <strong aria-hidden="true">{leverageByDetective[detective.id] ?? 0}</strong>
@@ -58,9 +61,9 @@
         </dl>
       </div>
     {:else}
-      <p class="noir-chisel-sealed-copy">Chisel notes remain private</p>
+      <p class="noir-chisel-sealed-copy">{t("Chisel notes remain private")}</p>
     {/if}
   {:else}
-    <h2 id="chisel-console-title" class="noir-chisel-sealed-copy">Chisel unavailable</h2>
+    <h2 id="chisel-console-title" class="noir-chisel-sealed-copy">{t("Chisel unavailable")}</h2>
   {/if}
 </section>

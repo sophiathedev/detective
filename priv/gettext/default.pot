@@ -1,0 +1,436 @@
+## This file is a PO Template file.
+##
+## "msgid"s here are often extracted from source code.
+## Add new messages manually only if they're dynamic
+## messages that can't be statically extracted.
+##
+## Run "mix gettext.extract" to bring this file up to
+## date. Leave "msgstr"s empty as changing them here has no
+## effect: edit them in PO (.po) files instead.
+#
+msgid ""
+msgstr ""
+
+#: lib/detective_web/live/game_new_live.ex:127
+#, elixir-autogen, elixir-format
+msgid "%{title} (version %{version})"
+msgstr ""
+
+#: lib/detective_web/live/user_live/settings.ex:207
+#, elixir-autogen, elixir-format
+msgid "A link to confirm your email change has been sent to the new address."
+msgstr ""
+
+#: lib/detective_web/components/layouts/root.html.heex:18
+#, elixir-autogen, elixir-format
+msgid "Account"
+msgstr ""
+
+#: lib/detective_web/live/user_live/settings.ex:28
+#, elixir-autogen, elixir-format
+msgid "Account settings"
+msgstr ""
+
+#: lib/detective_web/components/core_components.ex:391
+#, elixir-autogen, elixir-format
+msgid "Actions"
+msgstr ""
+
+#: lib/detective_web/live/user_live/registration.ex:29
+#, elixir-autogen, elixir-format
+msgid "Already registered?"
+msgstr ""
+
+#: lib/detective_web/live/user_live/registration.ex:106
+#, elixir-autogen, elixir-format
+msgid "An email was sent to %{email}, please access it to confirm your account."
+msgstr ""
+
+#: lib/detective_web/components/layouts.ex:73
+#: lib/detective_web/components/layouts.ex:88
+#, elixir-autogen, elixir-format
+msgid "Attempting to reconnect"
+msgstr ""
+
+#: lib/detective_web/live/game_live.ex:12
+#, elixir-autogen, elixir-format
+msgid "Casebook"
+msgstr ""
+
+#: lib/detective_web/live/user_live/settings.ex:74
+#, elixir-autogen, elixir-format
+msgid "Changing..."
+msgstr ""
+
+#: lib/detective_web/live/game_new_live.ex:75
+#, elixir-autogen, elixir-format
+msgid "Choose a valid invitation expiry."
+msgstr ""
+
+#: lib/detective_web/live/user_live/confirmation.ex:54
+#, elixir-autogen, elixir-format
+msgid "Confirm and log in only this time"
+msgstr ""
+
+#: lib/detective_web/live/user_live/confirmation.ex:48
+#, elixir-autogen, elixir-format
+msgid "Confirm and stay logged in"
+msgstr ""
+
+#: lib/detective_web/live/user_live/settings.ex:108
+#, elixir-autogen, elixir-format
+msgid "Confirm new password"
+msgstr ""
+
+#: lib/detective_web/live/user_live/confirmation.ex:28
+#, elixir-autogen, elixir-format
+msgid "Confirm this sealed link to finish opening your investigator record."
+msgstr ""
+
+#: lib/detective_web/live/user_live/confirmation.ex:45
+#: lib/detective_web/live/user_live/confirmation.ex:51
+#, elixir-autogen, elixir-format
+msgid "Confirming..."
+msgstr ""
+
+#: lib/detective_web/live/user_live/registration.ex:68
+#, elixir-autogen, elixir-format
+msgid "Create an account"
+msgstr ""
+
+#: lib/detective_web/live/game_new_live.ex:18
+#, elixir-autogen, elixir-format
+msgid "Create game"
+msgstr ""
+
+#: lib/detective_web/live/user_live/registration.ex:65
+#, elixir-autogen, elixir-format
+msgid "Creating account..."
+msgstr ""
+
+#: lib/detective_web/components/layouts/root.html.heex:71
+#: lib/detective_web/live/dashboard_live.ex:27
+#, elixir-autogen, elixir-format
+msgid "Dashboard"
+msgstr ""
+
+#: lib/detective_web/live/user_live/registration.ex:49
+#: lib/detective_web/live/user_live/settings.ex:45
+#, elixir-autogen, elixir-format
+msgid "Display name"
+msgstr ""
+
+#: lib/detective_web/live/user_live/login.ex:59
+#: lib/detective_web/live/user_live/login.ex:87
+#: lib/detective_web/live/user_live/registration.ex:57
+#: lib/detective_web/live/user_live/settings.ex:67
+#, elixir-autogen, elixir-format
+msgid "Email"
+msgstr ""
+
+#: lib/detective_web/live/user_live/settings.ex:134
+#, elixir-autogen, elixir-format
+msgid "Email change link is invalid or it has expired."
+msgstr ""
+
+#: lib/detective_web/live/user_live/settings.ex:131
+#, elixir-autogen, elixir-format
+msgid "Email changed successfully."
+msgstr ""
+
+#: lib/detective_web/live/invite_live.ex:14
+#: lib/detective_web/live/invite_live.ex:23
+#, elixir-autogen, elixir-format
+msgid "Game invitation"
+msgstr ""
+
+#: lib/detective_web/live/user_live/login.ex:13
+#, elixir-autogen, elixir-format
+msgid "Identity file"
+msgstr ""
+
+#: lib/detective_web/live/user_live/confirmation.ex:19
+#, elixir-autogen, elixir-format
+msgid "Identity verification"
+msgstr ""
+
+#: lib/detective_web/live/user_live/login.ex:142
+#, elixir-autogen, elixir-format
+msgid "If your email is in our system, you will receive instructions for logging in shortly."
+msgstr ""
+
+#: lib/detective_web/controllers/user_session_controller.ex:43
+#, elixir-autogen, elixir-format
+msgid "Invalid email or password"
+msgstr ""
+
+#: lib/detective_web/live/user_live/settings.ex:22
+#, elixir-autogen, elixir-format
+msgid "Investigator record"
+msgstr ""
+
+#: lib/detective_web/live/user_live/confirmation.ex:83
+#, elixir-autogen, elixir-format
+msgid "Keep me logged in on this device"
+msgstr ""
+
+#: lib/detective_web/components/layouts/root.html.heex:30
+#, elixir-autogen, elixir-format
+msgid "Language"
+msgstr ""
+
+#: lib/detective_web/components/layouts/root.html.heex:91
+#: lib/detective_web/live/user_live/confirmation.ex:74
+#: lib/detective_web/live/user_live/login.ex:19
+#: lib/detective_web/live/user_live/registration.ex:34
+#, elixir-autogen, elixir-format
+msgid "Log in"
+msgstr ""
+
+#: lib/detective_web/live/user_live/login.ex:105
+#, elixir-autogen, elixir-format
+msgid "Log in and stay logged in"
+msgstr ""
+
+#: lib/detective_web/live/user_live/login.ex:108
+#, elixir-autogen, elixir-format
+msgid "Log in only this time"
+msgstr ""
+
+#: lib/detective_web/live/user_live/login.ex:66
+#, elixir-autogen, elixir-format
+msgid "Log in with email"
+msgstr ""
+
+#: lib/detective_web/live/user_live/confirmation.ex:89
+#, elixir-autogen, elixir-format
+msgid "Log me in only this time"
+msgstr ""
+
+#: lib/detective_web/components/layouts/root.html.heex:81
+#, elixir-autogen, elixir-format
+msgid "Log out"
+msgstr ""
+
+#: lib/detective_web/controllers/user_session_controller.ex:64
+#, elixir-autogen, elixir-format
+msgid "Logged out successfully."
+msgstr ""
+
+#: lib/detective_web/live/user_live/confirmation.ex:71
+#: lib/detective_web/live/user_live/confirmation.ex:80
+#: lib/detective_web/live/user_live/confirmation.ex:86
+#, elixir-autogen, elixir-format
+msgid "Logging in..."
+msgstr ""
+
+#: lib/detective_web/live/user_live/confirmation.ex:116
+#, elixir-autogen, elixir-format
+msgid "Magic link is invalid or it has expired."
+msgstr ""
+
+#: lib/detective_web/live/user_live/settings.ex:31
+#, elixir-autogen, elixir-format
+msgid "Manage your public identity, private email address, and password."
+msgstr ""
+
+#: lib/detective_web/live/user_live/registration.ex:20
+#, elixir-autogen, elixir-format
+msgid "New investigator record"
+msgstr ""
+
+#: lib/detective_web/live/user_live/settings.ex:100
+#, elixir-autogen, elixir-format
+msgid "New password"
+msgstr ""
+
+#: lib/detective_web/live/user_live/login.ex:95
+#, elixir-autogen, elixir-format
+msgid "Password"
+msgstr ""
+
+#: lib/detective_web/live/user_live/settings.ex:89
+#, elixir-autogen, elixir-format
+msgid "Password cipher"
+msgstr ""
+
+#: lib/detective_web/controllers/user_session_controller.ex:59
+#, elixir-autogen, elixir-format
+msgid "Password updated successfully!"
+msgstr ""
+
+#: lib/detective_web/live/user_live/settings.ex:175
+#, elixir-autogen, elixir-format
+msgid "Profile updated successfully."
+msgstr ""
+
+#: lib/detective_web/live/user_live/settings.ex:41
+#, elixir-autogen, elixir-format
+msgid "Public identity"
+msgstr ""
+
+#: lib/detective_web/components/layouts/root.html.heex:87
+#, elixir-autogen, elixir-format
+msgid "Register"
+msgstr ""
+
+#: lib/detective_web/live/user_live/registration.ex:26
+#, elixir-autogen, elixir-format
+msgid "Register an investigator"
+msgstr ""
+
+#: lib/detective_web/live/user_live/settings.ex:51
+#: lib/detective_web/live/user_live/settings.ex:114
+#, elixir-autogen, elixir-format
+msgid "Saving..."
+msgstr ""
+
+#: lib/detective_web/live/user_live/settings.ex:63
+#, elixir-autogen, elixir-format
+msgid "Secure correspondence"
+msgstr ""
+
+#: lib/detective_web/components/layouts/root.html.heex:75
+#, elixir-autogen, elixir-format
+msgid "Settings"
+msgstr ""
+
+#: lib/detective_web/live/user_live/login.ex:29
+#, elixir-autogen, elixir-format
+msgid "Sign up"
+msgstr ""
+
+#: lib/detective_web/components/layouts.ex:80
+#, elixir-autogen, elixir-format
+msgid "Something went wrong!"
+msgstr ""
+
+#: lib/detective_web/live/game_new_live.ex:68
+#, elixir-autogen, elixir-format
+msgid "That case is no longer available. Choose another published case."
+msgstr ""
+
+#: lib/detective_web/controllers/user_session_controller.ex:27
+#, elixir-autogen, elixir-format
+msgid "The link is invalid or it has expired."
+msgstr ""
+
+#: lib/detective_web/live/game_live.ex:21
+#, elixir-autogen, elixir-format
+msgid "This casebook is unavailable."
+msgstr ""
+
+#: lib/detective_web/live/invite_live.ex:72
+#, elixir-autogen, elixir-format
+msgid "This invitation is no longer available."
+msgstr ""
+
+#: lib/detective_web/live/invite_live.ex:74
+#, elixir-autogen, elixir-format
+msgid "This room is full."
+msgstr ""
+
+#: lib/detective_web/live/lobby_live.ex:19
+#, elixir-autogen, elixir-format
+msgid "This room is unavailable."
+msgstr ""
+
+#: lib/detective_web/live/user_live/confirmation.ex:98
+#, elixir-autogen, elixir-format
+msgid "Tip: If you prefer passwords, you can enable them in the user settings."
+msgstr ""
+
+#: lib/detective_web/live/user_live/login.ex:41
+#, elixir-autogen, elixir-format
+msgid "To see sent emails, visit"
+msgstr ""
+
+#: lib/detective_web/live/invite_live.ex:76
+#, elixir-autogen, elixir-format
+msgid "Unable to join this room."
+msgstr ""
+
+#: lib/detective_web/controllers/user_session_controller.ex:8
+#, elixir-autogen, elixir-format
+msgid "User confirmed successfully."
+msgstr ""
+
+#: lib/detective_web/components/layouts.ex:65
+#, elixir-autogen, elixir-format
+msgid "We can't find the internet"
+msgstr ""
+
+#: lib/detective_web/live/user_live/confirmation.ex:25
+#, elixir-autogen, elixir-format
+msgid "Welcome %{email}"
+msgstr ""
+
+#: lib/detective_web/controllers/user_session_controller.ex:12
+#, elixir-autogen, elixir-format
+msgid "Welcome back!"
+msgstr ""
+
+#: lib/detective_web/live/user_live/login.ex:39
+#, elixir-autogen, elixir-format
+msgid "You are running the local mail adapter."
+msgstr ""
+
+#: lib/detective_web/live/invite_live.ex:75
+#, elixir-autogen, elixir-format
+msgid "You cannot join this room."
+msgstr ""
+
+#: lib/detective_web/live/user_live/login.ex:23
+#, elixir-autogen, elixir-format
+msgid "You need to reauthenticate to perform sensitive actions on your account."
+msgstr ""
+
+#: lib/detective_web/live/user_live/registration.ex:72
+#, elixir-autogen, elixir-format
+msgid "Your display name is public inside a room. Your email remains account-only."
+msgstr ""
+
+#: lib/detective_web/components/core_components.ex:77
+#, elixir-autogen, elixir-format
+msgid "close"
+msgstr ""
+
+#: lib/detective_web/live/user_live/login.ex:29
+#, elixir-autogen, elixir-format
+msgid "for an account now."
+msgstr ""
+
+#: lib/detective_web/live/user_live/login.ex:72
+#, elixir-autogen, elixir-format
+msgid "or"
+msgstr ""
+
+#: lib/detective_web/live/user_live/login.ex:42
+#, elixir-autogen, elixir-format
+msgid "the mailbox page"
+msgstr ""
+
+#: lib/detective_web/live/user_live/registration.ex:36
+#, elixir-autogen, elixir-format
+msgid "to reopen your file."
+msgstr ""
+
+#: lib/detective_web/live/user_live/login.ex:25
+#, elixir-autogen, elixir-format
+msgid "Don't have an account?"
+msgstr ""
+
+#: lib/detective_web/live/user_live/settings.ex:76
+#, elixir-autogen, elixir-format
+msgid "Change Email"
+msgstr ""
+
+#: lib/detective_web/live/user_live/settings.ex:117
+#, elixir-autogen, elixir-format
+msgid "Save Password"
+msgstr ""
+
+#: lib/detective_web/live/user_live/settings.ex:53
+#, elixir-autogen, elixir-format
+msgid "Save Profile"
+msgstr ""

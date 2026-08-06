@@ -6,6 +6,7 @@ defmodule DetectiveWeb.Router do
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
+    plug DetectiveWeb.Locale
     plug :fetch_live_flash
     plug :put_root_layout, html: {DetectiveWeb.Layouts, :root}
     plug :protect_from_forgery
@@ -45,7 +46,10 @@ defmodule DetectiveWeb.Router do
     pipe_through [:browser, :require_authenticated_user]
 
     live_session :require_authenticated_user,
-      on_mount: [{DetectiveWeb.UserAuth, :require_authenticated}] do
+      on_mount: [
+        {DetectiveWeb.Locale, :default},
+        {DetectiveWeb.UserAuth, :require_authenticated}
+      ] do
       live "/dashboard", DashboardLive, :index
       live "/games/new", GameNewLive, :new
       live "/games/:id/lobby", LobbyLive, :show
@@ -61,8 +65,13 @@ defmodule DetectiveWeb.Router do
   scope "/", DetectiveWeb do
     pipe_through [:browser]
 
+    post "/locale/:locale", LocaleController, :update
+
     live_session :current_user,
-      on_mount: [{DetectiveWeb.UserAuth, :mount_current_scope}] do
+      on_mount: [
+        {DetectiveWeb.Locale, :default},
+        {DetectiveWeb.UserAuth, :mount_current_scope}
+      ] do
       live "/", HomeLive, :index
       live "/users/register", UserLive.Registration, :new
       live "/users/log-in", UserLive.Login, :new

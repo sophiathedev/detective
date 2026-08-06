@@ -46,6 +46,9 @@ defmodule DetectiveWeb.GameLiveTest do
     private = component.props["initial_private"]
     public = component.props["initial_public"]
 
+    assert component.props["locale"] == "en"
+    assert is_binary(component.props["csrf_token"])
+    assert component.props["csrf_token"] != ""
     refute Map.has_key?(public, "solution")
     refute Map.has_key?(private, "response_options")
     refute Map.has_key?(private, "chisel_notes")

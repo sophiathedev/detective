@@ -1,5 +1,8 @@
 <script>
   import CaseCardRail from "./CaseCardRail.svelte"
+  import { useI18n } from "../i18n"
+
+  const { t } = useI18n()
 
   let {
     locations = [],
@@ -77,18 +80,18 @@
   function detectiveActionLabel(action) {
     return (
       {
-        search_location: "search location",
-        analyze: "analyze evidence",
-        kickback: "collect kickback",
-        bribe_officer: "bribe officer",
+        search_location: t("search location"),
+        analyze: t("analyze evidence"),
+        kickback: t("collect kickback"),
+        bribe_officer: t("bribe officer"),
       }[action] ?? action.replaceAll("_", " ")
     )
   }
 
   function detectiveLabel(detective, location, actions) {
-    const identity = `${detective.display_name} at ${location.name}`
+    const identity = t("{name} at {location}", { name: detective.display_name, location: location.name })
     return actions.length > 0
-      ? `${identity}. Available actions: ${actions.map(detectiveActionLabel).join(", ")}.`
+      ? t("{identity}. Available actions: {actions}.", { identity, actions: actions.map(detectiveActionLabel).join(", ") })
       : identity
   }
 
@@ -111,15 +114,15 @@
 
   function suspectActions(suspect) {
     return [
-      searchableIds.has(suspect.id) ? "search" : null,
-      interrogatableIds.has(suspect.id) ? "question" : null,
+      searchableIds.has(suspect.id) ? t("search") : null,
+      interrogatableIds.has(suspect.id) ? t("question") : null,
     ].filter(Boolean)
   }
 
   function suspectLabel(suspect, location, actions) {
-    const identity = `${suspect.name}, ${suspect.occupation}, at ${location.name}`
+    const identity = t("{name}, {occupation}, at {location}", { name: suspect.name, occupation: suspect.occupation, location: location.name })
     return actions.length > 0
-      ? `${identity}. Available actions: ${actions.join(" and ")}.`
+      ? t("{identity}. Available actions: {actions}.", { identity, actions: actions.join(t(" and ")) })
       : identity
   }
 
@@ -166,9 +169,13 @@
   }
 
   function specialActorLabel(actor, location, actionable) {
-    const status = actor.active ? "active" : "neutralized"
-    const action = actionable ? " Select to review special interactions." : ""
-    return `${actor.name}, ${actor.role}, at ${location.name}. ${status}.${action}`
+    const status = actor.active ? t("active") : t("neutralized")
+    const action = actionable ? t(" Select to review special interactions.") : ""
+    return t("{name}, {role}, at {location}. {status}.{action}", { name: actor.name, role: actor.role, location: location.name, status, action })
+  }
+
+  function locationMarkerLabel(location) {
+    return /^\d+$/.test(String(location.id)) ? location.id : "→"
   }
 
   function selectSpecialActor(event, actor, actionable) {
@@ -188,9 +195,9 @@
     preserveAspectRatio="xMidYMid meet"
     aria-labelledby="game-map-title game-map-description"
   >
-    <title id="game-map-title">Detective: City of Angels investigation board</title>
+    <title id="game-map-title">{t("Detective: City of Angels investigation board")}</title>
     <desc id="game-map-description">
-      Official game board with server-authorized location hotspots, Detective tokens, and revealed suspect standees.
+      {t("Official game board with server-authorized location hotspots, Detective tokens, and revealed suspect standees.")}
     </desc>
     <defs>
       <filter id="board-ink">
@@ -251,7 +258,7 @@
           role={legal ? "button" : undefined}
           tabindex={legal ? "0" : undefined}
           focusable={legal ? "true" : "false"}
-          aria-label={legal ? `Select ${location.name} on the map` : undefined}
+          aria-label={legal ? t("Select {location} on the map", { location: location.name }) : undefined}
           aria-busy={pendingLocationId === location.id ? "true" : undefined}
           onclick={(event) => select(event, location)}
           onkeydown={(event) => select(event, location)}
@@ -286,13 +293,13 @@
               font-family="IBM Plex Mono, monospace"
               font-size="10"
               font-weight="600"
-            >{location.id}</text>
+            >{locationMarkerLabel(location)}</text>
           {/if}
         </g>
       {/each}
     </g>
 
-    <g id="suspect-standees" aria-label="Revealed suspects">
+    <g id="suspect-standees" aria-label={t("Revealed suspects")}>
       {#each suspects as suspect (suspect.id)}
         {@const placement = suspectPlacement(suspect)}
         {#if placement}
@@ -351,7 +358,7 @@
       {/each}
     </g>
 
-    <g id="special-actor-tokens" aria-label="Case-specific people and contacts">
+    <g id="special-actor-tokens" aria-label={t("Case-specific people and contacts")}>
       {#each specialActors as actor (actor.id)}
         {@const placement = specialActorPlacement(actor)}
         {#if placement}
@@ -449,10 +456,10 @@
   <nav
     id="legal-map-destinations"
     class="map-destination-fallback"
-    aria-label="Legal map destinations"
+    aria-label={t("Legal map destinations")}
   >
     {#if legalLocations.length > 0}
-      <p class="map-destination-fallback-title">Keyboard destinations</p>
+      <p class="map-destination-fallback-title">{t("Keyboard destinations")}</p>
       <div class="map-destination-fallback-list">
         {#each legalLocations as location}
           <button
@@ -464,13 +471,13 @@
             aria-pressed={selectedLocationId === location.id}
             onclick={(event) => select(event, location)}
           >
-            Choose {location.name}
+            {t("Choose {location}", { location: location.name })}
           </button>
         {/each}
       </div>
     {:else}
       <p class="map-destination-fallback-empty">
-        No map destination is available for this player.
+        {t("No map destination is available for this player.")}
       </p>
     {/if}
   </nav>

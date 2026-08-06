@@ -24,7 +24,7 @@ defmodule DetectiveWeb.DashboardLive do
 
     {:ok,
      assign(socket,
-       page_title: "Dashboard",
+       page_title: gettext("Dashboard"),
        display_name: user.display_name,
        games: Games.game_summary(socket.assigns.current_scope),
        dossiers: game_dossiers
@@ -42,7 +42,8 @@ defmodule DetectiveWeb.DashboardLive do
           %{
             display_name: @display_name,
             games: @games,
-            dossiers: @dossiers
+            dossiers: @dossiers,
+            locale: @locale
           }
         }
         socket={@socket}

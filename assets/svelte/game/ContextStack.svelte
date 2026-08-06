@@ -1,4 +1,8 @@
 <script>
+  import { useI18n } from "../i18n"
+
+  const { t } = useI18n()
+
   let {
     selection = null,
     fieldSelection = null,
@@ -23,19 +27,19 @@
   } = $props()
 
   let confirmationLabel = $derived(
-    selection?.type === "place" ? "Confirm Placement" : "Confirm Move",
+    selection?.type === "place" ? t("Confirm Start") : t("Confirm Move"),
   )
   let cancelLabel = $derived(
-    selection?.type === "place" ? "Cancel Placement" : "Cancel Move",
+    selection?.type === "place" ? t("Cancel Start") : t("Cancel Move"),
   )
 
   function fieldActionLabel(action) {
     return (
       {
-        search_location: "Open Location Search",
-        analyze: "Analyze Case",
-        kickback: "Collect Kickback",
-        bribe_officer: "Open Officer Bribe",
+        search_location: t("Open Location Search"),
+        analyze: t("Analyze Case"),
+        kickback: t("Collect Kickback"),
+        bribe_officer: t("Open Officer Bribe"),
       }[action] ?? action.replaceAll("_", " ")
     )
   }
@@ -44,19 +48,19 @@
 {#if selection || fieldSelection || suspectSelection || specialActorSelection || actionPrompt || commandError}
   <div id="context-stack" class="noir-context-stack">
     {#if commandPending && (selection || actionPrompt)}
-      <p class="sr-only" role="status" aria-live="polite">Dispatching action</p>
+      <p class="sr-only" role="status" aria-live="polite">{t("Dispatching action")}</p>
     {/if}
 
     {#if fieldSelection}
       <article id="field-position-slip" class="noir-movement-slip noir-paper-sheet" aria-live="polite">
-        <div class="noir-movement-slip-stamp" aria-hidden="true">FIELD</div>
-        <p class="noir-movement-slip-kicker">Current field position</p>
+        <div class="noir-movement-slip-stamp" aria-hidden="true">{t("FIELD")}</div>
+        <p class="noir-movement-slip-kicker">{t("Current field position")}</p>
         <h3 class="noir-action-slip-title">{fieldSelection.location.name}</h3>
         <p class="noir-action-slip-description">
-          D{fieldSelection.detective.seat} {fieldSelection.detective.display_name} · {fieldSelection.detective.actions_remaining} AP remaining
+          {t("D{seat} {name} · {actions} AP remaining", { seat: fieldSelection.detective.seat, name: fieldSelection.detective.display_name, actions: fieldSelection.detective.actions_remaining })}
         </p>
         <p class="noir-movement-slip-districts">
-          Choose one authorized desk or location action.
+          {t("Choose one authorized desk or location action.")}
         </p>
 
         <div class="noir-field-slip-controls">
@@ -75,21 +79,21 @@
             class="noir-context-button noir-context-button-dismiss"
             disabled={commandPending}
             onclick={() => onCancelField(fieldSelection)}
-          >Close position</button>
+          >{t("Close position")}</button>
         </div>
       </article>
     {/if}
 
     {#if suspectSelection}
       <article id="suspect-dossier-slip" class="noir-movement-slip noir-paper-sheet" aria-live="polite">
-        <div class="noir-movement-slip-stamp" aria-hidden="true">PERSON</div>
-        <p class="noir-movement-slip-kicker">Authorized field lead</p>
+        <div class="noir-movement-slip-stamp" aria-hidden="true">{t("PERSON")}</div>
+        <p class="noir-movement-slip-kicker">{t("Authorized field lead")}</p>
         <h3 class="noir-action-slip-title">{suspectSelection.suspect.name}</h3>
         <p class="noir-action-slip-description">
-          {suspectSelection.suspect.occupation ?? "Person of interest"} · {suspectSelection.location.name}
+          {t("{occupation} · {location}", { occupation: suspectSelection.suspect.occupation ?? t("Person of interest"), location: suspectSelection.location.name })}
         </p>
         <p class="noir-movement-slip-districts">
-          Open the matching folio before spending an action.
+          {t("Open the matching folio before spending an action.")}
         </p>
 
         <div class="noir-suspect-slip-controls">
@@ -100,7 +104,7 @@
               class="noir-context-button noir-context-button-confirm"
               disabled={commandPending || !connectionOnline}
               onclick={() => onOpenSuspectAction(suspectSelection, "search_suspect")}
-            >Open Search</button>
+            >{t("Open Search")}</button>
           {/if}
           {#if suspectSelection.canInterrogate}
             <button
@@ -109,7 +113,7 @@
               class="noir-context-button noir-context-button-confirm"
               disabled={commandPending || !connectionOnline}
               onclick={() => onOpenSuspectAction(suspectSelection, "interrogate")}
-            >Open Question</button>
+            >{t("Open Question")}</button>
           {/if}
           <button
             id="action-cancel-suspect"
@@ -117,7 +121,7 @@
             class="noir-context-button noir-context-button-dismiss"
             disabled={commandPending}
             onclick={() => onCancelSuspect(suspectSelection)}
-          >Close file</button>
+          >{t("Close file")}</button>
         </div>
       </article>
     {/if}
@@ -126,20 +130,20 @@
       <article id="special-actor-slip" class="noir-movement-slip noir-paper-sheet" aria-live="polite">
         <div class="noir-movement-slip-stamp" aria-hidden="true">
           {specialActorSelection.options.some((option) => option.choice_group)
-            ? "DECISION"
-            : "SPECIAL"}
+            ? t("DECISION")
+            : t("SPECIAL")}
         </div>
-        <p class="noir-movement-slip-kicker">Case-specific interaction</p>
+        <p class="noir-movement-slip-kicker">{t("Case-specific interaction")}</p>
         <h3 class="noir-action-slip-title">{specialActorSelection.actor.name}</h3>
         <p class="noir-action-slip-description">
           {specialActorSelection.actor.role} · {specialActorSelection.location.name}
         </p>
         <p class="noir-movement-slip-districts">
-          The server will resolve the selected cost and any private result.
+          {t("The server will resolve the selected cost and any private result.")}
         </p>
         {#if specialActorSelection.options.some((option) => option.choice_group)}
           <p id="special-actor-choice-warning" class="noir-action-slip-description">
-            Choose one marked approach. Filing it permanently closes the alternatives.
+            {t("Choose one marked approach. Filing it permanently closes the alternatives.")}
           </p>
         {/if}
 
@@ -152,9 +156,9 @@
               disabled={commandPending || !connectionOnline}
               onclick={() => onInteractSpecialActor(specialActorSelection, option)}
             >
-              <span>{option.label}</span>
+              <span>{t(option.label)}</span>
               <small>
-                {option.choice_group ? "Exclusive route · " : ""}{option.action_cost} AP · ${option.scratch_cost}
+                {option.choice_group ? t("Exclusive route · ") : ""}{t("{actions} AP · ${scratch}", { actions: option.action_cost, scratch: option.scratch_cost })}
               </small>
             </button>
           {/each}
@@ -164,7 +168,7 @@
             class="noir-context-button noir-context-button-dismiss"
             disabled={commandPending}
             onclick={() => onCancelSpecialActor(specialActorSelection)}
-          >Close contact</button>
+          >{t("Close contact")}</button>
         </div>
       </article>
     {/if}
@@ -172,28 +176,28 @@
     {#if selection}
       <article id="movement-slip" class="noir-movement-slip noir-paper-sheet" aria-live="polite">
         <div class="noir-movement-slip-stamp" aria-hidden="true">
-          {selection.type === "place" ? "PLACE" : "MOVE"}
+          {selection.type === "place" ? t("START") : t("MOVE")}
         </div>
         <p class="noir-movement-slip-kicker">
-          {selection.type === "place" ? "Free initial placement" : "Proposed destination"}
+          {selection.type === "place" ? t("Initial dispatch point") : t("Proposed destination")}
         </p>
 
         <div class="noir-movement-slip-route">
           <div>
-            <span>From</span>
-            <strong>{origin?.name ?? "Off board"}</strong>
+            <span>{t("From")}</span>
+            <strong>{origin?.name ?? t("Off board")}</strong>
           </div>
           <span aria-hidden="true">→</span>
           <div>
-            <span>To</span>
+            <span>{t("To")}</span>
             <strong>{selection.location.name}</strong>
           </div>
         </div>
 
         <p class="noir-movement-slip-districts">
-          Filed districts · {selection.location.district_ids?.join(" / ") ?? "unfiled"}
+          {t("Filed districts · {districts}", { districts: selection.location.district_ids?.join(" / ") ?? t("unfiled") })}
           <strong class="noir-movement-slip-cost">
-            {selection.type === "place" ? "Free placement" : "Movement cost · 1 AP"}
+            {selection.type === "place" ? t("No AP cost") : t("Movement cost · 1 AP")}
           </strong>
         </p>
 
@@ -211,19 +215,19 @@
             class="noir-context-button noir-context-button-confirm"
             disabled={commandPending || !connectionOnline}
             onclick={() => onConfirmMove(selection)}
-          >{commandPending ? "Dispatching car" : confirmationLabel}</button>
+          >{commandPending ? t("Dispatching car") : confirmationLabel}</button>
         </div>
       </article>
     {/if}
 
     {#if actionPrompt}
       <article id="action-confirmation-slip" class="noir-movement-slip noir-paper-sheet" aria-live="polite">
-        <div class="noir-movement-slip-stamp" aria-hidden="true">{actionPrompt.stamp}</div>
-        <p class="noir-movement-slip-kicker">{actionPrompt.kicker}</p>
-        <h3 class="noir-action-slip-title">{actionPrompt.title}</h3>
-        <p class="noir-action-slip-description">{actionPrompt.description}</p>
+        <div class="noir-movement-slip-stamp" aria-hidden="true">{t(actionPrompt.stamp)}</div>
+        <p class="noir-movement-slip-kicker">{t(actionPrompt.kicker)}</p>
+        <h3 class="noir-action-slip-title">{t(actionPrompt.title)}</h3>
+        <p class="noir-action-slip-description">{t(actionPrompt.description)}</p>
         {#if origin}
-          <p class="noir-movement-slip-districts">Filed at {origin.name}</p>
+          <p class="noir-movement-slip-districts">{t("Filed at {location}", { location: origin.name })}</p>
         {/if}
 
         <div class="noir-movement-slip-controls">
@@ -233,14 +237,14 @@
             class="noir-context-button"
             disabled={commandPending}
             onclick={() => onCancelAction(actionPrompt)}
-          >Keep planning</button>
+          >{t("Keep planning")}</button>
           <button
             id="action-confirm-immediate"
             type="button"
             class="noir-context-button noir-context-button-confirm"
             disabled={commandPending || !connectionOnline}
             onclick={() => onConfirmAction(actionPrompt)}
-          >{commandPending ? "Filing action" : actionPrompt.confirmLabel}</button>
+          >{commandPending ? t("Filing action") : t(actionPrompt.confirmLabel)}</button>
         </div>
       </article>
     {/if}
@@ -253,7 +257,7 @@
         role={commandStatus ? "status" : "alert"}
         aria-live={commandStatus ? "polite" : "assertive"}
       >
-        {commandError}
+        {t(commandError)}
       </p>
     {/if}
   </div>

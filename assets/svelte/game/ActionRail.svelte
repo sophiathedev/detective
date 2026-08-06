@@ -1,5 +1,8 @@
 <script>
   import ActionGlyph from "./ActionGlyph.svelte"
+  import { useI18n } from "../i18n"
+
+  const { t } = useI18n()
 
   let {
     availableActions = [],
@@ -12,7 +15,7 @@
   } = $props()
 
   const actionDefinitions = [
-    { id: "place", label: "Place", mode: true },
+    { id: "place", label: "Choose Start", mode: true },
     { id: "move", label: "Move", mode: true },
     { id: "search_location", label: "Search Location" },
     { id: "search_suspect", label: "Search Suspect" },
@@ -41,8 +44,8 @@
 
 <div id="action-rail" class="noir-action-rail noir-wood-frame">
   <div class="noir-action-rail-ledger" aria-hidden="true">
-    <span>Dispatch</span>
-    <strong>{connectionOnline ? "Line open" : "Line closed"}</strong>
+    <span>{t("Dispatch")}</span>
+    <strong>{connectionOnline ? t("Line open") : t("Line closed")}</strong>
   </div>
 
   <div class="noir-action-key-row">
@@ -60,7 +63,7 @@
         <span class="noir-action-glyph" aria-hidden="true">
           <ActionGlyph name={action.id} />
         </span>
-        <span class="noir-action-key-label">{action.label}</span>
+        <span class="noir-action-key-label">{t(action.label)}</span>
       </button>
     {/each}
 
@@ -73,7 +76,7 @@
       <span class="noir-action-glyph" aria-hidden="true">
         <ActionGlyph name="casebook" />
       </span>
-      <span class="noir-action-key-label">Casebook</span>
+      <span class="noir-action-key-label">{t("Casebook")}</span>
     </button>
   </div>
 </div>

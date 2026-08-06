@@ -13,7 +13,16 @@ defmodule DetectiveWeb.HomeLiveTest do
 
     component = get_svelte(view, id: "home-frontend")
     assert component.name == "Home"
+    assert component.props["locale"] == "en"
     refute component.props["signed_in"]
+  end
+
+  test "projects the session locale into LiveSvelte", %{conn: conn} do
+    conn = init_test_session(conn, %{locale: "vi"})
+    {:ok, view, _html} = live(conn, ~p"/")
+
+    component = get_svelte(view, id: "home-frontend")
+    assert component.props["locale"] == "vi"
   end
 
   test "projects signed-in state without user details", %{conn: conn} do

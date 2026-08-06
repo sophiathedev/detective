@@ -1,5 +1,8 @@
 <script>
   import { onDestroy } from "svelte"
+  import { useI18n } from "../i18n"
+
+  const { t } = useI18n()
 
   let {
     open = false,
@@ -109,7 +112,7 @@
           bind:this={closeButton}
           type="button"
           class="noir-casebook-close"
-          aria-label="Close casebook"
+          aria-label={t("Close casebook")}
           onclick={requestClose}
         >
           <span aria-hidden="true">×</span>
@@ -117,7 +120,7 @@
       </header>
 
       {#if pages.length > 0}
-        <nav class="noir-casebook-page-tabs" aria-label="Casebook pages">
+        <nav class="noir-casebook-page-tabs" aria-label={t("Casebook pages")}>
           {#each pages as entry (entry.id)}
             <button
               type="button"

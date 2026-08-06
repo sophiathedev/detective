@@ -1,7 +1,14 @@
 <script>
-  let { name, role = "detective", seat = 1, size = "md" } = $props()
+  import { useI18n } from "../i18n"
 
-  let label = $derived(`${role === "chisel" ? "Chisel" : "Detective"} portrait for ${name}`)
+  let { name, role = "detective", seat = 1, size = "md" } = $props()
+  const { t } = useI18n()
+
+  let label = $derived(
+    role === "chisel"
+      ? t("Chisel portrait for {name}", { name })
+      : t("Detective portrait for {name}", { name }),
+  )
   let src = $derived(
     role === "chisel"
       ? "/images/ui/noir/portraits/chisel.webp"

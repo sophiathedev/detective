@@ -142,11 +142,18 @@ defmodule DetectiveWeb.UserAuth do
   #
   defp renew_session(conn, _user) do
     delete_csrf_token()
+    locale = get_session(conn, :locale)
 
     conn
     |> configure_session(renew: true)
     |> clear_session()
+    |> maybe_put_locale(locale)
   end
+
+  defp maybe_put_locale(conn, locale) when locale in ~w(en vi),
+    do: put_session(conn, :locale, locale)
+
+  defp maybe_put_locale(conn, _locale), do: conn
 
   defp maybe_write_remember_me_cookie(conn, token, %{"remember_me" => "true"}, _),
     do: write_remember_me_cookie(conn, token)
