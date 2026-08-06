@@ -1,10 +1,16 @@
-import { render, screen } from "@testing-library/svelte"
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte"
 import { createRawSnippet } from "svelte"
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import GameTableShell from "./GameTableShell.svelte"
 
 const snippet = (text) => createRawSnippet(() => ({ render: () => `<span>${text}</span>` }))
+
+afterEach(() => {
+  delete HTMLElement.prototype.requestFullscreen
+  delete document.exitFullscreen
+  delete document.fullscreenElement
+})
 
 describe("GameTableShell", () => {
   it("keeps the map primary and exposes every table landmark", () => {
@@ -31,5 +37,74 @@ describe("GameTableShell", () => {
     expect(document.querySelector("#game-action-region")).toHaveTextContent("actions")
     expect(document.querySelector("#game-overlay-region")).toHaveTextContent("overlay")
     expect(document.querySelector("#game-phase-plaque")).toHaveTextContent("Marlowe")
+    expect(document.querySelector("#game-return-dashboard")).toHaveAttribute(
+      "href",
+      "/dashboard",
+    )
+    expect(document.querySelector("#game-account-settings")).toHaveAttribute(
+      "href",
+      "/users/settings",
+    )
+    expect(document.querySelector("#game-account-log-out")).toHaveAttribute(
+      "data-method",
+      "delete",
+    )
+    expect(document.querySelector("#game-account-log-out")).toHaveAttribute(
+      "data-to",
+      "/users/log-out",
+    )
+  })
+
+  it("enters and exits fullscreen from the case menu", async () => {
+    let fullscreenElement = null
+    const requestFullscreen = vi.fn(async function () {
+      fullscreenElement = this
+      document.dispatchEvent(new Event("fullscreenchange"))
+    })
+    const exitFullscreen = vi.fn(async () => {
+      fullscreenElement = null
+      document.dispatchEvent(new Event("fullscreenchange"))
+    })
+
+    Object.defineProperty(HTMLElement.prototype, "requestFullscreen", {
+      configurable: true,
+      value: requestFullscreen,
+    })
+    Object.defineProperty(document, "exitFullscreen", {
+      configurable: true,
+      value: exitFullscreen,
+    })
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      get: () => fullscreenElement,
+    })
+
+    render(GameTableShell, {
+      phase: "detective_turn",
+      day: 1,
+      daysRemaining: 6,
+      activeDetectiveName: "Marlowe",
+      connectionState: "online",
+      version: 19,
+    })
+
+    await fireEvent.click(screen.getByLabelText("Open case menu"))
+    const button = screen.getByRole("button", { name: /Fill the screen/ })
+    await waitFor(() => expect(button).toBeEnabled())
+    await fireEvent.click(button)
+
+    await waitFor(() => {
+      expect(requestFullscreen).toHaveBeenCalledTimes(1)
+      expect(button).toHaveAttribute("aria-pressed", "true")
+      expect(button).toHaveTextContent("Exit fullscreen")
+    })
+
+    await fireEvent.click(screen.getByLabelText("Open case menu"))
+    await fireEvent.click(screen.getByRole("button", { name: /Exit fullscreen/ }))
+
+    await waitFor(() => {
+      expect(exitFullscreen).toHaveBeenCalledTimes(1)
+      expect(button).toHaveAttribute("aria-pressed", "false")
+    })
   })
 })

@@ -183,6 +183,19 @@
     var(--noir-ebony-950);
 }
 
+body:has(#game-table-shell) > #account-navigation {
+  display: none;
+}
+
+body:has(#game-table-shell) .noir-app-shell,
+body:has(#game-table-shell) .noir-game-book-shell {
+  min-height: 100dvh;
+}
+
+body:has(#game-table-shell) .noir-game-table {
+  height: 100dvh;
+}
+
 .noir-game-table {
   position: relative;
   height: calc(100dvh - 3.5rem);
@@ -224,12 +237,207 @@
   text-transform: uppercase;
 }
 
+body:has(#game-pause-curtain) .noir-game-phase {
+  z-index: 61;
+}
+
 .noir-game-phase strong {
   overflow: hidden;
   color: var(--noir-paper-100);
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.noir-game-table-menu {
+  position: absolute;
+  top: 0;
+  left: -2.65rem;
+  color: var(--noir-paper-300);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  text-transform: uppercase;
+}
+
+.noir-game-table-menu summary {
+  display: grid;
+  width: 2.15rem;
+  height: 2.15rem;
+  cursor: pointer;
+  list-style: none;
+  place-items: center;
+  border: 1px solid var(--noir-gold-700);
+  border-radius: 0.28rem;
+  background:
+    linear-gradient(110deg, transparent 0 46%, rgb(255 255 255 / 0.035) 47% 50%, transparent 51%),
+    var(--noir-ebony-800) url("/images/ui/noir/wood-grain.svg");
+  box-shadow: 0 0.25rem 0 #080706, inset 0 0 0 1px rgb(194 163 95 / 0.12);
+  transition: border-color 150ms ease, translate 150ms ease, box-shadow 150ms ease;
+}
+
+.noir-game-table-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.noir-game-table-menu summary:hover {
+  border-color: var(--noir-gold-500);
+  translate: 0 -1px;
+}
+
+.noir-game-table-menu summary:active {
+  box-shadow: 0 0.08rem 0 #080706;
+  translate: 0 1px;
+}
+
+.noir-game-table-menu summary:focus-visible {
+  outline: 3px solid var(--noir-focus);
+  outline-offset: 2px;
+}
+
+.noir-game-table-menu[open] summary {
+  border-color: #e0bd72;
+  background: linear-gradient(#784136, #321814);
+}
+
+.noir-game-table-menu-sigil {
+  display: grid;
+  width: 1rem;
+  gap: 0.2rem;
+}
+
+.noir-game-table-menu-sigil i {
+  display: block;
+  height: 1px;
+  background: #d8b970;
+  box-shadow: 0 1px #2d1d0c;
+}
+
+.noir-game-table-menu-sigil i:nth-child(2) {
+  width: 0.72rem;
+}
+
+.noir-game-table-menu-panel {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 0.65rem);
+  left: 0;
+  width: 14rem;
+  overflow: hidden;
+  border: 1px solid var(--noir-gold-700);
+  border-radius: 0.35rem;
+  background: rgb(15 13 12 / 0.98) url("/images/ui/noir/wood-grain.svg");
+  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 0.58), inset 0 0 0 1px rgb(194 163 95 / 0.1);
+  padding: 0.45rem;
+}
+
+.noir-game-table-menu-heading {
+  display: grid;
+  gap: 0.18rem;
+  border-bottom: 1px solid rgb(194 163 95 / 0.28);
+  padding: 0.45rem 0.5rem 0.65rem;
+}
+
+.noir-game-table-menu-heading span {
+  color: var(--noir-gold-500);
+  font-size: 0.48rem;
+  letter-spacing: 0.15em;
+}
+
+.noir-game-table-menu-heading strong {
+  color: var(--noir-paper-300);
+  font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: none;
+}
+
+#game-toggle-fullscreen {
+  display: grid;
+  width: 100%;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+  border-bottom: 1px solid rgb(194 163 95 / 0.2);
+  padding: 0.7rem 0.5rem;
+  color: var(--noir-paper-300);
+  text-align: left;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+#game-toggle-fullscreen:hover:not(:disabled) {
+  background: rgb(194 163 95 / 0.09);
+  color: #fff0cf;
+}
+
+#game-toggle-fullscreen:focus-visible,
+.noir-game-table-menu-panel nav a:focus-visible {
+  outline: 3px solid var(--noir-focus);
+  outline-offset: -3px;
+}
+
+#game-toggle-fullscreen:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+#game-toggle-fullscreen svg {
+  width: 1.35rem;
+  stroke: var(--noir-gold-500);
+  stroke-width: 1.55;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#game-toggle-fullscreen > span {
+  display: grid;
+  gap: 0.18rem;
+}
+
+#game-toggle-fullscreen strong {
+  color: inherit;
+  font-size: 0.62rem;
+  letter-spacing: 0.07em;
+  text-align: left;
+}
+
+#game-toggle-fullscreen small {
+  color: #8f7959;
+  font-size: 0.44rem;
+  letter-spacing: 0.03em;
+  text-transform: none;
+}
+
+#game-fullscreen-error {
+  border-bottom: 1px solid rgb(194 163 95 / 0.2);
+  padding: 0.55rem 0.5rem;
+  color: #dc8177;
+  font-size: 0.48rem;
+  letter-spacing: 0.04em;
+  line-height: 1.45;
+  text-transform: none;
+}
+
+.noir-game-table-menu-panel nav {
+  display: grid;
+  padding-top: 0.25rem;
+}
+
+.noir-game-table-menu-panel nav a {
+  padding: 0.52rem 0.5rem;
+  color: #bca883;
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.noir-game-table-menu-panel nav a:hover {
+  background: rgb(194 163 95 / 0.09);
+  color: var(--noir-paper-100);
+}
+
+#game-account-log-out {
+  color: #d87569;
 }
 
 .noir-game-detective-rail {
@@ -665,6 +873,16 @@
 
   .noir-game-phase strong {
     text-align: left;
+  }
+
+  .noir-game-table-menu {
+    right: -2.65rem;
+    left: auto;
+  }
+
+  .noir-game-table-menu-panel {
+    right: 0;
+    left: auto;
   }
 
   .noir-detective-tray {
