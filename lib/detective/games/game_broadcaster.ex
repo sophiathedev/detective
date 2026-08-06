@@ -53,7 +53,7 @@ defmodule Detective.Games.GameBroadcaster do
     Enum.each(state.players, fn {_player_id, player} ->
       {:ok, private_projection} = Projections.private_for_user(state, player.user_id)
 
-      Endpoint.broadcast(user_topic(player.user_id), "private_state", %{
+      Endpoint.broadcast(user_topic(state.game_id, player.user_id), "private_state", %{
         game_id: state.game_id,
         version: state.version,
         state: private_projection
@@ -73,7 +73,7 @@ defmodule Detective.Games.GameBroadcaster do
     })
 
     Enum.each(event.private_payloads, fn {recipient_user_id, payload} ->
-      Endpoint.broadcast(user_topic(recipient_user_id), "private_event", %{
+      Endpoint.broadcast(user_topic(state.game_id, recipient_user_id), "private_event", %{
         game_id: state.game_id,
         event_id: event.delivery_id,
         version: event.version || state.version,
@@ -84,5 +84,5 @@ defmodule Detective.Games.GameBroadcaster do
   end
 
   defp game_topic(game_id), do: "game:#{game_id}"
-  defp user_topic(user_id), do: "user:#{user_id}"
+  defp user_topic(game_id, user_id), do: "user:#{user_id}:game:#{game_id}"
 end

@@ -3,7 +3,11 @@ defmodule DetectiveWeb.LobbyChannel do
 
   alias Detective.Games
   alias Detective.Games.LobbyBroadcaster
+  alias Detective.Security.RateLimiter
   alias DetectiveWeb.Presence
+
+  @command_limit 10
+  @rate_window_ms 2_000
 
   @impl true
   def join("lobby:" <> game_id, _payload, socket) do
@@ -35,11 +39,11 @@ defmodule DetectiveWeb.LobbyChannel do
 
   @impl true
   def handle_in("ready", %{"expected_version" => expected_version}, socket) do
-    update_ready(socket, expected_version, true)
+    with_rate_limit(socket, fn -> update_ready(socket, expected_version, true) end)
   end
 
   def handle_in("unready", %{"expected_version" => expected_version}, socket) do
-    update_ready(socket, expected_version, false)
+    with_rate_limit(socket, fn -> update_ready(socket, expected_version, false) end)
   end
 
   def handle_in(
@@ -47,28 +51,31 @@ defmodule DetectiveWeb.LobbyChannel do
         %{"command_id" => command_id, "expected_version" => expected_version},
         socket
       ) do
-    case Games.start_game(
-           socket.assigns.current_scope,
-           socket.assigns.game_id,
-           command_id,
-           expected_version
-         ) do
-      {:ok, %{lobby: lobby}} ->
-        {:reply,
-         {:ok,
-          %{
-            path: "/games/#{lobby.id}",
-            version: lobby.current_version
-          }}, socket}
+    with_rate_limit(socket, fn ->
+      case Games.start_game(
+             socket.assigns.current_scope,
+             socket.assigns.game_id,
+             command_id,
+             expected_version
+           ) do
+        {:ok, %{lobby: lobby}} ->
+          {:reply,
+           {:ok,
+            %{
+              path: "/games/#{lobby.id}",
+              version: lobby.current_version
+            }}, socket}
 
-      {:error, reason} ->
-        {:reply, {:error, %{code: error_code(reason)}}, socket}
-    end
+        {:error, reason} ->
+          {:reply, {:error, %{code: error_code(reason)}}, socket}
+      end
+    end)
   end
 
   def handle_in("ready", _payload, socket), do: invalid_command(socket)
   def handle_in("unready", _payload, socket), do: invalid_command(socket)
   def handle_in("start_game", _payload, socket), do: invalid_command(socket)
+  def handle_in(_event, _payload, socket), do: invalid_command(socket)
 
   defp update_ready(socket, expected_version, ready) do
     case Games.set_ready(
@@ -87,7 +94,21 @@ defmodule DetectiveWeb.LobbyChannel do
   end
 
   defp invalid_command(socket),
-    do: {:reply, {:error, %{code: "invalid_command"}}, socket}
+    do:
+      with_rate_limit(socket, fn ->
+        {:reply, {:error, %{code: "invalid_command"}}, socket}
+      end)
+
+  defp with_rate_limit(socket, callback) do
+    case RateLimiter.check(
+           {:lobby_command, socket.assigns.user_id, socket.assigns.game_id},
+           limit: @command_limit,
+           window_ms: @rate_window_ms
+         ) do
+      :ok -> callback.()
+      {:error, reason} -> {:reply, {:error, %{code: error_code(reason)}}, socket}
+    end
+  end
 
   defp error_code(reason)
        when reason in [
@@ -104,7 +125,8 @@ defmodule DetectiveWeb.LobbyChannel do
               :detectives_not_ready,
               :command_id_conflict,
               :duplicate_command,
-              :invalid_initial_state
+              :invalid_initial_state,
+              :rate_limited
             ],
        do: Atom.to_string(reason)
 

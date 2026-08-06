@@ -3,7 +3,12 @@ defmodule DetectiveWeb.GameChannel do
 
   alias Detective.Games
   alias Detective.Games.{Command, ConnectionMonitor, GameBroadcaster, Session}
+  alias Detective.Security.RateLimiter
   alias DetectiveWeb.Presence
+
+  @command_limit 12
+  @sync_limit 10
+  @rate_window_ms 2_000
 
   @impl true
   def join("game:" <> game_id, _payload, socket) do
@@ -55,17 +60,17 @@ defmodule DetectiveWeb.GameChannel do
 
   @impl true
   def handle_in("sync_state", _payload, socket) do
-    case Games.game_projection(socket.assigns.current_scope, socket.assigns.game_id) do
-      {:ok, projection} ->
-        {:reply,
-         {:ok,
-          %{
-            version: projection.public.version,
-            state: projection.public
-          }}, socket}
-
-      {:error, reason} ->
-        {:reply, {:error, %{code: error_code(reason)}}, socket}
+    with :ok <- rate_limit(socket, :public_sync, @sync_limit),
+         {:ok, projection} <-
+           Games.game_projection(socket.assigns.current_scope, socket.assigns.game_id) do
+      {:reply,
+       {:ok,
+        %{
+          version: projection.public.version,
+          state: projection.public
+        }}, socket}
+    else
+      {:error, reason} -> {:reply, {:error, %{code: error_code(reason)}}, socket}
     end
   end
 
@@ -80,10 +85,11 @@ defmodule DetectiveWeb.GameChannel do
         },
         socket
       ) do
-    with {:ok, command} <- Command.build(command_id, type, expected_version, payload),
+    with :ok <- rate_limit(socket, :game_command, @command_limit),
+         {:ok, command} <- Command.build(command_id, type, expected_version, payload),
          {:ok, reply} <-
            Session.execute(socket.assigns.game_id, socket.assigns.user_id, command),
-         :ok <- GameBroadcaster.broadcast(reply.state, reply.events) do
+         :ok <- broadcast_new_command(reply) do
       {:reply,
        {:ok,
         %{
@@ -97,7 +103,27 @@ defmodule DetectiveWeb.GameChannel do
   end
 
   def handle_in("command", _payload, socket) do
+    _result = rate_limit(socket, :game_command, @command_limit)
     {:reply, {:error, %{code: "invalid_command"}}, socket}
+  end
+
+  def handle_in(_event, _payload, socket) do
+    _result = rate_limit(socket, :game_command, @command_limit)
+    {:reply, {:error, %{code: "invalid_command"}}, socket}
+  end
+
+  defp broadcast_new_command(%{duplicate: true}), do: :ok
+
+  defp broadcast_new_command(%{duplicate: false, state: state, events: events}) do
+    GameBroadcaster.broadcast(state, events)
+  end
+
+  defp rate_limit(socket, action, limit) do
+    RateLimiter.check(
+      {action, socket.assigns.user_id, socket.assigns.game_id},
+      limit: limit,
+      window_ms: @rate_window_ms
+    )
   end
 
   defp error_code(reason)
@@ -159,7 +185,8 @@ defmodule DetectiveWeb.GameChannel do
               :command_not_allowed,
               :command_id_conflict,
               :unknown_persisted_event,
-              :session_unavailable
+              :session_unavailable,
+              :rate_limited
             ],
        do: Atom.to_string(reason)
 

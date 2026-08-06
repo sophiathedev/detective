@@ -877,6 +877,7 @@
       game_paused: "The case is sealed while a player is offline.",
       game_not_paused: "The case is not paused.",
       players_offline: "Every player must reconnect before the Chisel resumes.",
+      rate_limited: "Dispatch rejected a burst of orders. Wait a moment before transmitting again.",
     }
 
     return t(messages[code] ?? "The server rejected this action.")
@@ -1146,7 +1147,7 @@
     }
 
     gameChannel = socket.channel(`game:${game_id}`, {})
-    userChannel = socket.channel(`user:${user_id}`, { game_id })
+    userChannel = socket.channel(`user:${user_id}:game:${game_id}`, { game_id })
 
     gameChannel.onError(() => invalidateConnectionSnapshot())
     gameChannel.onClose(() => invalidateConnectionSnapshot())

@@ -230,7 +230,7 @@ defmodule Detective.Games do
 
     with {:ok, game_id} <- cast_game_id(game_id),
          {:ok, command_id} <- cast_command_id(command_id),
-         :new <- start_command_status(game_id, user.id, command_id),
+         :new <- start_command_status(game_id, user.id, command_id, expected_version),
          {:ok, _changes} <-
            Repo.transact(start_game_multi(user.id, game_id, command_id, expected_version, now)),
          {:ok, _pid} <- SessionSupervisor.ensure_session(game_id),
@@ -415,13 +415,14 @@ defmodule Detective.Games do
     end
   end
 
-  defp start_command_status(game_id, actor_id, command_id) do
+  defp start_command_status(game_id, actor_id, command_id, expected_version) do
     case Persistence.lookup_command(game_id, command_id) do
       nil ->
         :new
 
       record ->
         if record.actor_id == actor_id and record.command_type == "start_game" and
+             record.expected_version == expected_version and
              record.payload_digest == Persistence.payload_digest(%{}) do
           :duplicate
         else

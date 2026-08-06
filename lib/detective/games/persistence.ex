@@ -86,6 +86,7 @@ defmodule Detective.Games.Persistence do
 
   def command_matches?(%CommandRecord{} = record, actor_id, %Command{} = command) do
     record.actor_id == actor_id and record.command_type == Atom.to_string(command.type) and
+      record.expected_version == command.expected_version and
       record.payload_digest == payload_digest(command.payload)
   end
 

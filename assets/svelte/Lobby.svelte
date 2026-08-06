@@ -91,7 +91,12 @@
       })
       .receive("error", ({ code }) => {
         commandPending = false
-        commandError = code === "stale_version" ? "Room changed. State refreshed; try again." : "Action rejected."
+        commandError =
+          code === "stale_version"
+            ? "Room changed. State refreshed; try again."
+            : code === "rate_limited"
+              ? "Dispatch rejected a burst of orders. Wait a moment before transmitting again."
+              : "Action rejected."
       })
       .receive("timeout", () => {
         commandPending = false
@@ -124,6 +129,8 @@
             ? "Every Detective must be ready."
             : code === "stale_version"
               ? "Room changed. State refreshed; try again."
+              : code === "rate_limited"
+                ? "Dispatch rejected a burst of orders. Wait a moment before transmitting again."
               : "Game could not start."
       })
       .receive("timeout", () => {

@@ -195,6 +195,9 @@ defmodule Detective.Games.GameFlowTest do
     assert {:ok, %{duplicate: true, version: ^placed_version}} =
              Session.execute(game.id, detective.id, place)
 
+    assert {:error, :command_id_conflict} =
+             Session.execute(game.id, detective.id, %{place | expected_version: placed_version})
+
     conflicting = %{place | payload: %{"location_id" => "84"}}
 
     assert {:error, :command_id_conflict} =

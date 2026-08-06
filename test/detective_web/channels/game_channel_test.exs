@@ -86,18 +86,96 @@ defmodule DetectiveWeb.GameChannelTest do
     assert public_json =~ "Test Clock"
 
     assert {:ok, private_reply, _user_socket} =
-             subscribe_and_join(socket, "user:#{context.detective.id}", %{
-               "game_id" => context.game.id
-             })
+             subscribe_and_join(
+               socket,
+               "user:#{context.detective.id}:game:#{context.game.id}",
+               %{
+                 "game_id" => context.game.id
+               }
+             )
 
     assert private_reply.state.role == "detective"
     assert private_reply.state.scratch == 4
     refute Jason.encode!(private_reply) =~ "solution"
 
     assert {:error, %{code: "unauthorized"}} =
-             subscribe_and_join(socket, "user:#{context.host.id}", %{
+             subscribe_and_join(socket, "user:#{context.host.id}:game:#{context.game.id}", %{
                "game_id" => context.game.id
              })
+
+    assert {:error, %{code: "unauthorized"}} =
+             subscribe_and_join(socket, "user:#{context.detective.id}", %{
+               "game_id" => context.game.id
+             })
+  end
+
+  test "private broadcasts are isolated by game topic", context do
+    socket = authenticated_socket(context.detective)
+    topic = "user:#{context.detective.id}:game:#{context.game.id}"
+
+    assert {:ok, _private_reply, _user_socket} =
+             subscribe_and_join(socket, topic, %{"game_id" => context.game.id})
+
+    other_game_id = Ecto.UUID.generate()
+
+    Endpoint.broadcast(
+      "user:#{context.detective.id}:game:#{other_game_id}",
+      "private_state",
+      %{game_id: other_game_id, state: %{solution: "must stay isolated"}}
+    )
+
+    refute_broadcast "private_state", %{game_id: ^other_game_id}
+
+    Endpoint.broadcast(topic, "private_state", %{
+      game_id: context.game.id,
+      state: %{role: "detective"}
+    })
+
+    assert_broadcast "private_state", %{game_id: game_id, state: %{role: "detective"}}
+    assert game_id == context.game.id
+  end
+
+  test "unknown events are rejected without terminating the channel", context do
+    assert {:ok, %{state: public_state}, game_socket} =
+             context.detective
+             |> authenticated_socket()
+             |> subscribe_and_join("game:#{context.game.id}", %{})
+
+    unknown_ref = push(game_socket, "invented_event", %{"actor_id" => context.host.id})
+    assert_reply unknown_ref, :error, %{code: "invalid_command"}
+
+    sync_ref = push(game_socket, "sync_state", %{})
+    assert_reply sync_ref, :ok, %{version: version}
+    assert version == public_state.version
+  end
+
+  test "game commands are rate limited per authenticated user and game", context do
+    assert {:ok, %{state: public_state}, game_socket} =
+             context.detective
+             |> authenticated_socket()
+             |> subscribe_and_join("game:#{context.game.id}", %{})
+
+    for _attempt <- 1..12 do
+      rejected_ref =
+        push(game_socket, "command", %{
+          "command_id" => Ecto.UUID.generate(),
+          "type" => "invented_command",
+          "expected_version" => public_state.version,
+          "payload" => %{}
+        })
+
+      assert_reply rejected_ref, :error, %{code: "invalid_command"}
+    end
+
+    ref =
+      push(game_socket, "command", %{
+        "command_id" => Ecto.UUID.generate(),
+        "type" => "end_turn",
+        "expected_version" => public_state.version,
+        "payload" => %{}
+      })
+
+    assert_reply ref, :error, %{code: "rate_limited"}
   end
 
   test "outsider cannot join public or private game channels", context do
@@ -107,9 +185,13 @@ defmodule DetectiveWeb.GameChannelTest do
              subscribe_and_join(socket, "game:#{context.game.id}", %{})
 
     assert {:error, %{code: "not_a_member"}} =
-             subscribe_and_join(socket, "user:#{context.outsider.id}", %{
-               "game_id" => context.game.id
-             })
+             subscribe_and_join(
+               socket,
+               "user:#{context.outsider.id}:game:#{context.game.id}",
+               %{
+                 "game_id" => context.game.id
+               }
+             )
   end
 
   test "a player stays online until their final game channel leaves", context do
@@ -205,7 +287,7 @@ defmodule DetectiveWeb.GameChannelTest do
     assert {:ok, paused_private_reply, _detective_user_socket} =
              subscribe_and_join(
                authenticated_socket(context.detective),
-               "user:#{context.detective.id}",
+               "user:#{context.detective.id}:game:#{context.game.id}",
                %{"game_id" => context.game.id}
              )
 
@@ -323,9 +405,13 @@ defmodule DetectiveWeb.GameChannelTest do
              subscribe_and_join(socket, "game:#{context.game.id}", %{})
 
     assert {:ok, _private_reply, user_socket} =
-             subscribe_and_join(socket, "user:#{context.detective.id}", %{
-               "game_id" => context.game.id
-             })
+             subscribe_and_join(
+               socket,
+               "user:#{context.detective.id}:game:#{context.game.id}",
+               %{
+                 "game_id" => context.game.id
+               }
+             )
 
     assert {:ok, _host_reply, _host_game_socket} =
              subscribe_and_join(
@@ -420,6 +506,9 @@ defmodule DetectiveWeb.GameChannelTest do
     assert moved_player.location_id == "82"
     assert moved_player.actions_remaining == 3
 
+    flush_broadcasts("player_moved")
+    flush_broadcasts("game_state")
+
     duplicate_ref =
       push(game_socket, "command", %{
         "command_id" => move_command_id,
@@ -430,18 +519,8 @@ defmodule DetectiveWeb.GameChannelTest do
 
     assert_reply duplicate_ref, :ok, %{version: ^moved_version, duplicate: true}
 
-    assert_broadcast "player_moved", %{
-      event_id: ^move_event_id,
-      version: ^moved_version,
-      payload: duplicate_move_payload
-    }
-
-    assert_broadcast "game_state", %{version: ^moved_version}
-
-    assert (duplicate_move_payload[:location_id] || duplicate_move_payload["location_id"]) == "82"
-
-    assert (duplicate_move_payload[:actions_remaining] ||
-              duplicate_move_payload["actions_remaining"]) == 3
+    refute_broadcast "player_moved", %{event_id: ^move_event_id}
+    refute_broadcast "game_state", %{version: ^moved_version}
 
     assert Repo.one(
              from event in GameEvent,
@@ -486,7 +565,7 @@ defmodule DetectiveWeb.GameChannelTest do
     socket = authenticated_socket(context.host)
 
     assert {:ok, reply, _user_socket} =
-             subscribe_and_join(socket, "user:#{context.host.id}", %{
+             subscribe_and_join(socket, "user:#{context.host.id}:game:#{context.game.id}", %{
                "game_id" => context.game.id
              })
 
@@ -507,9 +586,13 @@ defmodule DetectiveWeb.GameChannelTest do
              subscribe_and_join(socket, "game:#{context.game.id}", %{})
 
     assert {:ok, _private_reply, _user_socket} =
-             subscribe_and_join(socket, "user:#{context.detective.id}", %{
-               "game_id" => context.game.id
-             })
+             subscribe_and_join(
+               socket,
+               "user:#{context.detective.id}:game:#{context.game.id}",
+               %{
+                 "game_id" => context.game.id
+               }
+             )
 
     place_ref =
       push(game_socket, "command", %{
@@ -575,9 +658,13 @@ defmodule DetectiveWeb.GameChannelTest do
              subscribe_and_join(detective_socket, "game:#{context.game.id}", %{})
 
     assert {:ok, _detective_private, _detective_user_socket} =
-             subscribe_and_join(detective_socket, "user:#{context.detective.id}", %{
-               "game_id" => context.game.id
-             })
+             subscribe_and_join(
+               detective_socket,
+               "user:#{context.detective.id}:game:#{context.game.id}",
+               %{
+                 "game_id" => context.game.id
+               }
+             )
 
     assert {:ok, _host_public, host_game_socket} =
              subscribe_and_join(host_socket, "game:#{context.game.id}", %{})
@@ -590,9 +677,13 @@ defmodule DetectiveWeb.GameChannelTest do
              )
 
     assert {:ok, _host_private, _host_user_socket} =
-             subscribe_and_join(host_socket, "user:#{context.host.id}", %{
-               "game_id" => context.game.id
-             })
+             subscribe_and_join(
+               host_socket,
+               "user:#{context.host.id}:game:#{context.game.id}",
+               %{
+                 "game_id" => context.game.id
+               }
+             )
 
     place_ref =
       push(detective_game_socket, "command", %{
@@ -792,6 +883,14 @@ defmodule DetectiveWeb.GameChannelTest do
   defp flush_connection_states do
     receive do
       %Phoenix.Socket.Broadcast{event: "connection_state"} -> flush_connection_states()
+    after
+      0 -> :ok
+    end
+  end
+
+  defp flush_broadcasts(event) do
+    receive do
+      %Phoenix.Socket.Broadcast{event: ^event} -> flush_broadcasts(event)
     after
       0 -> :ok
     end

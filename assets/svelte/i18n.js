@@ -598,6 +598,8 @@ const vi = {
   "The case is sealed while a player is offline.": "Hồ sơ bị niêm phong khi có người chơi mất liên lạc.",
   "The case is not paused.": "Hồ sơ không ở trạng thái tạm dừng.",
   "Every player must reconnect before the Chisel resumes.": "Mọi người chơi phải nối lại liên lạc trước khi Chisel tiếp tục.",
+  "Dispatch rejected a burst of orders. Wait a moment before transmitting again.":
+    "Tổng đài phát hiện lệnh dồn bất thường. Tạm án binh vài giây rồi truyền lệnh lại.",
   "The server rejected this action.": "Máy chủ bác lệnh này.",
   "This account is no longer authorized for the case channel.": "Tài khoản này không còn quyền truy cập kênh hồ sơ án.",
   "Connection lost. Waiting for fresh public and private case files.":

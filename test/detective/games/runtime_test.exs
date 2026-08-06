@@ -106,6 +106,9 @@ defmodule Detective.Games.RuntimeTest do
     assert {:ok, %{duplicate: true}} =
              Games.start_game(Scope.for_user(host), game.id, command_id, version)
 
+    assert {:error, :command_id_conflict} =
+             Games.start_game(Scope.for_user(host), game.id, command_id, version + 1)
+
     assert Repo.aggregate(GameSnapshot, :count) == 1
     assert Repo.aggregate(GameEvent, :count) == 1
   end

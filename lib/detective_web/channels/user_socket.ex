@@ -1,5 +1,5 @@
 defmodule DetectiveWeb.UserSocket do
-  use Phoenix.Socket
+  use Phoenix.Socket, max_channels_per_transport: 8
 
   alias Detective.Accounts
   alias Detective.Accounts.Scope
