@@ -373,9 +373,6 @@
 
 .noir-detective-public-stats,
 .noir-detective-private-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 0.6rem;
   margin-top: 0.35rem;
   color: #b49c78;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
@@ -384,10 +381,144 @@
   text-transform: uppercase;
 }
 
+.noir-detective-public-stats {
+  display: grid;
+  gap: 0.32rem;
+}
+
+.noir-ap-meter {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.38rem;
+}
+
+.noir-resource-caption {
+  color: #b49c78;
+}
+
+.noir-ap-meter strong {
+  color: var(--noir-paper-300);
+  font-size: 0.58rem;
+}
+
+.noir-ap-pips {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.noir-ap-pip {
+  width: 0.52rem;
+  height: 0.52rem;
+  border: 1px solid #d2ad62;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 28%, #f4d68e 0 12%, transparent 13%),
+    radial-gradient(circle, #bd8737, #674219 68%, #21160b 70%);
+  box-shadow: 0 0.08rem 0 #241508, 0 0 0.35rem rgb(224 189 114 / 0.2);
+}
+
+.noir-ap-pip-spent {
+  border-color: #5b4c39;
+  background: radial-gradient(circle, #302921, #15120f 72%);
+  box-shadow: inset 0 0.08rem 0.18rem rgb(0 0 0 / 0.72);
+  opacity: 0.72;
+}
+
+.noir-detective-location {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.25rem;
+  color: #8f7959;
+}
+
+.noir-detective-location svg {
+  width: 0.72rem;
+  flex: none;
+  stroke: currentColor;
+  stroke-width: 1.35;
+}
+
+.noir-detective-location span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .noir-detective-private-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
   border-top: 1px solid rgb(194 163 95 / 0.25);
   padding-top: 0.35rem;
-  color: #d46a5e;
+}
+
+.noir-resource-counter {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid rgb(116 96 57 / 0.52);
+  border-radius: 0.24rem;
+  background: linear-gradient(145deg, rgb(63 50 35 / 0.48), rgb(8 7 6 / 0.52));
+  box-shadow: inset 0 0 0.45rem rgb(0 0 0 / 0.48);
+  padding: 0.26rem 0.3rem;
+}
+
+.noir-resource-counter > span:last-child {
+  display: grid;
+  min-width: 0;
+  line-height: 1;
+}
+
+.noir-resource-counter small {
+  overflow: hidden;
+  color: #977e59;
+  font-size: 0.4rem;
+  letter-spacing: 0.03em;
+  text-overflow: ellipsis;
+}
+
+.noir-resource-counter strong {
+  margin-top: 0.12rem;
+  color: var(--noir-paper-300);
+  font-size: 0.64rem;
+}
+
+.noir-scratch-coin,
+.noir-leverage-marker {
+  display: inline-grid;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.noir-scratch-coin {
+  border: 1px solid #d2ad62;
+  background:
+    radial-gradient(circle at 34% 25%, #f7dea0 0 9%, transparent 10%),
+    repeating-radial-gradient(circle, #c19040 0 42%, #8a5d24 44% 52%, #4a2c11 54% 60%);
+  box-shadow: 0 0.1rem 0 #35200d, 0 0.2rem 0.35rem rgb(0 0 0 / 0.48);
+  color: #301b0a;
+  text-shadow: 0 1px rgb(240 206 133 / 0.42);
+}
+
+.noir-leverage-marker {
+  border: 1px solid #b05b50;
+  background:
+    radial-gradient(circle at 34% 25%, rgb(255 214 192 / 0.34) 0 8%, transparent 9%),
+    radial-gradient(circle, #9b443a, #5f201d 72%);
+  box-shadow: 0 0.1rem 0 #2b0d0c, inset 0 0 0 2px rgb(70 17 15 / 0.34);
+  color: #f1c5ad;
+  text-shadow: 0 1px #4a1713;
 }
 
 .noir-detective-slot-empty {
@@ -452,6 +583,7 @@
 
 .noir-chisel-private-ledger dl > div {
   display: flex;
+  align-items: center;
   gap: 0.25rem;
   color: var(--noir-paper-300);
   font-family: "IBM Plex Mono", ui-monospace, monospace;
@@ -459,8 +591,23 @@
 }
 
 .noir-chisel-private-ledger dd {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
   color: var(--noir-gold-500);
   font-weight: 600;
+}
+
+.noir-chisel-private-ledger dd .noir-leverage-marker {
+  width: 1rem;
+  height: 1rem;
+  font-size: 0.48rem;
+}
+
+.noir-chisel-private-ledger dd strong {
+  min-width: 0.75rem;
+  font-size: 0.65rem;
+  text-align: center;
 }
 
 .noir-chisel-leverage-label {
@@ -554,6 +701,32 @@
 
   .noir-detective-private-stats {
     padding-top: 0.2rem;
+  }
+
+  .noir-ap-meter {
+    grid-template-columns: 1fr auto;
+    gap: 0.25rem;
+  }
+
+  .noir-resource-caption {
+    display: none;
+  }
+
+  .noir-ap-pip {
+    width: 0.42rem;
+    height: 0.42rem;
+  }
+
+  .noir-resource-counter {
+    gap: 0.2rem;
+    padding: 0.2rem;
+  }
+
+  .noir-scratch-coin,
+  .noir-leverage-marker {
+    width: 1.05rem;
+    height: 1.05rem;
+    font-size: 0.52rem;
   }
 
   .noir-chisel-console {
@@ -757,25 +930,81 @@
 }
 
 .noir-action-key {
+  position: relative;
+  display: grid;
   min-height: 3.2rem;
-  min-width: 5.4rem;
+  min-width: 6.25rem;
   flex: none;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.48rem;
+  overflow: hidden;
   cursor: pointer;
   border: 1px solid var(--noir-gold-700);
   border-radius: 0.32rem;
-  background: linear-gradient(#382f27, #171310);
-  box-shadow: 0 0.2rem 0 #080706, inset 0 0 0 1px rgb(194 163 95 / 0.12);
-  padding: 0.45rem 0.7rem;
+  background:
+    linear-gradient(105deg, transparent 0 48%, rgb(255 255 255 / 0.025) 49% 51%, transparent 52%),
+    linear-gradient(#3c3026, #17120e);
+  box-shadow:
+    0 0.2rem 0 #080706,
+    inset 0 0 0 1px rgb(194 163 95 / 0.12),
+    inset 0 0.65rem 1rem rgb(255 230 180 / 0.025);
+  padding: 0.4rem 0.62rem 0.44rem 0.45rem;
   color: var(--noir-paper-100);
   font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   font-size: 0.72rem;
   font-weight: 600;
   line-height: 1.1;
+  text-align: left;
   transition: border-color 140ms ease, translate 140ms ease, box-shadow 140ms ease;
+}
+
+.noir-action-key::after {
+  position: absolute;
+  right: 0.28rem;
+  bottom: 0.2rem;
+  left: 0.28rem;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(224 189 114 / 0.28), transparent);
+  content: "";
+}
+
+.noir-action-glyph {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 1px solid rgb(194 163 95 / 0.58);
+  border-radius: 0.28rem;
+  background:
+    radial-gradient(circle at 34% 28%, rgb(248 218 153 / 0.15), transparent 22%),
+    linear-gradient(145deg, #352b22, #15110e);
+  box-shadow: inset 0 0 0.5rem rgb(0 0 0 / 0.48), 0 0.12rem 0 #080706;
+  color: #d0ad68;
+  transition: background-color 140ms ease, color 140ms ease, translate 140ms ease;
+}
+
+.noir-action-glyph-art {
+  width: 1.28rem;
+  height: 1.28rem;
+  stroke: currentColor;
+  stroke-width: 1.55;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.noir-action-key-label {
+  max-width: 6.5rem;
+  text-wrap: balance;
 }
 
 .noir-action-key:hover:not(:disabled) {
   border-color: var(--noir-gold-500);
+  translate: 0 -1px;
+}
+
+.noir-action-key:hover:not(:disabled) .noir-action-glyph {
+  color: #f0ce83;
   translate: 0 -1px;
 }
 
@@ -800,9 +1029,20 @@
   color: #fff0cf;
 }
 
+.noir-action-key-active .noir-action-glyph {
+  border-color: #e0bd72;
+  background: radial-gradient(circle at 35% 28%, #f2d28c, #a96d2d 68%, #503018 70%);
+  color: #321814;
+}
+
 .noir-action-key-danger {
   border-color: #8f4139;
   color: #f0beb3;
+}
+
+.noir-action-key-danger .noir-action-glyph {
+  border-color: #8f4139;
+  color: #d87569;
 }
 
 .noir-action-key-casebook {
@@ -811,6 +1051,13 @@
   box-shadow: 0 0.2rem 0 #725a38, inset 0 0 1rem rgb(92 58 34 / 0.12);
   color: var(--noir-ink-900);
   font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
+}
+
+.noir-action-key-casebook .noir-action-glyph {
+  border-color: #8e7651;
+  background: rgb(89 66 39 / 0.13);
+  box-shadow: inset 0 0 0.45rem rgb(92 58 34 / 0.13), 0 0.1rem 0 rgb(114 90 56 / 0.42);
+  color: var(--noir-ink-900);
 }
 
 .noir-context-stack {
@@ -2068,9 +2315,28 @@
 
   .noir-action-key {
     min-height: 2.7rem;
-    min-width: 4.8rem;
-    padding: 0.35rem 0.55rem;
-    font-size: 0.66rem;
+    min-width: 5.5rem;
+    gap: 0.36rem;
+    padding: 0.3rem 0.45rem 0.34rem 0.34rem;
+    font-size: 0.62rem;
+  }
+
+  .noir-action-glyph {
+    width: 1.7rem;
+    height: 1.7rem;
+  }
+
+  .noir-action-glyph-art {
+    width: 1.08rem;
+    height: 1.08rem;
+  }
+
+  .noir-resource-counter small {
+    display: none;
+  }
+
+  .noir-resource-counter strong {
+    margin-top: 0;
   }
 
   .noir-map-status {

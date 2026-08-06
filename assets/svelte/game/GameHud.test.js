@@ -40,12 +40,17 @@ describe("game HUD role boundaries", () => {
     })
 
     expect(screen.getAllByTestId(/detective-rail-slot-/)).toHaveLength(4)
-    expect(screen.getByTestId("detective-rail-slot-1")).toHaveTextContent("Scratch 6")
-    expect(screen.getByTestId("detective-rail-slot-1")).toHaveTextContent(
+    expect(screen.getByLabelText("3 of 4 actions remaining")).toBeInTheDocument()
+    const firstSlot = screen.getByTestId("detective-rail-slot-1")
+    const thirdSlot = screen.getByTestId("detective-rail-slot-3")
+
+    expect(within(firstSlot).getByLabelText("Scratch: 6")).toBeInTheDocument()
+    expect(within(firstSlot).getByLabelText("Leverage: 3")).toBeInTheDocument()
+    expect(firstSlot).toHaveTextContent(
       "At LAPD Headquarters",
     )
-    expect(screen.getByTestId("detective-rail-slot-1")).not.toHaveTextContent("LOC 51")
-    expect(screen.getByTestId("detective-rail-slot-3")).not.toHaveTextContent("Scratch")
+    expect(firstSlot).not.toHaveTextContent("LOC 51")
+    expect(within(thirdSlot).queryByLabelText(/Scratch:/)).not.toBeInTheDocument()
   })
 
   it("keeps Chisel-private leverage inside the Chisel console", () => {
@@ -62,7 +67,9 @@ describe("game HUD role boundaries", () => {
     const consoleElement = screen.getByTestId("chisel-console")
     expect(consoleElement).toHaveTextContent("Question waiting")
     expect(consoleElement).toHaveTextContent("Leverage markers")
-    expect(consoleElement).toHaveTextContent("D1 2 held")
+    expect(
+      within(consoleElement).getByLabelText("2 leverage held for Detective 1"),
+    ).toBeInTheDocument()
     expect(within(consoleElement).queryByText(/AP/)).not.toBeInTheDocument()
     expect(within(consoleElement).queryByText(/Scratch/)).not.toBeInTheDocument()
   })

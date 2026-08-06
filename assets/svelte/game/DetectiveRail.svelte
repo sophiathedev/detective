@@ -35,6 +35,11 @@
 
     return locations.find((location) => location.id === locationId)?.name ?? "Location unavailable"
   }
+
+  function actionPoints(value) {
+    const points = Number.isFinite(value) ? value : 0
+    return Math.max(0, Math.min(4, points))
+  }
 </script>
 
 <section id="detective-rail" class="noir-detective-tray noir-wood-frame" aria-labelledby="detective-rail-title">
@@ -80,16 +85,55 @@
             </div>
 
             <div class="noir-detective-public-stats">
-              <span>AP {detective.actions_remaining}/4</span>
+              <div
+                class="noir-ap-meter"
+                role="img"
+                aria-label={`${actionPoints(detective.actions_remaining)} of 4 actions remaining`}
+              >
+                <span class="noir-resource-caption" aria-hidden="true">Actions</span>
+                <span class="noir-ap-pips" aria-hidden="true">
+                  {#each [1, 2, 3, 4] as point}
+                    <span
+                      class:noir-ap-pip-spent={point > actionPoints(detective.actions_remaining)}
+                      class="noir-ap-pip"
+                    ></span>
+                  {/each}
+                </span>
+                <strong aria-hidden="true">{actionPoints(detective.actions_remaining)}</strong>
+              </div>
               <span class="noir-detective-location" title={locationName(detective.location_id)}>
-                At {locationName(detective.location_id)}
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d="M8 14s4-3.6 4-7.5a4 4 0 1 0-8 0C4 10.4 8 14 8 14Z" />
+                  <circle cx="8" cy="6.5" r="1.4" />
+                </svg>
+                <span>At {locationName(detective.location_id)}</span>
               </span>
             </div>
 
             {#if ownPlayerId === detective.id && privateResources}
               <div class="noir-detective-private-stats">
-                <span>Scratch {privateResources.scratch ?? 0}</span>
-                <span>Leverage {privateResources.leverage ?? 0}</span>
+                <div
+                  class="noir-resource-counter"
+                  role="img"
+                  aria-label={`Scratch: ${privateResources.scratch ?? 0}`}
+                >
+                  <span class="noir-scratch-coin" aria-hidden="true">$</span>
+                  <span aria-hidden="true">
+                    <small>Scratch</small>
+                    <strong>{privateResources.scratch ?? 0}</strong>
+                  </span>
+                </div>
+                <div
+                  class="noir-resource-counter"
+                  role="img"
+                  aria-label={`Leverage: ${privateResources.leverage ?? 0}`}
+                >
+                  <span class="noir-leverage-marker" aria-hidden="true">L</span>
+                  <span aria-hidden="true">
+                    <small>Leverage</small>
+                    <strong>{privateResources.leverage ?? 0}</strong>
+                  </span>
+                </div>
               </div>
             {/if}
           </div>

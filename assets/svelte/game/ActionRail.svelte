@@ -1,4 +1,6 @@
 <script>
+  import ActionGlyph from "./ActionGlyph.svelte"
+
   let {
     availableActions = [],
     activeAction = null,
@@ -55,7 +57,10 @@
         disabled={commandPending || !connectionOnline}
         onclick={() => dispatch(action)}
       >
-        {action.label}
+        <span class="noir-action-glyph" aria-hidden="true">
+          <ActionGlyph name={action.id} />
+        </span>
+        <span class="noir-action-key-label">{action.label}</span>
       </button>
     {/each}
 
@@ -65,7 +70,10 @@
       class="noir-action-key noir-action-key-casebook"
       onclick={onOpenCasebook}
     >
-      Casebook
+      <span class="noir-action-glyph" aria-hidden="true">
+        <ActionGlyph name="casebook" />
+      </span>
+      <span class="noir-action-key-label">Casebook</span>
     </button>
   </div>
 </div>

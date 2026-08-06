@@ -46,7 +46,13 @@
           {#each detectiveSlots as detective, index}
             <div>
               <dt>D{detective.seat ?? index + 1}</dt>
-              <dd>{leverageByDetective[detective.id] ?? 0} held</dd>
+              <dd
+                role="img"
+                aria-label={`${leverageByDetective[detective.id] ?? 0} leverage held for Detective ${detective.seat ?? index + 1}`}
+              >
+                <span class="noir-leverage-marker" aria-hidden="true">L</span>
+                <strong aria-hidden="true">{leverageByDetective[detective.id] ?? 0}</strong>
+              </dd>
             </div>
           {/each}
         </dl>

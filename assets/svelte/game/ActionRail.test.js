@@ -28,6 +28,7 @@ describe("ActionRail", () => {
     expect(onAction).toHaveBeenCalledWith("analyze")
     expect(onAction).toHaveBeenCalledWith("bribe_detective")
     expect(onOpenCasebook).toHaveBeenCalledTimes(1)
+    expect(document.querySelectorAll(".noir-action-glyph-art")).toHaveLength(5)
     expect(screen.queryByRole("button", { name: "Kickback" })).not.toBeInTheDocument()
   })
 
