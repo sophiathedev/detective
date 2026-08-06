@@ -27,19 +27,11 @@ defmodule Detective.Games.GameFlowTest do
       detective: detective,
       second_detective: second_detective,
       game: game,
-      lobby_version: lobby_version
-    } = ready_branching_game()
-
-    assert {:ok, %{lobby: lobby}} =
-             Games.start_game(
-               Scope.for_user(host),
-               game.id,
-               Ecto.UUID.generate(),
-               lobby_version
-             )
+      game_version: game_version
+    } = started_branching_game()
 
     placed =
-      execute(game.id, detective.id, :place, lobby.current_version, %{
+      execute(game.id, detective.id, :place, game_version, %{
         "location_id" => "51"
       })
 
@@ -143,6 +135,231 @@ defmodule Detective.Games.GameFlowTest do
     assert restored.special_actors["station-tail"].resolved_choice_groups == ["tail-approach"]
   end
 
+  test "rejects out-of-turn and Chisel field commands without changing persisted state" do
+    %{
+      host: host,
+      detective: detective,
+      second_detective: second_detective,
+      game: game,
+      game_version: game_version
+    } = started_branching_game()
+
+    placed =
+      execute(game.id, detective.id, :place, game_version, %{"location_id" => "51"})
+
+    snapshot_count = snapshot_count(game.id)
+    event_count = event_count(game.id)
+
+    assert_command_error(
+      game.id,
+      second_detective.id,
+      :move,
+      placed.version,
+      %{"location_id" => "84"},
+      :not_your_turn
+    )
+
+    assert_command_error(
+      game.id,
+      host.id,
+      :move,
+      placed.version,
+      %{"location_id" => "82"},
+      :wrong_role
+    )
+
+    assert {:ok, unchanged} = Session.get_state(game.id)
+    assert unchanged.version == placed.version
+    assert State.player_by_user_id(unchanged, detective.id).location_id == "51"
+    assert snapshot_count(game.id) == snapshot_count
+    assert event_count(game.id) == event_count
+  end
+
+  test "deduplicates a command and rejects conflicting or stale retries" do
+    %{detective: detective, game: game, game_version: game_version} = started_branching_game()
+    command_id = Ecto.UUID.generate()
+
+    place =
+      command(
+        :place,
+        game_version,
+        %{"location_id" => "51"},
+        command_id
+      )
+
+    assert {:ok, %{duplicate: false, version: placed_version}} =
+             Session.execute(game.id, detective.id, place)
+
+    snapshot_count = snapshot_count(game.id)
+
+    assert {:ok, %{duplicate: true, version: ^placed_version}} =
+             Session.execute(game.id, detective.id, place)
+
+    conflicting = %{place | payload: %{"location_id" => "84"}}
+
+    assert {:error, :command_id_conflict} =
+             Session.execute(game.id, detective.id, conflicting)
+
+    assert_command_error(
+      game.id,
+      detective.id,
+      :analyze,
+      game_version,
+      %{},
+      :stale_version
+    )
+
+    assert {:ok, unchanged} = Session.get_state(game.id)
+    assert unchanged.version == placed_version
+    assert snapshot_count(game.id) == snapshot_count
+  end
+
+  test "keeps a special actor branch locked after session restart" do
+    %{detective: detective, game: game, game_version: game_version} = started_branching_game()
+
+    placed =
+      execute(game.id, detective.id, :place, game_version, %{"location_id" => "51"})
+
+    shadowed =
+      execute(game.id, detective.id, :interact_special_actor, placed.version, %{
+        "actor_id" => "station-tail",
+        "option_id" => "shadow-tail"
+      })
+
+    assert shadowed.state.special_actors["station-tail"].location_id == "96"
+    assert "sealed-ledger" in shadowed.state.public_case_card_ids
+
+    restart_session(game.id)
+    assert {:ok, restored} = Session.get_state(game.id)
+    assert restored.special_actors["station-tail"].resolved_choice_groups == ["tail-approach"]
+
+    at_border =
+      execute(game.id, detective.id, :move, restored.version, %{"location_id" => "82"})
+
+    at_contact =
+      execute(game.id, detective.id, :move, at_border.version, %{"location_id" => "96"})
+
+    assert {:ok, projection} = Games.game_projection(Scope.for_user(detective), game.id)
+    assert projection.private.special_actor_interactions == []
+
+    assert_command_error(
+      game.id,
+      detective.id,
+      :interact_special_actor,
+      at_contact.version,
+      %{"actor_id" => "station-tail", "option_id" => "buy-off"},
+      :special_choice_resolved
+    )
+
+    assert {:ok, unchanged} = Session.get_state(game.id)
+    assert unchanged.version == at_contact.version
+  end
+
+  test "rejects a repeated archived search without another event or snapshot" do
+    %{detective: detective, game: game, game_version: game_version} = started_branching_game()
+
+    placed =
+      execute(game.id, detective.id, :place, game_version, %{"location_id" => "51"})
+
+    unblocked =
+      execute(game.id, detective.id, :interact_special_actor, placed.version, %{
+        "actor_id" => "station-tail",
+        "option_id" => "buy-off"
+      })
+
+    searched = execute(game.id, detective.id, :search_location, unblocked.version)
+    snapshot_count = snapshot_count(game.id)
+    event_count = event_count(game.id)
+
+    assert_command_error(
+      game.id,
+      detective.id,
+      :search_location,
+      searched.version,
+      %{},
+      :search_archived
+    )
+
+    assert {:ok, unchanged} = Session.get_state(game.id)
+    assert unchanged.version == searched.version
+    assert snapshot_count(game.id) == snapshot_count
+    assert event_count(game.id) == event_count
+  end
+
+  test "keeps failed accusation feedback private and spends the Solve token" do
+    %{
+      detective: detective,
+      second_detective: second_detective,
+      game: game,
+      game_version: game_version
+    } = started_branching_game()
+
+    placed =
+      execute(game.id, detective.id, :place, game_version, %{"location_id" => "51"})
+
+    unblocked =
+      execute(game.id, detective.id, :interact_special_actor, placed.version, %{
+        "actor_id" => "station-tail",
+        "option_id" => "buy-off"
+      })
+
+    searched = execute(game.id, detective.id, :search_location, unblocked.version)
+    first_turn_ended = execute(game.id, detective.id, :end_turn, searched.version)
+
+    second_placed =
+      execute(game.id, second_detective.id, :place, first_turn_ended.version, %{
+        "location_id" => "84"
+      })
+
+    next_day = execute(game.id, second_detective.id, :end_turn, second_placed.version)
+
+    rejected =
+      execute(game.id, detective.id, :accuse, next_day.version, %{
+        "suspect_id" => "night-clerk",
+        "weapon_id" => "sealed-ledger",
+        "motive_id" => "robbery"
+      })
+
+    assert [%{type: :accusation_rejected} = event] = rejected.events
+    refute Map.has_key?(event.public_payload, :correct_count)
+    assert event.private_payloads[detective.id].correct_count == 2
+    assert rejected.state.status == :active
+
+    detective_state = State.player_by_user_id(rejected.state, detective.id)
+    refute detective_state.solve_token_available
+
+    assert_command_error(
+      game.id,
+      detective.id,
+      :accuse,
+      rejected.version,
+      %{
+        "suspect_id" => "night-clerk",
+        "weapon_id" => "sealed-ledger",
+        "motive_id" => "cover-up"
+      },
+      :solve_token_spent
+    )
+
+    assert {:ok, unchanged} = Session.get_state(game.id)
+    assert unchanged.version == rejected.version
+    assert unchanged.status == :active
+  end
+
+  defp started_branching_game do
+    %{host: host, game: game, lobby_version: lobby_version} = setup = ready_branching_game()
+
+    assert {:ok, %{lobby: lobby}} =
+             Games.start_game(
+               Scope.for_user(host),
+               game.id,
+               Ecto.UUID.generate(),
+               lobby_version
+             )
+
+    Map.put(setup, :game_version, lobby.current_version)
+  end
+
   defp ready_branching_game do
     base_version = case_version_fixture()
 
@@ -225,14 +442,31 @@ defmodule Detective.Games.GameFlowTest do
 
   defp execute(game_id, user_id, type, version, payload \\ %{}) do
     assert {:ok, result} =
-             Session.execute(game_id, user_id, %Command{
-               command_id: Ecto.UUID.generate(),
-               type: type,
-               expected_version: version,
-               payload: payload
-             })
+             Session.execute(game_id, user_id, command(type, version, payload))
 
     result
+  end
+
+  defp assert_command_error(game_id, user_id, type, version, payload, reason) do
+    assert {:error, ^reason} =
+             Session.execute(game_id, user_id, command(type, version, payload))
+  end
+
+  defp command(type, version, payload, command_id \\ Ecto.UUID.generate()) do
+    %Command{
+      command_id: command_id,
+      type: type,
+      expected_version: version,
+      payload: payload
+    }
+  end
+
+  defp snapshot_count(game_id) do
+    Repo.aggregate(from(snapshot in GameSnapshot, where: snapshot.game_id == ^game_id), :count)
+  end
+
+  defp event_count(game_id) do
+    Repo.aggregate(from(event in GameEvent, where: event.game_id == ^game_id), :count)
   end
 
   defp assert_public_event_order(game_id) do
