@@ -77,6 +77,7 @@
         <ActionGlyph name="casebook" />
       </span>
       <span class="noir-action-key-label">{t("Casebook")}</span>
+      <span class="noir-casebook-ribbon" aria-hidden="true"></span>
     </button>
   </div>
 </div>

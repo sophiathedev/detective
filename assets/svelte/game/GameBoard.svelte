@@ -116,6 +116,15 @@
       .toUpperCase()
   }
 
+  function suspectPortraitVariant(id) {
+    return (
+      Array.from(String(id)).reduce(
+        (sum, character, index) => sum + character.charCodeAt(0) * (index + 1),
+        0,
+      ) % 4
+    )
+  }
+
   function suspectActions(suspect) {
     return [
       searchableIds.has(suspect.id) ? t("search") : null,
@@ -318,11 +327,13 @@
         {#if placement}
           {@const actions = suspectActions(suspect)}
           {@const actionable = actions.length > 0}
+          {@const portraitVariant = suspectPortraitVariant(suspect.id)}
           <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
           <g
             id={`suspect-map-standee-${suspect.id}`}
             data-testid={`suspect-standee-${suspect.id}`}
             data-location-id={placement.location.id}
+            data-portrait-variant={portraitVariant}
             class={`map-suspect-standee ${actionable ? "map-suspect-standee-actionable" : ""} ${selectedSuspectId === suspect.id ? "map-suspect-standee-selected" : ""}`}
             style={`transform: translate(${placement.x}px, ${placement.y}px);`}
             role={actionable ? "button" : "img"}
@@ -338,34 +349,55 @@
             <title>{suspectLabel(suspect, placement.location, actions)}</title>
             <ellipse
               cx="0"
-              cy="-3"
-              rx="21"
-              ry="29"
+              cy="-4"
+              rx="25"
+              ry="34"
               class="map-suspect-action-ring"
               vector-effect="non-scaling-stroke"
               aria-hidden="true"
             />
             <rect
-              x="-14"
-              y="-25"
-              width="28"
-              height="37"
-              rx="3"
+              x="-17"
+              y="-29"
+              width="34"
+              height="44"
+              rx="2"
               class="map-suspect-card"
               vector-effect="non-scaling-stroke"
             />
-            <circle cx="0" cy="-13" r="7" class="map-suspect-portrait" />
-            <path d="M-9 5C-8-4-4-7 0-7S8-4 9 5Z" class="map-suspect-silhouette" />
+            <path d="M12-29H17V-24Z" class="map-suspect-card-fold" />
+            <rect x="-13" y="-25" width="26" height="25" rx="1.5" class="map-suspect-photo-well" />
+            <g class="map-suspect-portrait-art" aria-hidden="true">
+              <path d="M-11 0C-10-8-5-10 0-10S10-8 11 0Z" class="map-suspect-coat" />
+              <ellipse cx="0" cy="-13" rx="6.2" ry="7.4" class="map-suspect-face" />
+              {#if portraitVariant === 0}
+                <path d="M-8-17H8L5-22H-4Z" class="map-suspect-feature" />
+                <path d="M-11-16H11" class="map-suspect-detail" />
+              {:else if portraitVariant === 1}
+                <path d="M-7-19Q0-24 7-19L8-7 4-10 5-18Q0-21-5-18L-4-9-8-7Z" class="map-suspect-feature" />
+              {:else if portraitVariant === 2}
+                <path d="M-7-18Q0-23 7-18L5-20H-5Z" class="map-suspect-feature" />
+                <circle cx="-3" cy="-13" r="2.4" class="map-suspect-glasses" />
+                <circle cx="3" cy="-13" r="2.4" class="map-suspect-glasses" />
+                <path d="M-0.6-13H0.6" class="map-suspect-detail" />
+              {:else}
+                <path d="M-7-18Q0-23 8-18L6-15H-7Z" class="map-suspect-feature" />
+                <path d="M-8-17H9" class="map-suspect-detail" />
+              {/if}
+            </g>
+            <rect x="-14" y="2" width="28" height="10" rx="1" class="map-suspect-nameplate" />
             <text
-              y="9"
+              y="9.2"
               text-anchor="middle"
               class="map-suspect-initials"
             >{suspectInitials(suspect.name)}</text>
             <path
-              d="M-17 12H17L12 20H-12Z"
+              d="M-21 15H21L15 24H-15Z"
               class="map-suspect-base"
               vector-effect="non-scaling-stroke"
             />
+            <circle cx="-12" cy="19" r="1.2" class="map-suspect-rivet" />
+            <circle cx="12" cy="19" r="1.2" class="map-suspect-rivet" />
           </g>
         {/if}
       {/each}

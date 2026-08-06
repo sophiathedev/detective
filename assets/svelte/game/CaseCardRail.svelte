@@ -66,13 +66,18 @@
 
 {#snippet cardFace(slot)}
   {#if slot.status === "faceup"}
-    <div class="noir-case-card-face noir-case-card-faceup">
+    <div class="noir-case-card-face noir-case-card-faceup" data-card-type={slot.type ?? "case"}>
+      <i class="noir-case-card-staple" aria-hidden="true"></i>
+      <i class="noir-case-card-watermark" aria-hidden="true">
+        {(slot.type ?? "case").slice(0, 1).toUpperCase()}
+      </i>
       <span>{slot.type}</span>
       <strong>{slot.code}</strong>
       <p>{slot.title}</p>
     </div>
   {:else if slot.status === "removed"}
-    <div class="noir-case-card-face noir-case-card-removed">
+    <div class="noir-case-card-face noir-case-card-removed" data-card-type="evidence">
+      <i class="noir-case-card-staple" aria-hidden="true"></i>
       <span>{t("Evidence")}</span>
       <strong>{slot.code}</strong>
       <p>{t("Removed")}</p>

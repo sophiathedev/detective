@@ -46,10 +46,13 @@ describe("CaseCardRail", () => {
     expect(screen.getByLabelText("Case cards and public knowledge markers")).toBeInTheDocument()
     expect(screen.getByTestId("case-card-slot-A")).toHaveAttribute("data-status", "faceup")
     expect(screen.getByTestId("case-card-slot-A")).toHaveTextContent("Victim File")
+    expect(screen.getByTestId("case-card-slot-A").querySelector("[data-card-type='victim']")).toBeInTheDocument()
+    expect(screen.getByTestId("case-card-slot-A").querySelector(".noir-case-card-watermark")).toHaveTextContent("V")
     expect(screen.getByTestId("case-card-slot-B")).toHaveAttribute("data-status", "facedown")
     expect(screen.getByTestId("case-card-slot-B")).not.toHaveTextContent("Hidden Fingerprint")
     expect(screen.getByTestId("case-card-slot-C")).toHaveTextContent("Removed")
     expect(screen.getByTestId("case-card-slot-C")).toHaveTextContent("Day 4")
+    expect(screen.getByTestId("case-card-slot-C").querySelector(".noir-case-card-staple")).toBeInTheDocument()
   })
 
   it("shows public knowledge markers in each Detective color seat", () => {

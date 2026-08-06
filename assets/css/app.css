@@ -1486,18 +1486,76 @@ body:has(#game-pause-curtain) .noir-game-phase {
 }
 
 .noir-action-key-casebook {
-  border-color: var(--noir-paper-500);
-  background: var(--noir-paper-300) url("/images/ui/noir/paper-fiber.svg");
-  box-shadow: 0 0.2rem 0 #725a38, inset 0 0 1rem rgb(92 58 34 / 0.12);
-  color: var(--noir-ink-900);
+  overflow: visible;
+  border-color: #b88a42;
+  background:
+    linear-gradient(96deg, rgb(255 229 174 / 0.07), transparent 18%),
+    linear-gradient(#5a2d25, #2a1513),
+    url("/images/ui/noir/wood-grain.svg");
+  box-shadow:
+    0 0.24rem 0 #100908,
+    inset 0.4rem 0 #1d0d0c,
+    inset 0.52rem 0 rgb(219 166 89 / 0.28),
+    inset 0 0 1rem rgb(14 7 6 / 0.5);
+  padding-right: 0.8rem;
+  color: #f1dfba;
   font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
+  letter-spacing: 0.01em;
+}
+
+.noir-action-key-casebook::before {
+  position: absolute;
+  top: 0.22rem;
+  bottom: 0.22rem;
+  left: 0.48rem;
+  width: 1px;
+  background: rgb(231 192 119 / 0.38);
+  box-shadow: 0.18rem 0 rgb(20 9 8 / 0.7);
+  content: "";
+}
+
+.noir-action-key-casebook::after {
+  position: absolute;
+  top: 0.3rem;
+  right: -0.14rem;
+  bottom: 0.28rem;
+  left: auto;
+  width: 0.22rem;
+  height: auto;
+  border: 1px solid #6e512d;
+  background: repeating-linear-gradient(0deg, #d8c397 0 2px, #9b8159 2px 3px);
+  box-shadow: 0.12rem 0.08rem 0 #0d0806;
 }
 
 .noir-action-key-casebook .noir-action-glyph {
-  border-color: #8e7651;
-  background: rgb(89 66 39 / 0.13);
-  box-shadow: inset 0 0 0.45rem rgb(92 58 34 / 0.13), 0 0.1rem 0 rgb(114 90 56 / 0.42);
-  color: var(--noir-ink-900);
+  border-color: #c59a4e;
+  background:
+    radial-gradient(circle at 32% 28%, rgb(255 230 171 / 0.22), transparent 25%),
+    linear-gradient(#6f4927, #2f1c12);
+  box-shadow: inset 0 0 0.45rem rgb(12 6 5 / 0.56), 0 0.1rem 0 #140a08;
+  color: #f0cd81;
+}
+
+.noir-action-key-casebook:hover:not(:disabled) {
+  box-shadow:
+    0 0.32rem 0 #100908,
+    0 0 0 1px rgb(224 189 114 / 0.18),
+    inset 0.4rem 0 #1d0d0c,
+    inset 0.52rem 0 rgb(219 166 89 / 0.34),
+    inset 0 0 1rem rgb(14 7 6 / 0.42);
+}
+
+.noir-casebook-ribbon {
+  position: absolute;
+  z-index: 2;
+  right: 0.9rem;
+  bottom: -0.56rem;
+  width: 0.55rem;
+  height: 0.95rem;
+  background: linear-gradient(90deg, #5b1717, #aa4036 48%, #4c1212);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 76%, 0 100%);
+  filter: drop-shadow(0 0.14rem 0.12rem rgb(0 0 0 / 0.6));
+  pointer-events: none;
 }
 
 .noir-context-stack {
@@ -2043,6 +2101,8 @@ body:has(#game-pause-curtain) .noir-game-phase {
 }
 
 .noir-case-card-face {
+  position: relative;
+  isolation: isolate;
   display: grid;
   width: 6.65cqw;
   height: 10.65cqw;
@@ -2091,13 +2151,63 @@ body:has(#game-pause-curtain) .noir-game-phase {
 
 .noir-case-card-faceup {
   background:
+    linear-gradient(90deg, rgb(117 42 34 / 0.8) 0 0.32cqw, transparent 0.32cqw),
     linear-gradient(rgb(244 232 201 / 0.72), rgb(218 199 158 / 0.78)),
     url("/images/ui/noir/paper-fiber.svg");
   color: #35271d;
 }
 
+.noir-case-card-faceup::after,
+.noir-case-card-removed::after {
+  position: absolute;
+  z-index: -1;
+  right: 0.25cqw;
+  bottom: 0.2cqw;
+  width: 1.55cqw;
+  aspect-ratio: 1;
+  border: 0.12cqw double rgb(111 48 40 / 0.34);
+  border-radius: 50%;
+  content: "";
+  rotate: -11deg;
+}
+
+.noir-case-card-staple {
+  position: absolute;
+  top: 0.38cqw;
+  right: 0.42cqw;
+  width: 0.65cqw;
+  height: 0.16cqw;
+  rotate: 8deg;
+  border: 0.08cqw solid rgb(60 52 43 / 0.6);
+  border-bottom: 0;
+  border-radius: 0.14cqw 0.14cqw 0 0;
+  box-shadow: 0 0.08cqw 0 rgb(255 250 231 / 0.28);
+}
+
+.noir-case-card-watermark {
+  position: absolute;
+  z-index: -1;
+  right: 0.18cqw;
+  bottom: -0.55cqw;
+  color: rgb(112 55 43 / 0.11);
+  font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
+  font-size: 4.8cqw;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1;
+  rotate: -8deg;
+}
+
 .noir-case-card-faceup > span {
   color: #774235;
+}
+
+.noir-case-card-faceup > strong {
+  position: relative;
+  width: 2.15cqw;
+  margin-inline: auto;
+  border-bottom: 0.1cqw solid rgb(93 58 39 / 0.36);
+  padding-bottom: 0.18cqw;
 }
 
 .noir-case-card-removed {
@@ -2144,16 +2254,25 @@ body:has(#game-pause-curtain) .noir-game-phase {
   width: max(0.75rem, 1.35cqw);
   aspect-ratio: 1;
   place-items: center;
-  border: max(1px, 0.1cqw) solid #ead9b7;
+  border: max(1px, 0.12cqw) solid #d9b66b;
   border-radius: 50%;
-  background: #4d4439;
-  box-shadow: 0 0.18cqw 0.3cqw rgb(24 17 12 / 0.52);
+  background:
+    radial-gradient(circle at 34% 28%, rgb(255 239 198 / 0.34), transparent 18%),
+    var(--case-marker-color, #4d4439);
+  box-shadow:
+    0 0.18cqw 0.3cqw rgb(24 17 12 / 0.52),
+    inset 0 0 0 max(1px, 0.1cqw) rgb(30 19 12 / 0.48);
   color: #f7ead0;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: max(0.34rem, 0.48cqw);
   font-weight: 600;
   line-height: 1;
 }
+
+.noir-case-knowledge-marker[data-seat="1"] { --case-marker-color: #416f84; }
+.noir-case-knowledge-marker[data-seat="2"] { --case-marker-color: #8d493b; }
+.noir-case-knowledge-marker[data-seat="3"] { --case-marker-color: #557858; }
+.noir-case-knowledge-marker[data-seat="4"] { --case-marker-color: #907039; }
 
 .noir-case-knowledge-marker[data-seat="1"] { background: #28485c; }
 .noir-case-knowledge-marker[data-seat="2"] { background: #724438; }
@@ -2358,7 +2477,7 @@ body:has(#game-pause-curtain) .noir-game-phase {
 
 .map-suspect-standee-actionable:hover,
 .map-suspect-standee-actionable:focus-visible {
-  scale: 1.06;
+  scale: 1.09;
   filter: drop-shadow(0 6px 4px rgb(31 22 15 / 0.7));
   outline: none;
 }
@@ -2389,33 +2508,75 @@ body:has(#game-pause-curtain) .noir-game-phase {
 }
 
 .map-suspect-card {
-  fill: #d8c59e;
+  fill: #d7c39a;
   stroke: #4a3829;
   stroke-width: 2;
 }
 
-.map-suspect-portrait {
-  fill: #47382d;
-  stroke: #f0dfbc;
-  stroke-width: 1.5;
+.map-suspect-card-fold {
+  fill: #8e7857;
+  stroke: #4a3829;
+  stroke-width: 0.8;
 }
 
-.map-suspect-silhouette {
-  fill: #574538;
+.map-suspect-photo-well {
+  fill: #6e5d49;
+  stroke: #f0dfbc;
+  stroke-width: 1.2;
+}
+
+.map-suspect-portrait-art {
+  filter: sepia(0.18) contrast(1.04);
+}
+
+.map-suspect-coat {
+  fill: #2f2924;
+}
+
+.map-suspect-face {
+  fill: #aa9170;
+  stroke: #41342a;
+  stroke-width: 0.8;
+}
+
+.map-suspect-feature {
+  fill: #352c26;
+  stroke: #2e251f;
+  stroke-width: 0.7;
+}
+
+.map-suspect-detail,
+.map-suspect-glasses {
+  fill: none;
+  stroke: #2d241f;
+  stroke-linecap: round;
+  stroke-width: 0.9;
+}
+
+.map-suspect-nameplate {
+  fill: #ead9b6;
+  stroke: #5d4936;
+  stroke-width: 0.8;
 }
 
 .map-suspect-initials {
   fill: #3b2c21;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 7px;
+  font-size: 6.6px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
 
 .map-suspect-base {
-  fill: #32261e;
-  stroke: #d8c59e;
+  fill: url("#detective-token-rim");
+  stroke: #2d1d10;
   stroke-width: 1.5;
+}
+
+.map-suspect-rivet {
+  fill: #2d1d10;
+  stroke: #e0bd72;
+  stroke-width: 0.65;
 }
 
 #special-actor-tokens {

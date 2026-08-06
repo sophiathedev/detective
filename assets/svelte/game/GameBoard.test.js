@@ -324,6 +324,9 @@ describe("GameBoard", () => {
       "Celeste Rook, journalist, at L.A. Police Department Headquarters",
     )
     expect(iona).toHaveAttribute("data-location-id", "51")
+    expect(iona).toHaveAttribute("data-portrait-variant")
+    expect(celeste).toHaveAttribute("data-portrait-variant")
+    expect(iona.dataset.portraitVariant).not.toEqual(celeste.dataset.portraitVariant)
     expect(iona).toHaveAttribute("role", "button")
     expect(iona).toHaveAttribute("tabindex", "0")
     expect(iona).toHaveAttribute("aria-pressed", "true")
