@@ -210,6 +210,28 @@ defmodule Detective.Games.ConnectionMonitorTest do
     stop_presence_holder(game_id, online_player_id, online_tab)
   end
 
+  test "cold monitor startup reads the authoritative snapshot once" do
+    %{game: game, player_ids: player_ids} = active_game()
+    handler_id = {__MODULE__, :monitor_start_query_count, make_ref()}
+    test_pid = self()
+
+    :ok =
+      :telemetry.attach(
+        handler_id,
+        [:detective, :repo, :query],
+        fn _event, _measurements, _metadata, pid -> send(pid, :monitor_start_repo_query) end,
+        test_pid
+      )
+
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+
+    assert {:ok, _pid} =
+             ConnectionMonitor.ensure_monitor(game.id, player_ids, :active, 1)
+
+    assert_receive :monitor_start_repo_query
+    refute_receive :monitor_start_repo_query
+  end
+
   test "abnormal exits are recreated through ensure_monitor with the authoritative status" do
     game_id = Ecto.UUID.generate()
     player_ids = player_ids()

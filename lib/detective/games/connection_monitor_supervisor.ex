@@ -1,7 +1,7 @@
 defmodule Detective.Games.ConnectionMonitorSupervisor do
   use DynamicSupervisor
 
-  alias Detective.Games.{ConnectionMonitor, Persistence}
+  alias Detective.Games.ConnectionMonitor
 
   def start_link(init_arg) do
     DynamicSupervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
@@ -64,13 +64,13 @@ defmodule Detective.Games.ConnectionMonitorSupervisor do
   end
 
   defp start_monitor(game_id, player_ids, game_status, game_version, attempts_left) do
-    seed = authoritative_seed(game_id, player_ids, game_status, game_version)
+    seed = %{
+      player_ids: player_ids,
+      game_status: game_status,
+      game_version: game_version
+    }
 
-    if seed.game_status == :finished do
-      {:error, :game_finished}
-    else
-      do_start_monitor(game_id, seed, attempts_left)
-    end
+    do_start_monitor(game_id, seed, attempts_left)
   end
 
   defp do_start_monitor(game_id, seed, attempts_left) do
@@ -96,19 +96,6 @@ defmodule Detective.Games.ConnectionMonitorSupervisor do
 
       {:error, reason} ->
         {:error, reason}
-    end
-  end
-
-  defp authoritative_seed(game_id, player_ids, game_status, game_version) do
-    requested = %{
-      player_ids: player_ids,
-      game_status: game_status,
-      game_version: game_version
-    }
-
-    case Persistence.connection_monitor_seed(game_id) do
-      {:ok, persisted} when persisted.game_version >= game_version -> persisted
-      _missing_or_older -> requested
     end
   end
 end
