@@ -162,14 +162,65 @@
 }
 
 .noir-portrait {
+  position: relative;
+  z-index: 1;
   aspect-ratio: 1;
   display: block;
-  border: 2px solid var(--noir-gold-500);
+  border: 1px solid #e0bc70;
   border-radius: 50%;
   background: var(--noir-ebony-900);
-  box-shadow: 0 0.35rem 0.8rem rgb(0 0 0 / 0.45), inset 0 0 0 2px var(--noir-ebony-950);
+  box-shadow: inset 0 0 0 2px #21150c;
   object-fit: cover;
   user-select: none;
+}
+
+.noir-portrait-medallion {
+  position: relative;
+  display: inline-grid;
+  width: max-content;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  filter: drop-shadow(0 0.42rem 0.46rem rgb(0 0 0 / 0.52));
+  isolation: isolate;
+}
+
+.noir-portrait-medallion::before {
+  position: absolute;
+  z-index: 0;
+  inset: -0.2rem;
+  border: 1px solid #d6ad5c;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 24%, #f3d88f 0 7%, transparent 8%),
+    repeating-conic-gradient(from 12deg, #d2a34e 0 5deg, #735025 5deg 10deg),
+    #8c612e;
+  box-shadow:
+    0 0.12rem 0 #2b190a,
+    inset 0 0 0 2px rgb(255 235 177 / 0.2),
+    inset 0 0 0.45rem rgb(38 20 8 / 0.7);
+  content: "";
+}
+
+.noir-portrait-glint {
+  position: absolute;
+  z-index: 2;
+  top: 8%;
+  left: 16%;
+  width: 46%;
+  height: 22%;
+  rotate: -24deg;
+  border-top: 1px solid rgb(255 242 203 / 0.58);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.noir-portrait-medallion[data-role="chisel"]::before {
+  border-color: #b86458;
+  background:
+    radial-gradient(circle at 30% 24%, #f0c09b 0 7%, transparent 8%),
+    repeating-conic-gradient(from 12deg, #a64a40 0 5deg, #4f1d19 5deg 10deg),
+    #6d2a24;
 }
 
 .noir-portrait-sm { width: 2.5rem; }
@@ -208,6 +259,30 @@ body:has(#game-table-shell) .noir-game-table {
   isolation: isolate;
 }
 
+.noir-game-table::after {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    url("/images/ui/noir/wood-grain.svg"),
+    repeating-linear-gradient(113deg, transparent 0 8rem, rgb(238 211 153 / 0.025) 8.05rem 8.1rem);
+  mix-blend-mode: multiply;
+  opacity: 0.2;
+  content: "";
+}
+
+.noir-table-lighting {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 78% 8%, rgb(255 225 157 / 0.11), transparent 28%),
+    radial-gradient(circle at 16% 78%, rgb(139 52 44 / 0.08), transparent 30%);
+  mix-blend-mode: screen;
+}
+
 .noir-game-map-region {
   position: absolute;
   inset: 0;
@@ -235,6 +310,7 @@ body:has(#game-table-shell) .noir-game-table {
   font-size: 0.625rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  animation: noir-hud-settle 420ms cubic-bezier(0.18, 0.78, 0.22, 1) both;
 }
 
 body:has(#game-pause-curtain) .noir-game-phase {
@@ -479,6 +555,7 @@ body:has(#game-pause-curtain) .noir-game-phase {
   top: 50%;
   left: 1rem;
   translate: 0 -50%;
+  animation: noir-hud-settle-left 460ms 70ms cubic-bezier(0.18, 0.78, 0.22, 1) both;
 }
 
 .noir-game-chisel {
@@ -486,6 +563,7 @@ body:has(#game-pause-curtain) .noir-game-phase {
   z-index: 30;
   top: 1rem;
   right: 1rem;
+  animation: noir-hud-settle-right 460ms 120ms cubic-bezier(0.18, 0.78, 0.22, 1) both;
 }
 
 .noir-game-context {
@@ -501,6 +579,7 @@ body:has(#game-pause-curtain) .noir-game-phase {
   bottom: 1rem;
   left: 50%;
   translate: -50% 0;
+  animation: noir-hud-settle-up 460ms 170ms cubic-bezier(0.18, 0.78, 0.22, 1) both;
 }
 
 .noir-map-rotate-notice {
@@ -559,17 +638,59 @@ body:has(#game-pause-curtain) .noir-game-phase {
   gap: 0.65rem;
   overflow: hidden;
   border: 1px solid rgb(116 96 57 / 0.72);
-  border-radius: 0.45rem;
-  background: rgb(15 13 12 / 0.9);
-  padding: 0.6rem;
-  box-shadow: inset 0 0 1.25rem rgb(0 0 0 / 0.58);
-  transition: border-color 160ms ease, translate 160ms ease;
+  border-radius: 0.15rem 0.5rem 0.22rem 0.12rem;
+  background:
+    linear-gradient(96deg, rgb(66 50 36 / 0.82), rgb(17 14 12 / 0.95) 42%),
+    url("/images/ui/noir/wood-grain.svg");
+  padding: 0.6rem 0.78rem 0.6rem 0.72rem;
+  box-shadow:
+    inset 0 0 1.25rem rgb(0 0 0 / 0.58),
+    inset 0.18rem 0 rgb(255 232 184 / 0.045),
+    0 0.16rem 0 #080706;
+  transition: border-color 180ms ease, translate 180ms ease, box-shadow 180ms ease;
 }
+
+.noir-detective-slot::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 0.24rem;
+  background: var(--detective-accent, #746039);
+  box-shadow: 0 0 0.8rem color-mix(in srgb, var(--detective-accent, #746039) 52%, transparent);
+  content: "";
+  opacity: 0.72;
+}
+
+.noir-detective-slot::after {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 1rem;
+  height: 1rem;
+  border-bottom: 1px solid rgb(116 96 57 / 0.55);
+  border-left: 1px solid rgb(116 96 57 / 0.55);
+  background: linear-gradient(225deg, #090807 48%, #8b704d 50%, #2a211a 54%);
+  content: "";
+}
+
+.noir-detective-slot[data-seat="1"] { --detective-accent: #4f89a3; }
+.noir-detective-slot[data-seat="2"] { --detective-accent: #a95c4a; }
+.noir-detective-slot[data-seat="3"] { --detective-accent: #6c966d; }
+.noir-detective-slot[data-seat="4"] { --detective-accent: #b18c49; }
 
 .noir-detective-slot-active {
   border-color: var(--noir-gold-500);
-  box-shadow: inset 0.2rem 0 var(--noir-red-500), inset 0 0 1.25rem rgb(0 0 0 / 0.58);
+  box-shadow:
+    inset 0 0 1.25rem rgb(0 0 0 / 0.58),
+    0 0 0 1px rgb(226 190 111 / 0.16),
+    0 0.5rem 1.1rem rgb(0 0 0 / 0.35);
   translate: 0.15rem 0;
+}
+
+.noir-detective-slot-active::before {
+  opacity: 1;
+  animation: noir-dossier-signal 1.9s ease-in-out infinite;
 }
 
 .noir-detective-name {
@@ -1034,6 +1155,18 @@ body:has(#game-pause-curtain) .noir-game-phase {
   background: #17130f;
 }
 
+.noir-map-stage::before {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 68% 18%, rgb(255 229 169 / 0.08), transparent 36%),
+    radial-gradient(ellipse at 32% 84%, rgb(91 37 31 / 0.1), transparent 34%);
+  mix-blend-mode: soft-light;
+  content: "";
+}
+
 .noir-map-stage::after {
   position: absolute;
   z-index: 6;
@@ -1044,6 +1177,62 @@ body:has(#game-pause-curtain) .noir-game-phase {
     linear-gradient(rgb(9 8 7 / 0.48), transparent 16% 80%, rgb(9 8 7 / 0.62));
   box-shadow: inset 0 0 5rem rgb(0 0 0 / 0.48);
   content: "";
+}
+
+.noir-map-hardware {
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  pointer-events: none;
+}
+
+.noir-map-corner {
+  position: absolute;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-color: #b78b43;
+  background:
+    radial-gradient(circle at 0.68rem 0.68rem, #2d1b0d 0 0.12rem, #d5aa59 0.13rem 0.23rem, transparent 0.24rem),
+    linear-gradient(135deg, rgb(220 179 98 / 0.92), #6f4720 54%, #2c190b 78%);
+  box-shadow:
+    0 0.35rem 0.75rem rgb(0 0 0 / 0.38),
+    inset 0 0 0 1px rgb(255 235 182 / 0.26);
+  opacity: 0.88;
+}
+
+.noir-map-corner-nw {
+  top: 0.5rem;
+  left: 0.5rem;
+  border-right: 1px solid;
+  border-bottom: 1px solid;
+  clip-path: polygon(0 0, 100% 0, 100% 25%, 25% 25%, 25% 100%, 0 100%);
+}
+
+.noir-map-corner-ne {
+  top: 0.5rem;
+  right: 0.5rem;
+  rotate: 90deg;
+  border-right: 1px solid;
+  border-bottom: 1px solid;
+  clip-path: polygon(0 0, 100% 0, 100% 25%, 25% 25%, 25% 100%, 0 100%);
+}
+
+.noir-map-corner-se {
+  right: 0.5rem;
+  bottom: 0.5rem;
+  rotate: 180deg;
+  border-right: 1px solid;
+  border-bottom: 1px solid;
+  clip-path: polygon(0 0, 100% 0, 100% 25%, 25% 25%, 25% 100%, 0 100%);
+}
+
+.noir-map-corner-sw {
+  bottom: 0.5rem;
+  left: 0.5rem;
+  rotate: 270deg;
+  border-right: 1px solid;
+  border-bottom: 1px solid;
+  clip-path: polygon(0 0, 100% 0, 100% 25%, 25% 25%, 25% 100%, 0 100%);
 }
 
 .noir-map-status {
@@ -2072,8 +2261,8 @@ body:has(#game-pause-curtain) .noir-game-phase {
   will-change: transform;
 }
 
-.map-detective-token-active path {
-  filter: brightness(1.08);
+.map-detective-token-active .map-detective-chip {
+  filter: brightness(1.12) saturate(1.08);
 }
 
 .map-detective-token-actionable {
@@ -2082,8 +2271,43 @@ body:has(#game-pause-curtain) .noir-game-phase {
 
 .map-detective-token-actionable:hover,
 .map-detective-token-actionable:focus-visible {
-  scale: 1.06;
+  scale: 1.09;
   outline: none;
+}
+
+.map-detective-chip {
+  paint-order: stroke fill;
+  transition: filter 180ms ease-out, stroke-width 180ms ease-out;
+}
+
+.map-detective-photo-well {
+  fill: #16110e;
+  stroke: #2b1d12;
+  stroke-width: 2;
+}
+
+.map-detective-photo {
+  filter: sepia(0.12) contrast(1.06) saturate(0.88);
+  pointer-events: none;
+}
+
+.map-detective-photo-bezel {
+  fill: none;
+  stroke: rgb(255 238 199 / 0.7);
+  stroke-width: 1.5;
+}
+
+.map-detective-chip-glint {
+  fill: none;
+  stroke: rgb(255 241 205 / 0.72);
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.map-detective-seat-badge {
+  fill: #5b241f;
+  stroke: #e7c783;
+  stroke-width: 2;
 }
 
 .map-detective-action-ring {
@@ -2104,6 +2328,11 @@ body:has(#game-pause-curtain) .noir-game-phase {
 .map-detective-token-selected .map-detective-action-ring {
   opacity: 1;
   stroke: #fff0c5;
+}
+
+.map-detective-token-selected .map-detective-chip {
+  stroke-width: 7;
+  filter: brightness(1.12) saturate(1.1);
 }
 
 #suspect-standees {
@@ -2289,6 +2518,59 @@ body:has(#game-pause-curtain) .noir-game-phase {
   transform-box: fill-box;
   transform-origin: center;
   animation: map-arrival-pulse 1.1s 280ms ease-out forwards;
+}
+
+@keyframes noir-hud-settle {
+  from {
+    opacity: 0;
+    transform: translateY(-0.65rem) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes noir-hud-settle-left {
+  from {
+    opacity: 0;
+    transform: translateX(-0.85rem) rotate(-0.35deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) rotate(0);
+  }
+}
+
+@keyframes noir-hud-settle-right {
+  from {
+    opacity: 0;
+    transform: translateX(0.85rem) rotate(0.35deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) rotate(0);
+  }
+}
+
+@keyframes noir-hud-settle-up {
+  from {
+    opacity: 0;
+    transform: translateY(0.8rem) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes noir-dossier-signal {
+  0%, 100% {
+    filter: brightness(0.92);
+  }
+  50% {
+    filter: brightness(1.25);
+  }
 }
 
 @keyframes game-pause-seal-in {

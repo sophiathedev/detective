@@ -77,6 +77,10 @@
     return ["#28485c", "#724438", "#3f5d44", "#6b5535"][seat - 1] ?? "#4d4439"
   }
 
+  function detectivePortrait(seat) {
+    return `/images/ui/noir/portraits/detective-${Math.min(Math.max(seat, 1), 4)}.webp`
+  }
+
   function detectiveActionLabel(action) {
     return (
       {
@@ -211,6 +215,15 @@
       <filter id="token-shadow" x="-80%" y="-80%" width="260%" height="260%">
         <feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#211810" flood-opacity="0.66" />
       </filter>
+      <clipPath id="detective-token-portrait-clip" clipPathUnits="userSpaceOnUse">
+        <circle r="16" />
+      </clipPath>
+      <radialGradient id="detective-token-rim" cx="32%" cy="25%" r="76%">
+        <stop offset="0" stop-color="#f7dda0" />
+        <stop offset="0.28" stop-color="#c99a45" />
+        <stop offset="0.72" stop-color="#765025" />
+        <stop offset="1" stop-color="#2f1c0d" />
+      </radialGradient>
     </defs>
 
     <image
@@ -412,32 +425,53 @@
             focusable={actionable ? "true" : "false"}
             aria-pressed={actionable ? selectedDetectiveId === detective.id : undefined}
             aria-label={detectiveLabel(detective, tokenLocation, actions)}
+            data-seat={detective.seat}
             data-actionable={actionable}
             data-selected={selectedDetectiveId === detective.id}
             onclick={(event) => selectDetectiveToken(event, detective, actions)}
             onkeydown={(event) => selectDetectiveToken(event, detective, actions)}
           >
             <circle
-              r="27"
+              r="29"
               class="map-detective-action-ring"
               vector-effect="non-scaling-stroke"
               aria-hidden="true"
             />
-            <path
-              d="M0-18 15-8 12 14 0 22-12 14-15-8Z"
+            <circle
+              r="23"
+              class="map-detective-chip"
               fill={tokenColor(detective.seat)}
-              stroke="#f2e4c8"
-              stroke-width="3"
+              stroke="url(#detective-token-rim)"
+              stroke-width="6"
               vector-effect="non-scaling-stroke"
             />
+            <circle r="17.5" class="map-detective-photo-well" />
+            <image
+              data-testid={`detective-token-portrait-${detective.id}`}
+              href={detectivePortrait(detective.seat)}
+              x="-16"
+              y="-16"
+              width="32"
+              height="32"
+              preserveAspectRatio="xMidYMid slice"
+              clip-path="url(#detective-token-portrait-clip)"
+              class="map-detective-photo"
+            />
+            <circle r="16.5" class="map-detective-photo-bezel" vector-effect="non-scaling-stroke" />
+            <path d="M-14-14A20 20 0 0 1 13-15" class="map-detective-chip-glint" />
+            <circle cx="15" cy="15" r="8" class="map-detective-seat-badge" />
             <text
-              y="5"
+              x="15"
+              y="18"
               text-anchor="middle"
-              fill="#f8ecd2"
+              fill="#fff0d2"
+              stroke="#2d1d10"
+              stroke-width="1.5"
+              paint-order="stroke"
               font-family="IBM Plex Mono, monospace"
-              font-size="12"
-              font-weight="600"
-            >D{detective.seat}</text>
+              font-size="8"
+              font-weight="700"
+            >{detective.seat}</text>
           </g>
         {/if}
       {/each}

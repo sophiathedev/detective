@@ -57,6 +57,8 @@
       <li
         id={`detective-rail-slot-${seat}`}
         data-testid={`detective-rail-slot-${seat}`}
+        data-seat={seat}
+        data-occupied={Boolean(detective)}
         class:noir-detective-slot-active={detective?.id === currentDetectiveId}
         class="noir-detective-slot"
         aria-current={detective?.id === currentDetectiveId ? "turn" : undefined}

@@ -81,6 +81,8 @@
 </script>
 
 <main id="game-table-shell" class="noir-game-table">
+  <div class="noir-table-lighting" aria-hidden="true"></div>
+
   <section id="game-map-region" class="noir-game-map-region" aria-label={t("Investigation map")}>
     {@render mapStage?.()}
   </section>

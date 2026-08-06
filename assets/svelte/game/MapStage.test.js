@@ -66,6 +66,7 @@ describe("MapStage", () => {
     render(MapStage, baseProps)
 
     expect(screen.getByText(/Van Ryder Games/)).toBeInTheDocument()
+    expect(document.querySelectorAll(".noir-map-corner")).toHaveLength(4)
   })
 
   it("forwards authorized suspect interaction to the board", async () => {

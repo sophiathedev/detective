@@ -44,6 +44,12 @@ describe("game HUD role boundaries", () => {
     const firstSlot = screen.getByTestId("detective-rail-slot-1")
     const thirdSlot = screen.getByTestId("detective-rail-slot-3")
 
+    expect(firstSlot).toHaveAttribute("data-seat", "1")
+    expect(firstSlot).toHaveAttribute("data-occupied", "true")
+    expect(screen.getByTestId("detective-rail-slot-2")).toHaveAttribute(
+      "data-occupied",
+      "false",
+    )
     expect(within(firstSlot).getByLabelText("Scratch: 6")).toBeInTheDocument()
     expect(within(firstSlot).getByLabelText("Leverage: 3")).toBeInTheDocument()
     expect(firstSlot).toHaveTextContent(

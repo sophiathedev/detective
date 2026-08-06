@@ -16,4 +16,11 @@
   )
 </script>
 
-<img class={`noir-portrait noir-portrait-${size}`} {src} alt={label} draggable="false" />
+<span
+  class={`noir-portrait-medallion noir-portrait-medallion-${size}`}
+  data-role={role}
+  data-seat={seat}
+>
+  <img class={`noir-portrait noir-portrait-${size}`} {src} alt={label} draggable="false" />
+  <span class="noir-portrait-glint" aria-hidden="true"></span>
+</span>

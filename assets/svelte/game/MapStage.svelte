@@ -42,6 +42,13 @@
 </script>
 
 <section id="map-stage" class="noir-map-stage" aria-labelledby="game-map-title">
+  <div class="noir-map-hardware" aria-hidden="true">
+    <span class="noir-map-corner noir-map-corner-nw"></span>
+    <span class="noir-map-corner noir-map-corner-ne"></span>
+    <span class="noir-map-corner noir-map-corner-sw"></span>
+    <span class="noir-map-corner noir-map-corner-se"></span>
+  </div>
+
   <div
     id="map-stage-status"
     class="noir-map-status"

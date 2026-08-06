@@ -245,6 +245,14 @@ describe("GameBoard", () => {
     expect(ownToken).toHaveAttribute("aria-pressed", "true")
     expect(otherToken).toHaveAttribute("role", "img")
     expect(otherToken).toHaveAttribute("data-actionable", "false")
+    expect(screen.getByTestId("detective-token-portrait-detective-1")).toHaveAttribute(
+      "href",
+      "/images/ui/noir/portraits/detective-1.webp",
+    )
+    expect(screen.getByTestId("detective-token-portrait-detective-2")).toHaveAttribute(
+      "href",
+      "/images/ui/noir/portraits/detective-2.webp",
+    )
 
     await fireEvent.keyDown(ownToken, { key: "Escape" })
     expect(onSelectDetective).not.toHaveBeenCalled()
