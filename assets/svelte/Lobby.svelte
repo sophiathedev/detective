@@ -5,7 +5,7 @@
   import StatusStamp from "./ui/StatusStamp.svelte"
   import { initializeI18n } from "./i18n"
 
-  let { lobby, locale = "en" } = $props()
+  let { lobby, case_options = [], locale = "en" } = $props()
   const { t } = initializeI18n(() => locale)
 
   const initialLobby = () => lobby
@@ -18,6 +18,15 @@
   let commandPending = $state(false)
   let commandError = $state(null)
   let startCommandId = null
+  let pendingRemovalId = $state(null)
+  let leaveArmed = $state(false)
+  let revokeArmed = $state(false)
+  let inviteHours = $state(24)
+  let inviteUrl = $state(null)
+  let inviteCopied = $state(false)
+  let settingsOpen = $state(false)
+  let settingsCaseVersionId = $state(null)
+  let settingsMaxDetectives = $state(null)
 
   let detectives = $derived(room.players.filter((player) => player.role === "detective"))
   let detectiveSlots = $derived(
@@ -25,6 +34,31 @@
   )
   let chisel = $derived(room.players.find((player) => player.role === "chisel"))
   let canStart = $derived(detectives.length >= 2 && detectives.every((player) => player.ready))
+  let isChisel = $derived(room.membership.role === "chisel")
+  let settingsCapacityValid = $derived(Number(settingsMaxDetectives) >= detectives.length)
+
+  function commandFailure(code, fallback = "Action rejected.") {
+    if (code === "stale_version") return "Room changed. State refreshed; try again."
+    if (code === "rate_limited") {
+      return "Dispatch rejected a burst of orders. Wait a moment before transmitting again."
+    }
+    if (code === "invite_not_active") return "That invitation is no longer active."
+    if (code === "player_not_found") return "That Detective has already left the room."
+    if (code === "capacity_below_membership") {
+      return "Room capacity cannot be lower than the seated Detective count."
+    }
+    if (code === "case_version_not_published") return "That case file is no longer published."
+    return fallback
+  }
+
+  function invitationExpiry() {
+    if (!room.invite?.expires_at) return t("No active expiry")
+
+    return new Intl.DateTimeFormat(locale === "vi" ? "vi-VN" : "en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(room.invite.expires_at))
+  }
 
   function applyLobby(nextLobby, version = nextLobby.current_version) {
     if (version < room.current_version) return
@@ -91,12 +125,7 @@
       })
       .receive("error", ({ code }) => {
         commandPending = false
-        commandError =
-          code === "stale_version"
-            ? "Room changed. State refreshed; try again."
-            : code === "rate_limited"
-              ? "Dispatch rejected a burst of orders. Wait a moment before transmitting again."
-              : "Action rejected."
+        commandError = commandFailure(code)
       })
       .receive("timeout", () => {
         commandPending = false
@@ -127,16 +156,161 @@
         commandError =
           code === "detectives_not_ready"
             ? "Every Detective must be ready."
-            : code === "stale_version"
-              ? "Room changed. State refreshed; try again."
-              : code === "rate_limited"
-                ? "Dispatch rejected a burst of orders. Wait a moment before transmitting again."
-              : "Game could not start."
+            : commandFailure(code, "Game could not start.")
       })
       .receive("timeout", () => {
         commandPending = false
         commandError = "Start is still unconfirmed. Retry safely."
       })
+  }
+
+  function leaveLobby() {
+    if (!leaveArmed) {
+      leaveArmed = true
+      return
+    }
+    if (!channel || commandPending) return
+
+    commandPending = true
+    commandError = null
+    channel
+      .push("leave_lobby", { expected_version: room.current_version })
+      .receive("ok", ({ path }) => window.location.assign(path))
+      .receive("error", ({ code }) => {
+        commandPending = false
+        leaveArmed = false
+        commandError = commandFailure(code, "Could not leave the room.")
+      })
+      .receive("timeout", () => {
+        commandPending = false
+        commandError = "Connection timed out. Try again."
+      })
+  }
+
+  function removePlayer(playerId) {
+    if (pendingRemovalId !== playerId) {
+      pendingRemovalId = playerId
+      return
+    }
+    if (!channel || commandPending) return
+
+    commandPending = true
+    commandError = null
+    channel
+      .push("remove_player", {
+        player_id: playerId,
+        expected_version: room.current_version,
+      })
+      .receive("ok", () => {
+        commandPending = false
+        pendingRemovalId = null
+      })
+      .receive("error", ({ code }) => {
+        commandPending = false
+        pendingRemovalId = null
+        commandError = commandFailure(code, "Could not remove that Detective.")
+      })
+      .receive("timeout", () => {
+        commandPending = false
+        commandError = "Connection timed out. Try again."
+      })
+  }
+
+  function revokeInvite() {
+    if (!revokeArmed) {
+      revokeArmed = true
+      return
+    }
+    if (!channel || commandPending) return
+
+    commandPending = true
+    commandError = null
+    channel
+      .push("revoke_invite", { expected_version: room.current_version })
+      .receive("ok", () => {
+        commandPending = false
+        revokeArmed = false
+        inviteUrl = null
+        inviteCopied = false
+      })
+      .receive("error", ({ code }) => {
+        commandPending = false
+        revokeArmed = false
+        commandError = commandFailure(code, "Could not revoke the invitation.")
+      })
+      .receive("timeout", () => {
+        commandPending = false
+        commandError = "Connection timed out. Try again."
+      })
+  }
+
+  function regenerateInvite() {
+    if (!channel || commandPending) return
+
+    commandPending = true
+    commandError = null
+    inviteCopied = false
+    channel
+      .push("regenerate_invite", {
+        expected_version: room.current_version,
+        invite_hours: Number(inviteHours),
+      })
+      .receive("ok", ({ invite_path }) => {
+        commandPending = false
+        revokeArmed = false
+        inviteUrl = new URL(invite_path, window.location.origin).toString()
+      })
+      .receive("error", ({ code }) => {
+        commandPending = false
+        commandError = commandFailure(code, "Could not issue a new invitation.")
+      })
+      .receive("timeout", () => {
+        commandPending = false
+        commandError = "Connection timed out. Try again."
+      })
+  }
+
+  function toggleSettings() {
+    settingsOpen = !settingsOpen
+    if (settingsOpen) {
+      settingsCaseVersionId = room.case_version_id
+      settingsMaxDetectives = room.max_detectives
+    }
+  }
+
+  function saveLobbySettings() {
+    if (!channel || commandPending || !settingsCapacityValid) return
+
+    commandPending = true
+    commandError = null
+    channel
+      .push("update_lobby_settings", {
+        case_version_id: settingsCaseVersionId,
+        max_detectives: Number(settingsMaxDetectives),
+        expected_version: room.current_version,
+      })
+      .receive("ok", () => {
+        commandPending = false
+        settingsOpen = false
+      })
+      .receive("error", ({ code }) => {
+        commandPending = false
+        commandError = commandFailure(code, "Could not update the room orders.")
+      })
+      .receive("timeout", () => {
+        commandPending = false
+        commandError = "Connection timed out. Try again."
+      })
+  }
+
+  async function copyInvite() {
+    if (!inviteUrl || !navigator.clipboard) return
+    await navigator.clipboard.writeText(inviteUrl)
+    inviteCopied = true
+  }
+
+  function redirectRemovedPlayer({ player_id: playerId }) {
+    if (playerId === room.membership.id) window.location.assign("/dashboard")
   }
 
   onMount(() => {
@@ -151,6 +325,7 @@
     channel.on("presence_state", syncPresenceState)
     channel.on("presence_diff", syncPresenceDiff)
     channel.on("game_started", ({ path }) => window.location.assign(path))
+    channel.on("player_removed", redirectRemovedPlayer)
 
     channel
       .join()
@@ -246,6 +421,39 @@
                       </div>
                       <span class="sr-only">{onlinePlayerIds.has(player.id) ? t("Online") : t("Offline")}</span>
                     </div>
+                    {#if isChisel}
+                      <div class="ml-auto grid shrink-0 gap-1.5 text-right">
+                        {#if pendingRemovalId === player.id}
+                          <button
+                            id={`lobby-confirm-remove-${player.id}`}
+                            type="button"
+                            disabled={connectionState !== "online" || commandPending}
+                            onclick={() => removePlayer(player.id)}
+                            class="rounded border border-[#8b3029] bg-[#5b1f1b] px-2.5 py-1.5 font-mono text-[0.55rem] uppercase tracking-[0.1em] text-[#f1dfbd] transition hover:bg-[#762a24] disabled:opacity-45"
+                          >
+                            {commandPending ? t("Removing…") : t("Confirm removal")}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={commandPending}
+                            onclick={() => (pendingRemovalId = null)}
+                            class="px-2 py-1 font-mono text-[0.52rem] uppercase tracking-[0.1em] text-[#9c8254] underline-offset-4 hover:underline"
+                          >
+                            {t("Keep seated")}
+                          </button>
+                        {:else}
+                          <button
+                            id={`lobby-remove-${player.id}`}
+                            type="button"
+                            disabled={commandPending}
+                            onclick={() => removePlayer(player.id)}
+                            class="rounded border border-[#746039]/70 bg-black/20 px-2.5 py-1.5 font-mono text-[0.52rem] uppercase tracking-[0.1em] text-[#b89b68] transition hover:border-[#8b3029] hover:text-[#d9b98a] disabled:opacity-45"
+                          >
+                            {t("Remove")}
+                          </button>
+                        {/if}
+                      </div>
+                    {/if}
                   {:else}
                     <div class="grid size-20 shrink-0 place-items-center rounded-full border border-dashed border-[#746039]/60 bg-black/25 font-serif text-3xl text-[#746039]">
                       {seat}
@@ -296,6 +504,113 @@
           </div>
         </section>
 
+        {#if isChisel}
+          <section id="lobby-invite-controls" aria-labelledby="invite-controls-title" class="noir-paper-sheet p-5" data-tilt="right">
+            <div class="flex items-start justify-between gap-3 border-b border-[#a98d63] pb-3">
+              <div>
+                <p class="font-mono text-[0.55rem] uppercase tracking-[0.16em] text-[#8b3029]">{t("Dispatch desk")}</p>
+                <h2 id="invite-controls-title" class="mt-1 font-serif text-xl font-semibold text-[#35271d]">{t("Invitation orders")}</h2>
+              </div>
+              <StatusStamp tone={room.invite?.status === "active" ? "ready" : "neutral"}>
+                {t(`invite ${room.invite?.status ?? "unavailable"}`)}
+              </StatusStamp>
+            </div>
+
+            <dl class="mt-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-xs text-[#5f4b39]">
+              <dt class="font-mono uppercase tracking-[0.1em] text-[#7d654a]">{t("Expires")}</dt>
+              <dd class="text-right">{invitationExpiry()}</dd>
+              <dt class="font-mono uppercase tracking-[0.1em] text-[#7d654a]">{t("Uses left")}</dt>
+              <dd class="text-right">{room.invite?.uses_remaining ?? 0}</dd>
+            </dl>
+
+            {#if inviteUrl}
+              <div class="mt-4 border-y border-[#a98d63]/60 py-3">
+                <label for="lobby-invite-url" class="font-mono text-[0.55rem] uppercase tracking-[0.12em] text-[#6d533c]">
+                  {t("One-time dispatch copy")}
+                </label>
+                <input
+                  id="lobby-invite-url"
+                  readonly
+                  value={inviteUrl}
+                  class="mt-2 w-full border border-[#9c805b] bg-[#efe1c2]/70 px-2.5 py-2 font-mono text-[0.68rem] text-[#39291f] outline-none focus:border-[#6b4c31]"
+                />
+                <button
+                  id="lobby-copy-invite"
+                  type="button"
+                  onclick={copyInvite}
+                  class="mt-2 w-full border border-[#6d533c] bg-[#d5c09a] px-3 py-2 font-mono text-[0.58rem] font-semibold uppercase tracking-[0.12em] text-[#3b2a1e] transition hover:bg-[#cbb183]"
+                >
+                  {inviteCopied ? t("Copied") : t("Copy invitation")}
+                </button>
+              </div>
+            {:else}
+              <p class="mt-4 border-l-2 border-[#8b3029]/70 pl-3 text-xs leading-5 text-[#6b5540]">
+                {t("The raw link stays sealed. Issue a replacement to reveal it once.")}
+              </p>
+            {/if}
+
+            <div class="mt-4 grid grid-cols-[1fr_auto] gap-2">
+              <label for="lobby-invite-expiry" class="sr-only">{t("Invite expires")}</label>
+              <select
+                id="lobby-invite-expiry"
+                bind:value={inviteHours}
+                disabled={commandPending}
+                class="border border-[#8e7552] bg-[#ead8b5] px-3 py-2 font-mono text-[0.62rem] uppercase tracking-[0.08em] text-[#49372a] outline-none focus:border-[#6b4c31] disabled:opacity-50"
+              >
+                <option value={1}>{t("1 hour")}</option>
+                <option value={6}>{t("6 hours")}</option>
+                <option value={24}>{t("24 hours")}</option>
+                <option value={72}>{t("3 days")}</option>
+              </select>
+              <button
+                id="lobby-regenerate-invite"
+                type="button"
+                disabled={connectionState !== "online" || commandPending}
+                onclick={regenerateInvite}
+                class="border border-[#5a422e] bg-[#3f2d20] px-3 py-2 font-mono text-[0.58rem] font-semibold uppercase tracking-[0.1em] text-[#eadbbd] transition hover:bg-[#523927] disabled:opacity-45"
+              >
+                {commandPending ? t("Sealing…") : room.invite?.status === "active" ? t("Replace") : t("Issue")}
+              </button>
+            </div>
+
+            {#if room.invite?.status === "active"}
+              <div class="mt-3">
+                {#if revokeArmed}
+                  <div class="grid grid-cols-2 gap-2">
+                    <button
+                      id="lobby-confirm-revoke-invite"
+                      type="button"
+                      disabled={connectionState !== "online" || commandPending}
+                      onclick={revokeInvite}
+                      class="border border-[#8b3029] bg-[#6b241e] px-3 py-2 font-mono text-[0.56rem] font-semibold uppercase tracking-[0.1em] text-[#f1dfbd] transition hover:bg-[#812d25] disabled:opacity-45"
+                    >
+                      {t("Confirm revoke")}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={commandPending}
+                      onclick={() => (revokeArmed = false)}
+                      class="border border-[#8e7552] px-3 py-2 font-mono text-[0.56rem] uppercase tracking-[0.1em] text-[#624a36] transition hover:bg-[#d9c6a2]"
+                    >
+                      {t("Keep active")}
+                    </button>
+                  </div>
+                {:else}
+                  <button
+                    id="lobby-revoke-invite"
+                    type="button"
+                    disabled={commandPending}
+                    onclick={revokeInvite}
+                    class="w-full border border-[#8b3029]/55 px-3 py-2 font-mono text-[0.56rem] uppercase tracking-[0.1em] text-[#752b25] transition hover:bg-[#8b3029]/10 disabled:opacity-45"
+                  >
+                    {t("Revoke current invitation")}
+                  </button>
+                {/if}
+              </div>
+            {/if}
+          </section>
+        {/if}
+
         <section id="lobby-controls" aria-labelledby="lobby-controls-title" class="noir-paper-sheet p-5">
           <div class="flex items-center justify-between gap-3 border-b border-[#a98d63] pb-3">
             <h2 id="lobby-controls-title" class="font-mono text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-[#49372a]">
@@ -312,6 +627,85 @@
               ? t("Mark your badge ready when you have reviewed the case assignment.")
               : t("Briefing may begin once every seated Detective has marked ready.")}
           </p>
+
+          {#if isChisel}
+            <div class="mt-4 border-y border-[#a98d63]/70 py-3">
+              <button
+                id="lobby-toggle-settings"
+                type="button"
+                disabled={commandPending}
+                onclick={toggleSettings}
+                class="flex w-full items-center justify-between gap-3 text-left font-mono text-[0.58rem] font-semibold uppercase tracking-[0.12em] text-[#624a36] transition hover:text-[#8b3029] disabled:opacity-45"
+              >
+                <span>{t("Room orders")}</span>
+                <span aria-hidden="true">{settingsOpen ? "−" : "+"}</span>
+              </button>
+
+              {#if settingsOpen}
+                <div id="lobby-settings-panel" class="mt-4 grid gap-4">
+                  <div>
+                    <label for="lobby-case-version" class="font-mono text-[0.54rem] uppercase tracking-[0.1em] text-[#765c42]">
+                      {t("Assigned case file")}
+                    </label>
+                    <select
+                      id="lobby-case-version"
+                      bind:value={settingsCaseVersionId}
+                      disabled={commandPending}
+                      class="mt-1.5 w-full border border-[#8e7552] bg-[#ead8b5] px-3 py-2 text-sm text-[#49372a] outline-none focus:border-[#6b4c31] disabled:opacity-50"
+                    >
+                      {#each case_options as option (option.value)}
+                        <option value={option.value}>{option.label}</option>
+                      {/each}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label for="lobby-max-detectives" class="font-mono text-[0.54rem] uppercase tracking-[0.1em] text-[#765c42]">
+                      {t("Detective seats")}
+                    </label>
+                    <select
+                      id="lobby-max-detectives"
+                      bind:value={settingsMaxDetectives}
+                      disabled={commandPending}
+                      class="mt-1.5 w-full border border-[#8e7552] bg-[#ead8b5] px-3 py-2 text-sm text-[#49372a] outline-none focus:border-[#6b4c31] disabled:opacity-50"
+                    >
+                      {#each [2, 3, 4] as count}
+                        <option value={count}>{t("{count} detectives", { count })}</option>
+                      {/each}
+                    </select>
+                    {#if !settingsCapacityValid}
+                      <p id="lobby-settings-capacity-error" class="mt-2 text-xs leading-5 text-[#7a2b25]">
+                        {t("Room capacity cannot be lower than the seated Detective count.")}
+                      </p>
+                    {/if}
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2">
+                    <button
+                      id="lobby-save-settings"
+                      type="button"
+                      disabled={connectionState !== "online" || commandPending || !settingsCapacityValid || case_options.length === 0}
+                      onclick={saveLobbySettings}
+                      class="border border-[#5a422e] bg-[#3f2d20] px-3 py-2 font-mono text-[0.56rem] font-semibold uppercase tracking-[0.1em] text-[#eadbbd] transition hover:bg-[#523927] disabled:opacity-45"
+                    >
+                      {commandPending ? t("Sealing…") : t("Seal changes")}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={commandPending}
+                      onclick={toggleSettings}
+                      class="border border-[#8e7552] px-3 py-2 font-mono text-[0.56rem] uppercase tracking-[0.1em] text-[#624a36] transition hover:bg-[#d9c6a2] disabled:opacity-45"
+                    >
+                      {t("Cancel")}
+                    </button>
+                  </div>
+                  <p class="text-[0.68rem] leading-5 text-[#715a42]">
+                    {t("Published cases and room capacity may change only before briefing begins.")}
+                  </p>
+                </div>
+              {/if}
+            </div>
+          {/if}
 
           <div class="mt-5">
             {#if room.membership.role === "detective"}
@@ -341,6 +735,45 @@
             <p id="lobby-command-error" class="mt-3 border-l-2 border-[#8b3029] pl-3 text-sm text-[#6b211c]" role="alert">
               {t(commandError)}
             </p>
+          {/if}
+
+          {#if room.membership.role === "detective"}
+            <div class="mt-5 border-t border-[#a98d63]/70 pt-4">
+              {#if leaveArmed}
+                <p class="mb-3 text-xs leading-5 text-[#6b211c]">
+                  {t("Leaving releases your badge. A valid invitation can admit you again.")}
+                </p>
+                <div class="grid grid-cols-2 gap-2">
+                  <button
+                    id="lobby-confirm-leave"
+                    type="button"
+                    disabled={connectionState !== "online" || commandPending}
+                    onclick={leaveLobby}
+                    class="border border-[#8b3029] bg-[#6b241e] px-3 py-2 font-mono text-[0.56rem] font-semibold uppercase tracking-[0.1em] text-[#f1dfbd] transition hover:bg-[#812d25] disabled:opacity-45"
+                  >
+                    {commandPending ? t("Leaving…") : t("Confirm exit")}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={commandPending}
+                    onclick={() => (leaveArmed = false)}
+                    class="border border-[#8e7552] px-3 py-2 font-mono text-[0.56rem] uppercase tracking-[0.1em] text-[#624a36] transition hover:bg-[#d9c6a2]"
+                  >
+                    {t("Stay in room")}
+                  </button>
+                </div>
+              {:else}
+                <button
+                  id="lobby-leave"
+                  type="button"
+                  disabled={commandPending}
+                  onclick={leaveLobby}
+                  class="w-full border border-[#8b3029]/55 px-3 py-2 font-mono text-[0.56rem] uppercase tracking-[0.1em] text-[#752b25] transition hover:bg-[#8b3029]/10 disabled:opacity-45"
+                >
+                  {t("Leave investigation room")}
+                </button>
+              {/if}
+            </div>
           {/if}
         </section>
       </aside>

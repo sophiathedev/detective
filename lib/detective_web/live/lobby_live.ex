@@ -1,7 +1,7 @@
 defmodule DetectiveWeb.LobbyLive do
   use DetectiveWeb, :live_view
 
-  alias Detective.Games
+  alias Detective.{Cases, Games}
 
   @impl true
   def mount(%{"id" => game_id}, _session, socket) do
@@ -10,7 +10,8 @@ defmodule DetectiveWeb.LobbyLive do
         {:ok,
          assign(socket,
            page_title: lobby.title,
-           lobby: lobby
+           lobby: lobby,
+           case_options: case_options(Cases.list_published_versions())
          )}
 
       {:error, _reason} ->
@@ -28,10 +29,23 @@ defmodule DetectiveWeb.LobbyLive do
       <.svelte
         id="lobby-frontend"
         name="Lobby"
-        props={%{lobby: @lobby, locale: @locale}}
+        props={%{lobby: @lobby, case_options: @case_options, locale: @locale}}
         socket={@socket}
       />
     </Layouts.app>
     """
+  end
+
+  defp case_options(case_versions) do
+    Enum.map(case_versions, fn version ->
+      %{
+        value: version.id,
+        label:
+          gettext("%{title} (version %{version})",
+            title: version.case_file.title,
+            version: version.version
+          )
+      }
+    end)
   end
 end

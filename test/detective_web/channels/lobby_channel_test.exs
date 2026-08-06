@@ -4,6 +4,7 @@ defmodule DetectiveWeb.LobbyChannelTest do
   @endpoint DetectiveWeb.Endpoint
 
   import Detective.AccountsFixtures
+  import Detective.CasesFixtures
   import Detective.GamesFixtures
   import Phoenix.ChannelTest
 
@@ -82,6 +83,112 @@ defmodule DetectiveWeb.LobbyChannelTest do
     ref = push(socket, "ready", %{"expected_version" => lobby.current_version})
     assert_reply ref, :error, %{code: "not_detective"}
     refute_broadcast "lobby_state", _payload
+  end
+
+  test "a Detective leaves through an authenticated versioned command" do
+    host = user_fixture()
+    detective = user_fixture()
+    %{game: game, invite_token: token} = game_fixture(host)
+    assert {:ok, _result} = Invitations.accept(Scope.for_user(detective), token)
+
+    assert {:ok, %{lobby: lobby}, socket} =
+             detective
+             |> authenticated_socket()
+             |> subscribe_and_join("lobby:#{game.id}", %{})
+
+    assert_push "presence_state", _presence
+
+    ref = push(socket, "leave_lobby", %{"expected_version" => lobby.current_version})
+    assert_reply ref, :ok, %{path: "/dashboard", version: 1}
+    assert_broadcast "lobby_state", %{version: 1, lobby: next_lobby}
+    refute Enum.any?(next_lobby.players, &(&1.id == lobby.membership.id))
+    assert_broadcast "player_left", %{player_id: player_id, version: 1}
+    assert player_id == lobby.membership.id
+  end
+
+  test "the Chisel removes a Detective and the departure is broadcast" do
+    host = user_fixture()
+    detective = user_fixture()
+    %{game: game, invite_token: token} = game_fixture(host)
+    assert {:ok, %{player: player}} = Invitations.accept(Scope.for_user(detective), token)
+
+    assert {:ok, %{lobby: lobby}, socket} =
+             host
+             |> authenticated_socket()
+             |> subscribe_and_join("lobby:#{game.id}", %{})
+
+    assert_push "presence_state", _presence
+
+    ref =
+      push(socket, "remove_player", %{
+        "player_id" => player.id,
+        "expected_version" => lobby.current_version
+      })
+
+    assert_reply ref, :ok, %{version: 1}
+    assert_broadcast "lobby_state", %{version: 1, lobby: next_lobby}
+    refute Enum.any?(next_lobby.players, &(&1.id == player.id))
+    assert_broadcast "player_removed", %{player_id: player_id, version: 1}
+    assert player_id == player.id
+  end
+
+  test "the Chisel revokes and regenerates invitations without broadcasting raw tokens" do
+    host = user_fixture()
+    %{game: game} = game_fixture(host)
+
+    assert {:ok, %{lobby: lobby}, socket} =
+             host
+             |> authenticated_socket()
+             |> subscribe_and_join("lobby:#{game.id}", %{})
+
+    assert_push "presence_state", _presence
+
+    revoke_ref =
+      push(socket, "revoke_invite", %{"expected_version" => lobby.current_version})
+
+    assert_reply revoke_ref, :ok, %{version: 1}
+    assert_broadcast "lobby_state", %{version: 1, lobby: revoked_lobby}
+    assert revoked_lobby.invite.status == "revoked"
+    refute Map.has_key?(revoked_lobby.invite, :token)
+    refute Map.has_key?(revoked_lobby.invite, :token_hash)
+
+    regenerate_ref =
+      push(socket, "regenerate_invite", %{
+        "expected_version" => 1,
+        "invite_hours" => 6
+      })
+
+    assert_reply regenerate_ref, :ok, %{invite_path: invite_path, version: 2}
+    assert invite_path =~ ~r{^/invites/[A-Za-z0-9_-]+$}
+    assert_broadcast "lobby_state", %{version: 2, lobby: active_lobby}
+    assert active_lobby.invite.status == "active"
+    refute inspect(active_lobby) =~ invite_path
+  end
+
+  test "the Chisel updates lobby case and capacity through the canonical projection" do
+    host = user_fixture()
+    replacement_case = case_version_fixture()
+    %{game: game} = game_fixture(host, %{max_detectives: 4})
+
+    assert {:ok, %{lobby: lobby}, socket} =
+             host
+             |> authenticated_socket()
+             |> subscribe_and_join("lobby:#{game.id}", %{})
+
+    assert_push "presence_state", _presence
+
+    ref =
+      push(socket, "update_lobby_settings", %{
+        "case_version_id" => replacement_case.id,
+        "max_detectives" => 3,
+        "expected_version" => lobby.current_version
+      })
+
+    assert_reply ref, :ok, %{version: 1}
+    assert_broadcast "lobby_state", %{version: 1, lobby: next_lobby}
+    assert next_lobby.case_version_id == replacement_case.id
+    assert next_lobby.case_title == replacement_case.case_file.title
+    assert next_lobby.max_detectives == 3
   end
 
   test "ready lobby starts once and broadcasts the game route" do

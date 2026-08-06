@@ -122,6 +122,94 @@ defmodule Detective.GamesTest do
              Games.set_ready(Scope.for_user(host), "not-a-uuid", 0, true)
   end
 
+  test "a Detective can leave a waiting lobby and the public projection drops membership" do
+    host = user_fixture()
+    detective = user_fixture()
+    %{game: game, invite_token: token} = game_fixture(host)
+    assert {:ok, %{player: player}} = Invitations.accept(Scope.for_user(detective), token)
+
+    assert {:ok, %{event: :player_left, player_id: player_id, lobby: lobby}} =
+             Games.leave_lobby(Scope.for_user(detective), game.id, 0)
+
+    assert player_id == player.id
+    assert lobby.current_version == 1
+    refute Enum.any?(lobby.players, &(&1.id == player.id))
+    assert lobby.invite.status == "active"
+    refute Map.has_key?(lobby.invite, :token_hash)
+    assert {:error, :not_a_member} = Games.get_lobby(Scope.for_user(detective), game.id)
+    assert Repo.get!(GamePlayer, player.id).status == "left"
+  end
+
+  test "the Chisel cannot leave and only the Chisel can remove an active Detective" do
+    host = user_fixture()
+    detective = user_fixture()
+    %{game: game, invite_token: token} = game_fixture(host)
+    assert {:ok, %{player: player}} = Invitations.accept(Scope.for_user(detective), token)
+
+    assert {:error, :not_detective} =
+             Games.leave_lobby(Scope.for_user(host), game.id, 0)
+
+    assert {:error, :not_chisel} =
+             Games.remove_player(Scope.for_user(detective), game.id, player.id, 0)
+
+    assert {:ok, %{event: :player_removed, player_id: player_id, lobby: lobby}} =
+             Games.remove_player(Scope.for_user(host), game.id, player.id, 0)
+
+    assert player_id == player.id
+    assert lobby.current_version == 1
+    refute Enum.any?(lobby.players, &(&1.id == player.id))
+    assert Repo.get!(GamePlayer, player.id).status == "removed"
+  end
+
+  test "the Chisel updates only published case files and a capacity that fits the room" do
+    host = user_fixture()
+    detective = user_fixture()
+    replacement_case = case_version_fixture()
+    %{game: game, invite_token: token} = game_fixture(host, %{max_detectives: 4})
+    assert {:ok, _result} = Invitations.accept(Scope.for_user(detective), token)
+
+    assert {:error, :not_chisel} =
+             Games.update_lobby_settings(
+               Scope.for_user(detective),
+               game.id,
+               %{case_version_id: replacement_case.id, max_detectives: 2},
+               0
+             )
+
+    assert {:ok, %{event: :lobby_settings_updated, lobby: lobby}} =
+             Games.update_lobby_settings(
+               Scope.for_user(host),
+               game.id,
+               %{case_version_id: replacement_case.id, max_detectives: 2},
+               0
+             )
+
+    assert lobby.case_version_id == replacement_case.id
+    assert lobby.case_title == replacement_case.case_file.title
+    assert lobby.max_detectives == 2
+    assert lobby.current_version == 1
+    assert Repo.one!(GameInvite).max_uses == 2
+  end
+
+  test "room capacity cannot be reduced below active Detective membership" do
+    host = user_fixture()
+    case_version = case_version_fixture()
+    %{game: game, invite_token: token} = game_fixture(host, %{max_detectives: 4})
+
+    Enum.each(1..3, fn _seat ->
+      detective = user_fixture()
+      assert {:ok, _result} = Invitations.accept(Scope.for_user(detective), token)
+    end)
+
+    assert {:error, :capacity_below_membership} =
+             Games.update_lobby_settings(
+               Scope.for_user(host),
+               game.id,
+               %{case_version_id: case_version.id, max_detectives: 2},
+               0
+             )
+  end
+
   test "counts paused games in the active dashboard bucket" do
     user = user_fixture()
     %{game: game} = game_fixture(user)

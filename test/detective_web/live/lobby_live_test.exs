@@ -16,6 +16,10 @@ defmodule DetectiveWeb.LobbyLiveTest do
     lobby = component.props["lobby"]
     assert lobby["id"] == game.id
     assert [%{"display_name" => "Host Name", "role" => "chisel"}] = lobby["players"]
+    assert [%{"value" => case_version_id}] = component.props["case_options"]
+    assert case_version_id == lobby["case_version_id"]
+    assert lobby["invite"]["status"] == "active"
+    refute Map.has_key?(lobby["invite"], "token_hash")
     refute Map.has_key?(lobby, "case_content")
     assert component.props["invite_url"] == nil
   end

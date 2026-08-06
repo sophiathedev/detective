@@ -3,6 +3,7 @@ defmodule DetectiveWeb.LobbyChannel do
 
   alias Detective.Games
   alias Detective.Games.LobbyBroadcaster
+  alias Detective.Invitations
   alias Detective.Security.RateLimiter
   alias DetectiveWeb.Presence
 
@@ -72,9 +73,138 @@ defmodule DetectiveWeb.LobbyChannel do
     end)
   end
 
+  def handle_in("leave_lobby", %{"expected_version" => expected_version}, socket) do
+    with_rate_limit(socket, fn ->
+      case Games.leave_lobby(
+             socket.assigns.current_scope,
+             socket.assigns.game_id,
+             expected_version
+           ) do
+        {:ok, %{event: event, player_id: player_id, lobby: lobby}} ->
+          :ok = LobbyBroadcaster.broadcast_lobby(lobby)
+          :ok = LobbyBroadcaster.broadcast_player_departure(lobby, event, player_id)
+
+          {:reply, {:ok, %{path: "/dashboard", version: lobby.current_version}}, socket}
+
+        {:error, reason} ->
+          {:reply, {:error, %{code: error_code(reason)}}, socket}
+      end
+    end)
+  end
+
+  def handle_in(
+        "remove_player",
+        %{"player_id" => player_id, "expected_version" => expected_version},
+        socket
+      ) do
+    with_rate_limit(socket, fn ->
+      case Games.remove_player(
+             socket.assigns.current_scope,
+             socket.assigns.game_id,
+             player_id,
+             expected_version
+           ) do
+        {:ok, %{event: event, player_id: removed_player_id, lobby: lobby}} ->
+          :ok = LobbyBroadcaster.broadcast_lobby(lobby)
+
+          :ok =
+            LobbyBroadcaster.broadcast_player_departure(lobby, event, removed_player_id)
+
+          {:reply, {:ok, %{version: lobby.current_version}}, socket}
+
+        {:error, reason} ->
+          {:reply, {:error, %{code: error_code(reason)}}, socket}
+      end
+    end)
+  end
+
+  def handle_in("revoke_invite", %{"expected_version" => expected_version}, socket) do
+    with_rate_limit(socket, fn ->
+      case Invitations.revoke(
+             socket.assigns.current_scope,
+             socket.assigns.game_id,
+             expected_version
+           ) do
+        {:ok, _result} ->
+          broadcast_updated_lobby(socket)
+
+        {:error, reason} ->
+          {:reply, {:error, %{code: error_code(reason)}}, socket}
+      end
+    end)
+  end
+
+  def handle_in(
+        "regenerate_invite",
+        %{"expected_version" => expected_version, "invite_hours" => invite_hours},
+        socket
+      ) do
+    with_rate_limit(socket, fn ->
+      case Invitations.regenerate(
+             socket.assigns.current_scope,
+             socket.assigns.game_id,
+             expected_version,
+             invite_hours
+           ) do
+        {:ok, %{token: token}} ->
+          with {:ok, lobby} <-
+                 Games.get_lobby(socket.assigns.current_scope, socket.assigns.game_id) do
+            :ok = LobbyBroadcaster.broadcast_lobby(lobby)
+
+            {:reply,
+             {:ok,
+              %{
+                invite_path: "/invites/#{token}",
+                version: lobby.current_version
+              }}, socket}
+          else
+            {:error, reason} ->
+              {:reply, {:error, %{code: error_code(reason)}}, socket}
+          end
+
+        {:error, reason} ->
+          {:reply, {:error, %{code: error_code(reason)}}, socket}
+      end
+    end)
+  end
+
+  def handle_in(
+        "update_lobby_settings",
+        %{
+          "case_version_id" => case_version_id,
+          "max_detectives" => max_detectives,
+          "expected_version" => expected_version
+        },
+        socket
+      ) do
+    with_rate_limit(socket, fn ->
+      case Games.update_lobby_settings(
+             socket.assigns.current_scope,
+             socket.assigns.game_id,
+             %{
+               case_version_id: case_version_id,
+               max_detectives: max_detectives
+             },
+             expected_version
+           ) do
+        {:ok, %{lobby: lobby}} ->
+          :ok = LobbyBroadcaster.broadcast_lobby(lobby)
+          {:reply, {:ok, %{version: lobby.current_version}}, socket}
+
+        {:error, reason} ->
+          {:reply, {:error, %{code: error_code(reason)}}, socket}
+      end
+    end)
+  end
+
   def handle_in("ready", _payload, socket), do: invalid_command(socket)
   def handle_in("unready", _payload, socket), do: invalid_command(socket)
   def handle_in("start_game", _payload, socket), do: invalid_command(socket)
+  def handle_in("leave_lobby", _payload, socket), do: invalid_command(socket)
+  def handle_in("remove_player", _payload, socket), do: invalid_command(socket)
+  def handle_in("revoke_invite", _payload, socket), do: invalid_command(socket)
+  def handle_in("regenerate_invite", _payload, socket), do: invalid_command(socket)
+  def handle_in("update_lobby_settings", _payload, socket), do: invalid_command(socket)
   def handle_in(_event, _payload, socket), do: invalid_command(socket)
 
   defp update_ready(socket, expected_version, ready) do
@@ -85,6 +215,17 @@ defmodule DetectiveWeb.LobbyChannel do
            ready
          ) do
       {:ok, %{lobby: lobby}} ->
+        :ok = LobbyBroadcaster.broadcast_lobby(lobby)
+        {:reply, {:ok, %{version: lobby.current_version}}, socket}
+
+      {:error, reason} ->
+        {:reply, {:error, %{code: error_code(reason)}}, socket}
+    end
+  end
+
+  defp broadcast_updated_lobby(socket) do
+    case Games.get_lobby(socket.assigns.current_scope, socket.assigns.game_id) do
+      {:ok, lobby} ->
         :ok = LobbyBroadcaster.broadcast_lobby(lobby)
         {:reply, {:ok, %{version: lobby.current_version}}, socket}
 
@@ -116,9 +257,16 @@ defmodule DetectiveWeb.LobbyChannel do
               :not_a_member,
               :not_detective,
               :not_chisel,
+              :game_not_found,
+              :player_not_found,
               :game_not_waiting,
               :stale_version,
               :invalid_command,
+              :invalid_invite_expiry,
+              :invite_not_active,
+              :invalid_lobby_settings,
+              :capacity_below_membership,
+              :case_version_not_published,
               :no_detectives,
               :not_enough_detectives,
               :too_many_detectives,

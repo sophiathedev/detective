@@ -20,5 +20,13 @@ defmodule Detective.Games.LobbyBroadcaster do
     })
   end
 
+  def broadcast_player_departure(lobby, event, player_id)
+      when event in [:player_left, :player_removed] do
+    Endpoint.broadcast(topic(lobby.id), Atom.to_string(event), %{
+      player_id: player_id,
+      version: lobby.current_version
+    })
+  end
+
   defp topic(game_id), do: "lobby:#{game_id}"
 end

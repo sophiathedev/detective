@@ -193,7 +193,10 @@ defmodule Detective.Games do
   def public_lobby(game_id) do
     with {:ok, game_id} <- cast_game_id(game_id),
          %{id: _id} = game <- lobby_game_projection(game_id) do
-      {:ok, Map.put(game, :players, lobby_player_projections(game_id))}
+      {:ok,
+       game
+       |> Map.put(:players, lobby_player_projections(game_id))
+       |> Map.put(:invite, Invitations.lobby_status(game_id))}
     else
       :error -> {:error, :invalid_game_id}
       nil -> {:error, :game_not_found}
@@ -214,6 +217,72 @@ defmodule Detective.Games do
   end
 
   def set_ready(%Scope{}, _game_id, _expected_version, _ready),
+    do: {:error, :invalid_command}
+
+  def leave_lobby(%Scope{user: user}, game_id, expected_version)
+      when is_integer(expected_version) and expected_version >= 0 do
+    with {:ok, game_id} <- cast_game_id(game_id),
+         {:ok, result} <- transact_leave_lobby(user.id, game_id, expected_version),
+         {:ok, lobby} <- public_lobby(game_id) do
+      {:ok, %{event: :player_left, player_id: result.player_id, lobby: lobby}}
+    else
+      :error -> {:error, :invalid_game_id}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def leave_lobby(%Scope{}, _game_id, _expected_version),
+    do: {:error, :invalid_command}
+
+  def remove_player(%Scope{user: user}, game_id, player_id, expected_version)
+      when is_integer(expected_version) and expected_version >= 0 do
+    with {:ok, game_id} <- cast_game_id(game_id),
+         {:ok, player_id} <- cast_player_id(player_id),
+         {:ok, result} <-
+           transact_remove_player(user.id, game_id, player_id, expected_version),
+         {:ok, lobby} <- get_lobby(Scope.for_user(user), game_id) do
+      {:ok, %{event: :player_removed, player_id: result.player_id, lobby: lobby}}
+    else
+      :error -> {:error, :invalid_command}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def remove_player(%Scope{}, _game_id, _player_id, _expected_version),
+    do: {:error, :invalid_command}
+
+  def update_lobby_settings(
+        %Scope{user: user} = scope,
+        game_id,
+        attrs,
+        expected_version
+      )
+      when is_map(attrs) and is_integer(expected_version) and expected_version >= 0 do
+    max_detectives = parse_lobby_capacity(value(attrs, :max_detectives))
+
+    with {:ok, game_id} <- cast_game_id(game_id),
+         {:ok, case_version_id} <- cast_case_version_id(value(attrs, :case_version_id)),
+         true <- max_detectives in 2..4,
+         %CaseVersion{} <- Cases.get_published_version(case_version_id),
+         {:ok, _result} <-
+           transact_lobby_settings(
+             user.id,
+             game_id,
+             case_version_id,
+             max_detectives,
+             expected_version
+           ),
+         {:ok, lobby} <- get_lobby(scope, game_id) do
+      {:ok, %{event: :lobby_settings_updated, lobby: lobby}}
+    else
+      :error -> {:error, :invalid_lobby_settings}
+      false -> {:error, :invalid_lobby_settings}
+      nil -> {:error, :case_version_not_published}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def update_lobby_settings(%Scope{}, _game_id, _attrs, _expected_version),
     do: {:error, :invalid_command}
 
   def start_game(scope, game_id, command_id, expected_version, opts \\ [])
@@ -296,6 +365,10 @@ defmodule Detective.Games do
     end
   end
 
+  defp parse_lobby_capacity(value) when is_integer(value), do: value
+  defp parse_lobby_capacity(value) when is_binary(value), do: parse_integer(value)
+  defp parse_lobby_capacity(_value), do: nil
+
   defp value(attrs, key), do: Map.get(attrs, key) || Map.get(attrs, Atom.to_string(key))
 
   defp transact_ready(user_id, game_id, expected_version, ready) do
@@ -337,6 +410,149 @@ defmodule Detective.Games do
     end)
   end
 
+  defp transact_leave_lobby(user_id, game_id, expected_version) do
+    Repo.transact(fn ->
+      game = locked_game(game_id)
+      player = locked_active_player(game_id, user_id)
+
+      with %Game{} <- game,
+           %GamePlayer{} <- player,
+           :ok <- validate_waiting_lobby(game),
+           :ok <- validate_detective(player),
+           :ok <- validate_version(game, expected_version) do
+        player
+        |> Ecto.Changeset.change(status: "left", ready: false)
+        |> Repo.update!()
+
+        increment_lobby_version!(game)
+
+        {:ok, %{player_id: player.id}}
+      else
+        nil -> {:error, if(game, do: :not_a_member, else: :game_not_found)}
+        {:error, reason} -> {:error, reason}
+      end
+    end)
+  end
+
+  defp transact_remove_player(actor_id, game_id, player_id, expected_version) do
+    Repo.transact(fn ->
+      game = locked_game(game_id)
+
+      player =
+        GamePlayer
+        |> where(
+          [player],
+          player.game_id == ^game_id and player.id == ^player_id and player.status == "active"
+        )
+        |> lock("FOR UPDATE")
+        |> Repo.one()
+
+      with %Game{} <- game,
+           :ok <- validate_waiting_lobby(game),
+           :ok <- validate_host(game, actor_id),
+           :ok <- validate_version(game, expected_version),
+           %GamePlayer{} <- player,
+           :ok <- validate_detective(player) do
+        player
+        |> Ecto.Changeset.change(status: "removed", ready: false)
+        |> Repo.update!()
+
+        increment_lobby_version!(game)
+
+        {:ok, %{player_id: player.id}}
+      else
+        nil -> {:error, if(game, do: :player_not_found, else: :game_not_found)}
+        {:error, reason} -> {:error, reason}
+      end
+    end)
+  end
+
+  defp transact_lobby_settings(
+         actor_id,
+         game_id,
+         case_version_id,
+         max_detectives,
+         expected_version
+       ) do
+    Repo.transact(fn ->
+      game = locked_game(game_id)
+
+      detective_count =
+        GamePlayer
+        |> where(
+          [player],
+          player.game_id == ^game_id and player.role == "detective" and
+            player.status == "active"
+        )
+        |> Repo.aggregate(:count)
+
+      with %Game{} <- game,
+           :ok <- validate_waiting_lobby(game),
+           :ok <- validate_host(game, actor_id),
+           :ok <- validate_version(game, expected_version),
+           :ok <- validate_lobby_capacity(max_detectives, detective_count) do
+        update_result =
+          game
+          |> Game.create_changeset(%{
+            "title" => game.title,
+            "case_version_id" => case_version_id,
+            "max_detectives" => max_detectives
+          })
+          |> Ecto.Changeset.change(current_version: game.current_version + 1)
+          |> Repo.update()
+
+        case update_result do
+          {:ok, updated_game} ->
+            now = DateTime.utc_now(:second)
+
+            GameInvite
+            |> where([invite], invite.game_id == ^game.id and is_nil(invite.revoked_at))
+            |> Repo.all()
+            |> Enum.each(fn invite ->
+              invite
+              |> Ecto.Changeset.change(
+                max_uses: max(max_detectives, invite.use_count),
+                updated_at: now
+              )
+              |> Repo.update!()
+            end)
+
+            {:ok, %{version: updated_game.current_version}}
+
+          {:error, changeset} ->
+            {:error, changeset}
+        end
+      else
+        nil -> {:error, :game_not_found}
+        {:error, reason} -> {:error, reason}
+      end
+    end)
+  end
+
+  defp locked_game(game_id) do
+    Game
+    |> where([game], game.id == ^game_id)
+    |> lock("FOR UPDATE")
+    |> Repo.one()
+  end
+
+  defp locked_active_player(game_id, user_id) do
+    GamePlayer
+    |> where(
+      [player],
+      player.game_id == ^game_id and player.user_id == ^user_id and
+        player.status == "active"
+    )
+    |> lock("FOR UPDATE")
+    |> Repo.one()
+  end
+
+  defp increment_lobby_version!(game) do
+    game
+    |> Ecto.Changeset.change(current_version: game.current_version + 1)
+    |> Repo.update!()
+  end
+
   defp membership_projection(game_id, user_id) do
     GamePlayer
     |> where(
@@ -366,6 +582,7 @@ defmodule Detective.Games do
       max_detectives: game.max_detectives,
       current_version: game.current_version,
       case_title: case_file.title,
+      case_version_id: version.id,
       case_version: version.version
     })
     |> Repo.one()
@@ -392,6 +609,16 @@ defmodule Detective.Games do
   defp validate_detective(%GamePlayer{role: "detective"}), do: :ok
   defp validate_detective(%GamePlayer{}), do: {:error, :not_detective}
 
+  defp validate_host(%Game{host_user_id: user_id}, user_id), do: :ok
+  defp validate_host(%Game{}, _user_id), do: {:error, :not_chisel}
+
+  defp validate_lobby_capacity(max_detectives, detective_count)
+       when max_detectives >= detective_count,
+       do: :ok
+
+  defp validate_lobby_capacity(_max_detectives, _detective_count),
+    do: {:error, :capacity_below_membership}
+
   defp validate_version(%Game{current_version: version}, version), do: :ok
   defp validate_version(%Game{}, _expected_version), do: {:error, :stale_version}
 
@@ -403,6 +630,20 @@ defmodule Detective.Games do
 
   defp cast_game_id(game_id) do
     case Ecto.UUID.cast(game_id) do
+      {:ok, cast_id} -> {:ok, cast_id}
+      :error -> :error
+    end
+  end
+
+  defp cast_player_id(player_id) do
+    case Ecto.UUID.cast(player_id) do
+      {:ok, cast_id} -> {:ok, cast_id}
+      :error -> :error
+    end
+  end
+
+  defp cast_case_version_id(case_version_id) do
+    case Ecto.UUID.cast(case_version_id) do
       {:ok, cast_id} -> {:ok, cast_id}
       :error -> :error
     end
