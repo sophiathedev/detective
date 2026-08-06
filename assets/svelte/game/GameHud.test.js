@@ -30,6 +30,10 @@ describe("game HUD role boundaries", () => {
       currentDetectiveId: "d1",
       ownPlayerId: "d1",
       privateResources: { scratch: 6, leverage: 3 },
+      locations: [
+        { id: "51", name: "LAPD Headquarters" },
+        { id: "84", name: "Bradbury Building" },
+      ],
       onlinePlayerIds: ["d1"],
       connectionSnapshotReceived: true,
       disconnectLabel: () => "OFFLINE",
@@ -37,6 +41,10 @@ describe("game HUD role boundaries", () => {
 
     expect(screen.getAllByTestId(/detective-rail-slot-/)).toHaveLength(4)
     expect(screen.getByTestId("detective-rail-slot-1")).toHaveTextContent("Scratch 6")
+    expect(screen.getByTestId("detective-rail-slot-1")).toHaveTextContent(
+      "At LAPD Headquarters",
+    )
+    expect(screen.getByTestId("detective-rail-slot-1")).not.toHaveTextContent("LOC 51")
     expect(screen.getByTestId("detective-rail-slot-3")).not.toHaveTextContent("Scratch")
   })
 
@@ -52,8 +60,9 @@ describe("game HUD role boundaries", () => {
     })
 
     const consoleElement = screen.getByTestId("chisel-console")
-    expect(consoleElement).toHaveTextContent("Response open")
-    expect(consoleElement).toHaveTextContent("D1 2")
+    expect(consoleElement).toHaveTextContent("Question waiting")
+    expect(consoleElement).toHaveTextContent("Leverage markers")
+    expect(consoleElement).toHaveTextContent("D1 2 held")
     expect(within(consoleElement).queryByText(/AP/)).not.toBeInTheDocument()
     expect(within(consoleElement).queryByText(/Scratch/)).not.toBeInTheDocument()
   })
@@ -70,8 +79,8 @@ describe("game HUD role boundaries", () => {
     })
 
     const consoleElement = screen.getByTestId("chisel-console")
-    expect(consoleElement).toHaveTextContent("Private controls sealed")
-    expect(consoleElement).not.toHaveTextContent("Response open")
-    expect(consoleElement).not.toHaveTextContent("D1 9")
+    expect(consoleElement).toHaveTextContent("Chisel notes remain private")
+    expect(consoleElement).not.toHaveTextContent("Question waiting")
+    expect(consoleElement).not.toHaveTextContent("D1 9 held")
   })
 })

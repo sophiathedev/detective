@@ -41,6 +41,7 @@ defmodule Detective.Games.ProjectionsTest do
 
     assert chisel.private.role == "chisel"
     assert chisel.private.casebook.solution == %{"suspect_id" => "murderer"}
+    assert chisel.private.casebook.suspects == []
 
     assert chisel.private.casebook.response_matrix["suspect"]["topic"]["most_useful"] ==
              "secret answer"

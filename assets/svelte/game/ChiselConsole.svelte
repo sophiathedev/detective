@@ -39,19 +39,20 @@
     {#if isCurrentChisel}
       <div class="noir-chisel-private-ledger">
         <p class="noir-chisel-response-state">
-          {pendingInterrogation ? "Response open" : "No pending response"}
+          {pendingInterrogation ? "Question waiting" : "Waiting for a question"}
         </p>
+        <p class="noir-chisel-leverage-label">Leverage markers</p>
         <dl>
           {#each detectiveSlots as detective, index}
             <div>
               <dt>D{detective.seat ?? index + 1}</dt>
-              <dd>{leverageByDetective[detective.id] ?? 0}</dd>
+              <dd>{leverageByDetective[detective.id] ?? 0} held</dd>
             </div>
           {/each}
         </dl>
       </div>
     {:else}
-      <p class="noir-chisel-sealed-copy">Private controls sealed</p>
+      <p class="noir-chisel-sealed-copy">Chisel notes remain private</p>
     {/if}
   {:else}
     <h2 id="chisel-console-title" class="noir-chisel-sealed-copy">Chisel unavailable</h2>

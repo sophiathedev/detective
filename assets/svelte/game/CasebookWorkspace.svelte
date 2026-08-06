@@ -75,6 +75,33 @@
     return (evidence.caseCards ?? []).find((candidate) => candidate.id === cardId) ?? null
   }
 
+  function readableIdentifier(value) {
+    if (!value) return "Not filed"
+
+    return String(value)
+      .split(/[-_]/)
+      .filter(Boolean)
+      .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+      .join(" ")
+  }
+
+  function chiselSuspectName(casebook) {
+    const suspectId = casebook?.solution?.suspect_id
+    return (
+      (casebook?.suspects ?? []).find((suspect) => suspect.id === suspectId)?.name ??
+      readableIdentifier(suspectId)
+    )
+  }
+
+  function chiselOptionLabel(casebook, group, idKey) {
+    const optionId = casebook?.solution?.[idKey]
+    const option = (casebook?.accusation_options?.[group] ?? []).find(
+      (candidate) => candidate.id === optionId,
+    )
+
+    return option?.label ?? option?.name ?? readableIdentifier(optionId)
+  }
+
   function selectEvidenceCaseCard(card) {
     if (!card || !(evidence.caseCards ?? []).some((candidate) => candidate.code === card.code))
       return
@@ -714,6 +741,7 @@
   </div>
 
 {:else if page === "chisel" && view.role === "chisel" && view.chisel}
+  {@const privateCasebook = view.chisel.casebook ?? {}}
   <section id="chisel-casebook-page" class="casebook-workspace-page bg-[#cab99a] p-4 sm:p-5" aria-labelledby="chisel-heading">
     <div class="flex items-center gap-3">
       <svg class="size-14 shrink-0 border border-[#533b2d] bg-[#231b17]" viewBox="0 0 64 64" role="img" aria-label="Original Chisel portrait token"><rect width="64" height="64" fill="#352720" /><path d="M12 25h40L44 12H21Z" fill="#111315" /><path d="M20 23c0 15 3 24 12 24s13-9 13-24Z" fill="#b18a68" /><path d="M18 64c2-14 7-20 14-20s14 6 16 20Z" fill="#7b3029" /><path d="M25 29h5m5 0h5" stroke="#1e1815" stroke-width="2" /></svg>
@@ -735,7 +763,16 @@
           </ul>
         </section>
       {/if}
-      <dl class="mt-4 space-y-2 text-xs"><div class="flex justify-between gap-3"><dt class="text-[#715d47]">Solution suspect</dt><dd class="font-mono font-semibold">{view.chisel.casebook?.solution?.suspect_id ?? "-"}</dd></div><div class="flex justify-between gap-3"><dt class="text-[#715d47]">Leverage held</dt><dd class="font-mono font-semibold">{Object.values(view.chisel.leverageByDetective ?? {}).reduce((sum, value) => sum + value, 0)}</dd></div><div class="flex justify-between gap-3"><dt class="text-[#715d47]">Pending response</dt><dd class="font-mono font-semibold">{view.chisel.pendingInterrogation ? "OPEN" : "NONE"}</dd></div></dl>
+      <section class="mt-5 border-l-4 border-[#7e3029] bg-[#dfcfad] px-4 py-3" aria-labelledby="sealed-solution-heading">
+        <p class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7e3029]">Chisel eyes only</p>
+        <h3 id="sealed-solution-heading" class="mt-1 font-serif text-lg font-semibold">Sealed solution</h3>
+        <dl class="mt-3 grid gap-2 text-xs sm:grid-cols-3">
+          <div><dt class="text-[#715d47]">Suspect</dt><dd class="mt-1 font-serif text-sm font-semibold">{chiselSuspectName(privateCasebook)}</dd></div>
+          <div><dt class="text-[#715d47]">Weapon</dt><dd class="mt-1 font-serif text-sm font-semibold">{chiselOptionLabel(privateCasebook, "weapons", "weapon_id")}</dd></div>
+          <div><dt class="text-[#715d47]">Motive</dt><dd class="mt-1 font-serif text-sm font-semibold">{chiselOptionLabel(privateCasebook, "motives", "motive_id")}</dd></div>
+        </dl>
+      </section>
+      <dl class="mt-4 grid gap-2 text-xs sm:grid-cols-2"><div class="flex justify-between gap-3"><dt class="text-[#715d47]">Leverage held</dt><dd class="font-mono font-semibold">{Object.values(view.chisel.leverageByDetective ?? {}).reduce((sum, value) => sum + value, 0)}</dd></div><div class="flex justify-between gap-3"><dt class="text-[#715d47]">Pending response</dt><dd class="font-mono font-semibold">{view.chisel.pendingInterrogation ? "OPEN" : "NONE"}</dd></div></dl>
     </div>
   </section>
 {/if}

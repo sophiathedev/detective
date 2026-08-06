@@ -6,6 +6,7 @@
     currentDetectiveId = null,
     ownPlayerId = null,
     privateResources = null,
+    locations = [],
     onlinePlayerIds = [],
     connectionSnapshotReceived = false,
     disconnectLabel = () => "OFFLINE",
@@ -27,6 +28,12 @@
 
   function online(playerId) {
     return connectionSnapshotReceived && onlinePlayerIds.includes(playerId)
+  }
+
+  function locationName(locationId) {
+    if (!locationId) return "Awaiting placement"
+
+    return locations.find((location) => location.id === locationId)?.name ?? "Location unavailable"
   }
 </script>
 
@@ -60,7 +67,10 @@
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0">
                 <p class="noir-detective-slot-label">D{seat}</p>
-                <p class="truncate font-serif text-sm font-semibold text-[#eadbbd]">{detective.display_name}</p>
+                <p
+                  class="noir-detective-name break-words font-serif text-sm font-semibold leading-tight text-[#eadbbd]"
+                  title={detective.display_name}
+                >{detective.display_name}</p>
               </div>
               <span
                 class:noir-connection-online={online(detective.id)}
@@ -71,7 +81,9 @@
 
             <div class="noir-detective-public-stats">
               <span>AP {detective.actions_remaining}/4</span>
-              <span>LOC {detective.location_id ?? "-"}</span>
+              <span class="noir-detective-location" title={locationName(detective.location_id)}>
+                At {locationName(detective.location_id)}
+              </span>
             </div>
 
             {#if ownPlayerId === detective.id && privateResources}

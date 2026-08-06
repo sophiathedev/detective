@@ -192,6 +192,9 @@
 
         <p class="noir-movement-slip-districts">
           Filed districts · {selection.location.district_ids?.join(" / ") ?? "unfiled"}
+          <strong class="noir-movement-slip-cost">
+            {selection.type === "place" ? "Free placement" : "Movement cost · 1 AP"}
+          </strong>
         </p>
 
         <div class="noir-movement-slip-controls">

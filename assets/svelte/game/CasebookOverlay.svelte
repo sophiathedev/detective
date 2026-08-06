@@ -1,7 +1,10 @@
 <script>
+  import { onDestroy } from "svelte"
+
   let {
     open = false,
     title = "Casebook",
+    folioLabel = "Detective field folio",
     page = null,
     pages = [],
     onSelectPage = () => {},
@@ -11,12 +14,15 @@
 
   let returnFocus = null
   let closeButton = $state(null)
+  let dialog = $state(null)
   let wasOpen = false
 
   $effect(() => {
     if (open && !wasOpen && typeof document !== "undefined") {
       returnFocus = document.activeElement
       window.requestAnimationFrame(() => closeButton?.focus({ preventScroll: true }))
+    } else if (!open && wasOpen) {
+      restoreOpeningFocus()
     }
 
     wasOpen = open
@@ -38,12 +44,46 @@
   }
 
   function handleKeydown(event) {
-    if (!open || event.key !== "Escape") return
+    if (!open) return
+
+    if (event.key === "Tab") {
+      const controls = [
+        ...(dialog?.querySelectorAll(
+          "button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex='0']",
+        ) ?? []),
+      ]
+
+      if (controls.length === 0) {
+        event.preventDefault()
+        dialog?.focus({ preventScroll: true })
+        return
+      }
+
+      const first = controls[0]
+      const last = controls[controls.length - 1]
+      const focusOutside = !dialog?.contains(document.activeElement)
+
+      if (event.shiftKey && (focusOutside || document.activeElement === first)) {
+        event.preventDefault()
+        last.focus({ preventScroll: true })
+      } else if (!event.shiftKey && (focusOutside || document.activeElement === last)) {
+        event.preventDefault()
+        first.focus({ preventScroll: true })
+      }
+
+      return
+    }
+
+    if (event.key !== "Escape") return
 
     event.preventDefault()
     event.stopPropagation()
     requestClose()
   }
+
+  onDestroy(() => {
+    if (open) restoreOpeningFocus()
+  })
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -52,14 +92,16 @@
   <div id="casebook-overlay" class="noir-casebook-backdrop">
     <div
       id="casebook-dialog"
+      bind:this={dialog}
       class="noir-casebook-dialog noir-paper-sheet"
       role="dialog"
       aria-modal="true"
       aria-labelledby="casebook-overlay-title"
+      tabindex="-1"
     >
       <header class="noir-casebook-header">
         <div>
-          <p>Detective field folio</p>
+          <p>{folioLabel}</p>
           <h2 id="casebook-overlay-title">{title}</h2>
         </div>
         <button

@@ -105,6 +105,9 @@
   let drawerTitle = $derived(
     drawerPages.find((page) => page.id === drawerPage)?.label ?? "Casebook",
   )
+  let drawerFolioLabel = $derived(
+    privateState.role === "chisel" ? "Chisel private casebook" : "Detective field folio",
+  )
   let projectionsSynchronized = $derived(
     publicProjectionReady &&
       privateProjectionReady &&
@@ -701,9 +704,10 @@
     sendCommand(mapSelection.type, { location_id: mapSelection.location.id })
   }
 
-  function cancelMapMovement() {
+  function cancelMapMovement(selection) {
     if (commandPending) return
     mapSelection = null
+    if (selection?.type === activeAction) activeAction = null
   }
 
   function mapErrorInvalidatesSelection(code) {
@@ -1388,6 +1392,7 @@
     {#snippet detectiveRail()}
       <DetectiveRail
         players={publicState.players}
+        locations={publicState.locations}
         currentDetectiveId={publicState.current_detective_id}
         ownPlayerId={privateState.role === "detective" ? ownPlayer?.id ?? null : null}
         privateResources={privateState.role === "detective"
@@ -1493,6 +1498,7 @@
       <CasebookOverlay
         open={drawerOpen}
         title={drawerTitle}
+        folioLabel={drawerFolioLabel}
         page={drawerPage}
         pages={drawerPages}
         onSelectPage={(page) => (drawerPage = page)}

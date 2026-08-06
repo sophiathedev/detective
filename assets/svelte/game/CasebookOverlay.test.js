@@ -13,6 +13,7 @@ describe("CasebookOverlay", () => {
     render(CasebookOverlay, {
       open: true,
       title: "Evidence",
+      folioLabel: "Chisel private casebook",
       page: "evidence",
       pages: [{ id: "evidence", label: "Evidence" }],
       onSelectPage: vi.fn(),
@@ -21,6 +22,7 @@ describe("CasebookOverlay", () => {
     })
 
     expect(screen.getByRole("dialog", { name: "Evidence" })).toBeInTheDocument()
+    expect(screen.getByText("Chisel private casebook")).toBeInTheDocument()
     expect(screen.getByText("Private evidence")).toBeInTheDocument()
     await fireEvent.keyDown(window, { key: "Escape" })
     expect(onClose).toHaveBeenCalledTimes(1)
@@ -65,6 +67,27 @@ describe("CasebookOverlay", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Close casebook" }))
     await waitFor(() => expect(opener).toHaveFocus())
     opener.remove()
+  })
+
+  it("keeps keyboard focus inside the open folio", async () => {
+    render(CasebookOverlay, {
+      open: true,
+      title: "Evidence",
+      page: "evidence",
+      pages: [{ id: "evidence", label: "Evidence" }],
+      onSelectPage: vi.fn(),
+      onClose: vi.fn(),
+      children: content,
+    })
+
+    const outside = document.createElement("button")
+    outside.textContent = "Underlying map control"
+    document.body.append(outside)
+    outside.focus()
+
+    await fireEvent.keyDown(window, { key: "Tab" })
+    expect(screen.getByRole("button", { name: "Close casebook" })).toHaveFocus()
+    outside.remove()
   })
 
   it("leaves no hidden dialog when closed", () => {

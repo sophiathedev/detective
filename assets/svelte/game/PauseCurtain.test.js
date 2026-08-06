@@ -9,7 +9,7 @@ describe("PauseCurtain", () => {
 
     render(PauseCurtain, {
       active: true,
-      reason: "Detective disconnected",
+      reason: "player_disconnected",
       offlinePlayers: [{ id: "d1", display_name: "Marlowe" }],
       canResume: true,
       commandPending: false,
@@ -18,6 +18,10 @@ describe("PauseCurtain", () => {
     })
 
     expect(screen.getByRole("dialog", { name: "Case paused" })).toHaveTextContent("Marlowe")
+    expect(screen.getByRole("dialog", { name: "Case paused" })).toHaveTextContent(
+      "left the table",
+    )
+    expect(screen.queryByText("player_disconnected")).not.toBeInTheDocument()
     await fireEvent.click(screen.getByRole("button", { name: "Resume game" }))
     expect(onResume).toHaveBeenCalledTimes(1)
   })
@@ -33,7 +37,7 @@ describe("PauseCurtain", () => {
       onResume: vi.fn(),
     })
 
-    expect(screen.getByText(/waiting for the Chisel/i)).toBeInTheDocument()
+    expect(screen.getByText(/Chisel will reopen the case/i)).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Resume game" })).not.toBeInTheDocument()
   })
 

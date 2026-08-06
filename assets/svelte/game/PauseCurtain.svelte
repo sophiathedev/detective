@@ -50,6 +50,21 @@
     }
   }
 
+  function pauseDescription(pauseReason, absentPlayers) {
+    if (pauseReason === "player_disconnected") {
+      if (absentPlayers.length === 0) {
+        return "Everyone is back at the table. The Chisel may reopen the case."
+      }
+
+      const names = absentPlayers.map((player) => player.display_name).join(", ")
+      return `${names} left the table. The case stays sealed until they return.`
+    }
+
+    if (typeof pauseReason === "string" && !pauseReason.includes("_")) return pauseReason
+
+    return "Play is paused while the table reconnects."
+  }
+
   $effect(() => {
     if (active && !wasActive && typeof document !== "undefined") {
       returnFocus = document.activeElement
@@ -89,7 +104,7 @@
         Case paused
       </h2>
       <p id="game-pause-description" class="mt-3 font-serif text-base italic leading-7">
-        {reason ?? "Waiting for every investigator to return."}
+        {pauseDescription(reason, offlinePlayers)}
       </p>
 
       <div class="game-pause-ledger">
@@ -106,7 +121,7 @@
       </ul>
 
       <p class="game-pause-provenance">
-        Presence reports connection only. Membership, role, and resume authority remain server-owned.
+        No clues, actions, or Day advances are filed while the case is sealed.
       </p>
 
       {#if commandError}
@@ -123,7 +138,7 @@
           onclick={onResume}
         >{commandPending ? "Reopening case…" : "Resume game"}</button>
       {:else}
-        <p class="noir-pause-waiting">Waiting for the Chisel to reopen the case.</p>
+        <p class="noir-pause-waiting">The Chisel will reopen the case when every player is back.</p>
       {/if}
     </div>
   </div>

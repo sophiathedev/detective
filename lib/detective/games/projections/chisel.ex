@@ -16,6 +16,7 @@ defmodule Detective.Games.Projections.Chisel do
           casebook: %{
             briefing: state.case_definition["briefing"],
             solution: state.case_definition["solution"],
+            suspects: state.case_definition["suspects"] || [],
             response_matrix: state.case_definition["response_matrix"],
             search_results: state.case_definition["search_results"],
             case_cards: state.case_definition["case_cards"],

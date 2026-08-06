@@ -11,6 +11,7 @@ const selection = {
 describe("ContextStack", () => {
   it("previews without confirming until the physical control is clicked", async () => {
     const onConfirmMove = vi.fn()
+    const onCancelMove = vi.fn()
 
     render(ContextStack, {
       selection,
@@ -20,13 +21,16 @@ describe("ContextStack", () => {
       commandStatus: false,
       connectionOnline: true,
       onConfirmMove,
-      onCancelMove: vi.fn(),
+      onCancelMove,
     })
 
     expect(onConfirmMove).not.toHaveBeenCalled()
     expect(screen.getByText("Bradbury Building")).toBeInTheDocument()
+    expect(document.querySelector("#movement-slip")).toHaveTextContent("Movement cost · 1 AP")
     await fireEvent.click(screen.getByRole("button", { name: "Confirm Move" }))
+    await fireEvent.click(screen.getByRole("button", { name: "Cancel Move" }))
     expect(onConfirmMove).toHaveBeenCalledWith(selection)
+    expect(onCancelMove).toHaveBeenCalledWith(selection)
   })
 
   it("announces stale sync as status rather than an alert", () => {

@@ -432,7 +432,16 @@ describe("CasebookWorkspace", () => {
         selectedResponseId: null,
         casebook: {
           briefing: "Private briefing",
-          solution: { suspect_id: "s1" },
+          solution: {
+            suspect_id: "s1",
+            weapon_id: "piano-wire",
+            motive_id: "blackmail",
+          },
+          suspects: [{ id: "s1", name: "Iona Pike" }],
+          accusation_options: {
+            weapons: [{ id: "piano-wire", label: "Piano Wire" }],
+            motives: [{ id: "blackmail", label: "Blackmail" }],
+          },
           special_rules: [
             {
               id: "hidden-arrival",
@@ -448,7 +457,10 @@ describe("CasebookWorkspace", () => {
     render(CasebookWorkspace, { page: "chisel", view: chiselView, actions: noActions })
 
     expect(document.querySelector("#chisel-casebook-page")).toHaveTextContent("Private briefing")
-    expect(document.querySelector("#chisel-casebook-page")).toHaveTextContent("s1")
+    expect(document.querySelector("#chisel-casebook-page")).toHaveTextContent("Iona Pike")
+    expect(document.querySelector("#chisel-casebook-page")).toHaveTextContent("Piano Wire")
+    expect(document.querySelector("#chisel-casebook-page")).toHaveTextContent("Blackmail")
+    expect(document.querySelector("#chisel-casebook-page")).not.toHaveTextContent("piano-wire")
     expect(document.querySelector("#chisel-special-rule-hidden-arrival")).toHaveTextContent(
       "Reveal a witness on Day 2.",
     )
