@@ -22,6 +22,7 @@ defmodule Detective.Games.Projections.Public do
           else: nil
         ),
       current_detective_id: state.current_detective_id,
+      briefing: state.case_definition["briefing"],
       players: public_players(state),
       locations: public_locations(state),
       suspects: public_suspects(state),

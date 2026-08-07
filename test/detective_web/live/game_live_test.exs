@@ -34,6 +34,41 @@ defmodule DetectiveWeb.GameLiveTest do
     assert has_element?(view, "#game-book-frontend")
   end
 
+  test "finished member reopens the graphical verdict from the archive", %{conn: conn} do
+    %{detective: detective, game: game} = active_game()
+    {:ok, session_pid} = SessionSupervisor.ensure_session(game.id)
+
+    :sys.replace_state(session_pid, fn state ->
+      detective_player = State.player_by_user_id(state, detective.id)
+
+      %{
+        state
+        | status: :finished,
+          phase: :finished,
+          current_detective_id: nil,
+          winner: %{
+            "role" => "detective",
+            "player_id" => detective_player.id,
+            "reason" => "case_solved"
+          }
+      }
+    end)
+
+    assert {:ok, view, _html} =
+             conn
+             |> log_in_user(detective)
+             |> live(~p"/games/#{game.id}")
+
+    component = get_svelte(view, id: "game-book-frontend")
+    public = component.props["initial_public"]
+
+    assert public["status"] == "finished"
+    assert public["result"]["solution"]["suspect_name"] == "Night Clerk"
+
+    assert public["result"]["winner"]["player_id"] ==
+             State.player_by_user_id(:sys.get_state(session_pid), detective.id).id
+  end
+
   test "detective frontend receives only its allow-listed private projection", %{conn: conn} do
     %{detective: detective, game: game} = active_game()
 

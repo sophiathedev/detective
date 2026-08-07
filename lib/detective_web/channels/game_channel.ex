@@ -18,6 +18,7 @@ defmodule DetectiveWeb.GameChannel do
           case projection.public.status do
             "active" -> :active
             "paused" -> :paused
+            "finished" -> :finished
           end
 
         socket =
@@ -37,6 +38,10 @@ defmodule DetectiveWeb.GameChannel do
   end
 
   @impl true
+  def handle_info(:after_join, %{assigns: %{game_status: :finished}} = socket) do
+    {:noreply, socket}
+  end
+
   def handle_info(:after_join, socket) do
     {:ok, _pid} =
       ConnectionMonitor.ensure_monitor(

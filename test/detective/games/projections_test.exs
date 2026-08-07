@@ -15,6 +15,9 @@ defmodule Detective.Games.ProjectionsTest do
     public_json = Jason.encode!(public)
     detective_json = Jason.encode!(detective)
 
+    assert public.briefing == "Case briefing"
+    assert detective.public.briefing == "Case briefing"
+
     for forbidden <- [
           "solution",
           "response_matrix",
@@ -669,7 +672,7 @@ defmodule Detective.Games.ProjectionsTest do
         }
       },
       case_definition: %{
-        "briefing" => "Private briefing",
+        "briefing" => "Case briefing",
         "solution" => %{"suspect_id" => "murderer"},
         "case_cards" => [
           %{

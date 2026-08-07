@@ -625,9 +625,18 @@ defmodule Detective.Games.RuntimeTest do
     assert restored.status == :finished
     assert restored.phase == :finished
     assert restored.winner["player_id"] == State.player_by_user_id(restored, detective.id).id
+
+    assert {:ok, %{public: public_result}} =
+             Games.game_projection(Scope.for_user(detective), game.id)
+
+    assert public_result.status == "finished"
+    assert public_result.result.winner["player_id"] == restored.winner["player_id"]
+    assert public_result.result.solution["suspect_name"] == "Night Clerk"
+    assert public_result.result.solution["weapon_label"] == "Sealed Ledger"
+    assert public_result.result.solution["motive_label"] == "Cover up the altered register"
   end
 
-  test "game projection fails closed when the authoritative session is terminal" do
+  test "finished game projection remains available to a member" do
     %{host: host, game: game, version: version} = ready_game()
 
     assert {:ok, _result} =
@@ -641,11 +650,21 @@ defmodule Detective.Games.RuntimeTest do
     {:ok, session_pid} = SessionSupervisor.ensure_session(game.id)
 
     :sys.replace_state(session_pid, fn state ->
-      %{state | status: :finished, phase: :finished}
+      %{
+        state
+        | status: :finished,
+          phase: :finished,
+          winner: %{"role" => "chisel", "reason" => "time_expired"}
+      }
     end)
 
-    assert {:error, :game_not_active} =
+    assert {:ok, %{public: public_result, private: private_result}} =
              Games.game_projection(Scope.for_user(host), game.id)
+
+    assert public_result.status == "finished"
+    assert public_result.result.winner == %{"role" => "chisel", "reason" => "time_expired"}
+    assert public_result.result.solution["suspect_name"] == "Night Clerk"
+    assert private_result.role == "chisel"
   end
 
   test "game projection authorizes membership with one database query" do

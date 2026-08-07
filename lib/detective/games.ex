@@ -626,7 +626,10 @@ defmodule Detective.Games do
   defp validate_version(%Game{current_version: version}, version), do: :ok
   defp validate_version(%Game{}, _expected_version), do: {:error, :stale_version}
 
-  defp validate_playable_state(%State{status: status}) when status in [:active, :paused], do: :ok
+  defp validate_playable_state(%State{status: status})
+       when status in [:active, :paused, :finished],
+       do: :ok
+
   defp validate_playable_state(%State{}), do: {:error, :game_not_active}
 
   defp cast_game_id(game_id) do

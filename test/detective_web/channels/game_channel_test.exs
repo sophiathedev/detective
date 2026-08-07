@@ -109,6 +109,41 @@ defmodule DetectiveWeb.GameChannelTest do
              })
   end
 
+  test "member reopens a finished case with the public solution but no private leak", context do
+    {:ok, session_pid} = SessionSupervisor.ensure_session(context.game.id)
+
+    :sys.replace_state(session_pid, fn state ->
+      %{
+        state
+        | status: :finished,
+          phase: :finished,
+          winner: %{"role" => "chisel", "reason" => "time_expired"}
+      }
+    end)
+
+    socket = authenticated_socket(context.detective)
+
+    assert {:ok, %{state: public_state}, game_socket} =
+             subscribe_and_join(socket, "game:#{context.game.id}", %{})
+
+    assert public_state.status == "finished"
+    assert public_state.result.winner == %{"role" => "chisel", "reason" => "time_expired"}
+    assert public_state.result.solution["suspect_name"] == "Night Clerk"
+
+    assert {:ok, private_reply, _user_socket} =
+             subscribe_and_join(
+               socket,
+               "user:#{context.detective.id}:game:#{context.game.id}",
+               %{"game_id" => context.game.id}
+             )
+
+    refute Jason.encode!(private_reply.state) =~ "solution"
+
+    _channel_state = :sys.get_state(game_socket.channel_pid)
+
+    assert Registry.lookup(Detective.GameRegistry, {:connection_monitor, context.game.id}) == []
+  end
+
   test "private broadcasts are isolated by game topic", context do
     socket = authenticated_socket(context.detective)
     topic = "user:#{context.detective.id}:game:#{context.game.id}"
@@ -593,6 +628,24 @@ defmodule DetectiveWeb.GameChannelTest do
                  "game_id" => context.game.id
                }
              )
+
+    assert {:ok, _host_reply, _host_game_socket} =
+             context.host
+             |> authenticated_socket()
+             |> subscribe_and_join("game:#{context.game.id}", %{})
+
+    assert {:ok, _second_reply, _second_game_socket} =
+             context.second_detective
+             |> authenticated_socket()
+             |> subscribe_and_join("game:#{context.game.id}", %{})
+
+    detective_id = player_id_for_user(context.game.id, context.detective.id)
+    host_id = player_id_for_role(context.lobby.players, "chisel")
+    second_detective_id = player_id_for_user(context.game.id, context.second_detective.id)
+
+    await_presence_count(context.game.id, detective_id, &(&1 == 1))
+    await_presence_count(context.game.id, host_id, &(&1 == 1))
+    await_presence_count(context.game.id, second_detective_id, &(&1 == 1))
 
     place_ref =
       push(game_socket, "command", %{
