@@ -37,6 +37,9 @@ const noActions = {
 const baseView = {
   role: "detective",
   phase: "detective_turn",
+  briefing: "A singer vanished after the midnight show.",
+  day: 2,
+  daysRemaining: 6,
   result: null,
   activeDetective: { id: "d1", display_name: "Marlowe" },
   ownPlayer: { id: "d1", actions_remaining: 3 },
@@ -94,6 +97,84 @@ const baseView = {
 }
 
 describe("CasebookWorkspace", () => {
+  it("keeps the public case briefing and active directives readable", () => {
+    const view = {
+      ...baseView,
+      specialRules: [
+        {
+          id: "station-tail",
+          title: "Station Tail",
+          text: "Counter-surveillance blocks a search until the tail is handled.",
+          triggered: true,
+        },
+      ],
+    }
+
+    render(CasebookWorkspace, { page: "briefing", view, actions: noActions })
+
+    expect(document.querySelector("#case-public-briefing")).toHaveTextContent(
+      "A singer vanished after the midnight show.",
+    )
+    expect(document.querySelector("#case-file-rule-station-tail")).toHaveTextContent(
+      "Counter-surveillance blocks a search",
+    )
+    expect(document.querySelector("#case-file-reference")).toHaveTextContent("6")
+  })
+
+  it("renders a standing rulebook without exposing case secrets", () => {
+    render(CasebookWorkspace, { page: "rules", view: baseView, actions: noActions })
+
+    expect(document.querySelector("#rulebook-reference")).toHaveTextContent("Four actions")
+    expect(document.querySelector("#rulebook-interrogation")).toHaveTextContent(
+      "Accept, challenge, or spend leverage",
+    )
+    expect(document.querySelector("#rulebook-close-case")).toHaveTextContent("Solve token")
+    expect(document.querySelector("#rulebook-reference")).not.toHaveTextContent(
+      "most useful response id",
+    )
+  })
+
+  it("releases the full server verdict only on the finished result page", () => {
+    const view = {
+      ...baseView,
+      detectives: [{ id: "d1", display_name: "Marlowe" }],
+      result: {
+        winner: { role: "detective", player_id: "d1", reason: "case_solved" },
+        solution: {
+          suspect_name: "Iona Pike",
+          weapon_label: "Piano Wire",
+          motive_label: "Blackmail",
+        },
+        epilogue: "The city finally heard the whole recording.",
+      },
+    }
+
+    render(CasebookWorkspace, { page: "result", view, actions: noActions })
+
+    expect(document.querySelector("#case-closed-result")).toHaveTextContent(
+      "Marlowe broke the case",
+    )
+    expect(document.querySelector("#released-solution")).toHaveTextContent("Iona Pike")
+    expect(document.querySelector("#released-solution")).toHaveTextContent("Piano Wire")
+    expect(document.querySelector("#released-solution")).toHaveTextContent("Blackmail")
+    expect(document.querySelector("#case-result-dashboard-link")).toHaveAttribute(
+      "href",
+      "/dashboard",
+    )
+  })
+
+  it("fails visibly when a terminal case has no releasable solution sheet", () => {
+    const view = {
+      ...baseView,
+      result: { winner: { role: "chisel", reason: "time_expired" } },
+    }
+
+    render(CasebookWorkspace, { page: "result", view, actions: noActions })
+
+    expect(document.querySelector("#solution-release-error")).toBeInTheDocument()
+    expect(document.querySelector("#released-solution")).not.toBeInTheDocument()
+  })
+
   it("selects an interrogation subject directly from the Question folio", async () => {
     const selectSuspect = vi.fn()
     const view = {
@@ -431,7 +512,7 @@ describe("CasebookWorkspace", () => {
         pendingInterrogation: null,
         selectedResponseId: null,
         casebook: {
-          briefing: "Private briefing",
+          briefing: "Case briefing",
           solution: {
             suspect_id: "s1",
             weapon_id: "piano-wire",
@@ -456,7 +537,7 @@ describe("CasebookWorkspace", () => {
 
     render(CasebookWorkspace, { page: "chisel", view: chiselView, actions: noActions })
 
-    expect(document.querySelector("#chisel-casebook-page")).toHaveTextContent("Private briefing")
+    expect(document.querySelector("#chisel-casebook-page")).toHaveTextContent("Case briefing")
     expect(document.querySelector("#chisel-casebook-page")).toHaveTextContent("Iona Pike")
     expect(document.querySelector("#chisel-casebook-page")).toHaveTextContent("Piano Wire")
     expect(document.querySelector("#chisel-casebook-page")).toHaveTextContent("Blackmail")

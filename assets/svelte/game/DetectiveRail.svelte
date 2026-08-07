@@ -12,6 +12,7 @@
     locations = [],
     onlinePlayerIds = [],
     connectionSnapshotReceived = false,
+    archived = false,
     disconnectLabel = () => "OFFLINE",
   } = $props()
 
@@ -22,6 +23,7 @@
   )
 
   function connectionLabel(playerId) {
+    if (archived) return t("ARCHIVED")
     if (!connectionSnapshotReceived) return t("SYNCING")
     if (onlinePlayerIds.includes(playerId)) return t("ONLINE")
 
@@ -85,7 +87,7 @@
               <span
                 class:noir-connection-online={online(detective.id)}
                 class="noir-connection-label"
-                role={connectionSnapshotReceived && !online(detective.id) ? "timer" : undefined}
+                role={!archived && connectionSnapshotReceived && !online(detective.id) ? "timer" : undefined}
               >{connectionLabel(detective.id)}</span>
             </div>
 

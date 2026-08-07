@@ -289,6 +289,9 @@ const vi = {
   Question: "Thẩm vấn",
   Evidence: "Vật chứng",
   Casebook: "Sổ án",
+  "Case file": "Hồ sơ vụ án",
+  Rules: "Luật điều tra",
+  Verdict: "Kết án",
   Bribes: "Hối lộ",
   Accusation: "Cáo buộc",
   History: "Lịch sử",
@@ -526,12 +529,92 @@ const vi = {
   "Pay and inspect": "Trả tiền và xem hồ sơ",
   "Review bribe": "Duyệt vụ hối lộ",
   "Bribe records are private to each Detective.": "Sổ hối lộ của mỗi Thám tử là tài liệu mật.",
+  "Standing orders · Los Angeles detail": "Thường lệnh · Đội trọng án Los Angeles",
+  "Field rulebook": "Cẩm nang điều tra hiện trường",
+  "Chisel copy": "Bản dành cho Chisel",
+  "Detective copy": "Bản dành cho Thám tử",
+  "Identify the suspect, weapon, and motive before the Day track expires. The server is the final authority for every cost, legal move, response, and verdict.":
+    "Xác định đúng nghi phạm, hung khí và động cơ trước khi lịch điều tra cạn ngày. Máy chủ là thẩm quyền cuối cùng đối với mọi chi phí, đường đi, lời khai và phán quyết.",
+  "01 · Your turn": "01 · Lượt điều tra",
+  "Four actions, one lead": "Bốn hành động, một đường dây",
+  "A Detective receives 4 AP at the start of their turn. Initial placement at a highlighted Police Station is free.":
+    "Mỗi Thám tử nhận 4 Hành động khi bắt đầu lượt. Việc xuất phát tại một Sở cảnh sát được đánh dấu không tốn Hành động.",
+  "Move · 1 AP": "Di chuyển · 1 Hành động",
+  "Click a highlighted location on the map. You may reach any location sharing a district; border locations connect districts for a later move.":
+    "Nhấp một địa điểm được đánh dấu trên bản đồ. Có thể tới bất kỳ nơi nào cùng khu vực; địa điểm giáp ranh nối các khu vực cho lần di chuyển sau.",
+  "Search · 1 AP": "Khám xét · 1 Hành động",
+  "Search your location or a co-located suspect. A filed Search lead cannot be searched again.":
+    "Khám xét địa điểm hiện tại hoặc nghi phạm đang ở cùng chỗ. Đầu mối đã lập biên bản không thể bị khám lại.",
+  "Question · 1 AP": "Thẩm vấn · 1 Hành động",
+  "Question a suspect at your location about a discovered Case topic. A free follow-up must be resolved or declined immediately.":
+    "Thẩm vấn nghi phạm tại cùng địa điểm về một chủ đề hồ sơ đã phát hiện. Lượt hỏi miễn phí phải được tiến hành hoặc từ chối ngay.",
+  "Analyze · 1 AP": "Phân tích · 1 Hành động",
+  "Trade one action for $1 Scratch when the street has gone cold.":
+    "Đổi một Hành động lấy $1 tiền mặt khi đầu mối ngoài đường đã nguội lạnh.",
+  "02 · ARC interrogation": "02 · Thẩm vấn ARC",
+  "Accept, challenge, or spend leverage": "Chấp nhận, lật lời khai hoặc tung điểm yếu",
+  "The Chisel may allow the question or spend leverage to send a goon. The asking Detective may abandon it or pay $2 to continue.":
+    "Chisel có thể cho phép câu hỏi hoặc tiêu điểm yếu để sai tay chân cản trở. Thám tử đặt câu hỏi có thể bỏ cuộc hoặc chi $2 để tiếp tục.",
+  "The Chisel selects one server-authorized response. Detective leverage forces the most useful available statement.":
+    "Chisel chọn một lời đáp được máy chủ cho phép. Điểm yếu do Thám tử tung ra buộc phải dùng lời khai hữu ích nhất hiện có.",
+  "The asking Detective accepts the statement or stakes one leverage marker to challenge it. The server resolves truth, reward, and penalty.":
+    "Thám tử đặt câu hỏi chấp nhận lời khai hoặc cược một dấu điểm yếu để lật lời. Máy chủ phân xử thật giả, phần thưởng và hình phạt.",
+  "Challenge outcome": "Kết quả lật lời khai",
+  "A successful challenge corrects the record. A failed challenge transfers the staked leverage to the Chisel. No client decides the result.":
+    "Lật lời thành công sẽ đính chính biên bản. Thất bại chuyển dấu điểm yếu đã cược cho Chisel. Không trình duyệt nào được tự quyết kết quả.",
+  "03 · Street economy": "03 · Luật tiền ngoài phố",
+  "Scratch opens sealed doors": "Tiền mặt mở được cửa niêm phong",
+  "Kickback · 1 AP": "Tiền chia chác · 1 Hành động",
+  "At a Mob Joint, collect the table payout once per Day.":
+    "Tại hang ổ băng đảng, nhận khoản chia chác của cả bàn một lần mỗi Ngày.",
+  "Detective bribe · $2": "Mua tin Thám tử · $2",
+  "At the same location, pay to inspect one unknown Case card another Detective knows. Bribes cost no AP.":
+    "Khi ở cùng địa điểm, trả tiền để xem một thẻ Hồ sơ chưa biết mà Thám tử khác nắm. Hối lộ không tốn Hành động.",
+  "Officer bribe · $3": "Mua chuộc cảnh sát · $3",
+  "At a Police Station, pay the desk officer to inspect an eligible unknown Case card. Bribes cost no AP.":
+    "Tại Sở cảnh sát, trả tiền trực ban để xem một thẻ Hồ sơ chưa biết hợp lệ. Hối lộ không tốn Hành động.",
+  "04 · Close the case": "04 · Khép chuyên án",
+  "Commit to the whole theory": "Đặt cược vào toàn bộ giả thuyết",
+  "Use your single Solve token only at the beginning of your turn, before spending any AP. Name one suspect, one known weapon, and one motive.":
+    "Chỉ được dùng thẻ Phá án duy nhất ở đầu lượt, trước khi tiêu bất kỳ Hành động nào. Chỉ ra một nghi phạm, một hung khí đã biết và một động cơ.",
+  "A correct Solve closes the case immediately. If time expires, every Detective files one private final guess; the solution is revealed only after all envelopes are in.":
+    "Phá án đúng sẽ khép hồ sơ ngay. Nếu hết thời gian, mỗi Thám tử nộp một kết luận mật; chân tướng chỉ được công bố sau khi đủ mọi phong bì.",
+  "Case directives outrank this guide.": "Chỉ thị riêng của vụ án có quyền ưu tiên.",
+  "Special actors, counter-surveillance, and triggered rules appear in the Case File when the server authorizes them.":
+    "Nhân vật đặc biệt, hoạt động phản trinh sát và điều khoản kích hoạt sẽ xuất hiện trong Hồ sơ vụ án khi máy chủ cho phép.",
+  "OPEN FILE": "HỒ SƠ MỞ",
+  "Case intake · public copy": "Tiếp nhận chuyên án · bản công khai",
+  "Briefing for the investigation": "Tóm lược chuyên án",
+  "No public briefing was filed for this case.": "Vụ án này chưa có bản tóm lược công khai.",
+  Day: "Ngày",
+  "Days left": "Ngày còn lại",
+  "Your desk": "Ban phụ trách",
+  "Special rules on record": "Điều khoản đặc biệt trong hồ sơ",
+  "ON FILE": "ĐÃ LẬP HỒ SƠ",
+  "No public exception is currently on record. Follow the standing Field Rulebook.":
+    "Hiện chưa có ngoại lệ công khai nào. Tiếp tục tuân theo Cẩm nang điều tra hiện trường.",
   "Case closed": "Khép hồ sơ",
   "The sealed solution": "Chân tướng sau niêm phong",
   "Winner: {role}": "Bên thắng: {role}",
   Suspect: "Nghi phạm",
   Weapon: "Hung khí",
   Motive: "Động cơ",
+  "Case closed · solution released": "Khép hồ sơ · công bố chân tướng",
+  "The final verdict": "Phán quyết cuối cùng",
+  VERDICT: "PHÁN QUYẾT",
+  "{name} broke the case": "{name} đã phá án",
+  "A Detective": "Một Thám tử",
+  "The Chisel buried the truth": "Chisel đã chôn vùi chân tướng",
+  "Solved before the clock expired": "Phá án trước khi thời hạn khép lại",
+  "Solved by a sealed final guess": "Phá án bằng kết luận cuối niêm phong",
+  "The Day track expired": "Lịch điều tra đã cạn ngày",
+  "The verdict was recorded, but this case version has no releasable solution sheet.":
+    "Phán quyết đã được ghi nhận nhưng phiên bản vụ án này không có phiếu đáp án có thể công bố.",
+  "Closing report": "Biên bản khép án",
+  Epilogue: "Hậu truyện",
+  "This solution comes from the server-owned case version and is now public to every member of this finished game.":
+    "Đáp án này lấy từ phiên bản vụ án do máy chủ nắm giữ và nay được công khai cho mọi thành viên của ván đã kết thúc.",
+  "Return to case cabinet": "Trở về tủ hồ sơ",
   "Sealed deduction": "Suy luận niêm phong",
   "Suspect, weapon, motive": "Nghi phạm, hung khí, động cơ",
   "final guess": "kết luận cuối",
@@ -540,6 +623,7 @@ const vi = {
   "{current} / {total} filed": "Đã nộp {current} / {total}",
   FILED: "ĐÃ NỘP",
   PENDING: "ĐANG CHỜ",
+  ARCHIVED: "ĐÃ LƯU TRỮ",
   "{count} of 3 elements were correct. The token is spent; your turn continues.":
     "Có {count}/3 yếu tố chính xác. Thẻ Phá án đã dùng; lượt của bạn tiếp tục.",
   "Your final guess is sealed. Waiting for the remaining Detectives.":

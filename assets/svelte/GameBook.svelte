@@ -27,12 +27,13 @@
 
   const initialPublic = () => initial_public
   const initialPrivate = () => initial_private
+  const initiallyFinished = initialPublic().status === "finished"
 
   let publicState = $state(initialPublic())
   let privateState = $state(initialPrivate())
   let connectionState = $state("connecting")
-  let drawerOpen = $state(false)
-  let drawerPage = $state(initialPrivate().role === "chisel" ? "chisel" : "search")
+  let drawerOpen = $state(initiallyFinished)
+  let drawerPage = $state(initiallyFinished ? "result" : "briefing")
   let activeAction = $state(null)
   let mapSelection = $state(null)
   let mapFieldSelectionPlayerId = $state(null)
@@ -72,7 +73,11 @@
   const seenPublicEventIds = new Set()
   const seenPrivateEventIds = new Set()
 
-  const detectiveDrawerPages = [
+  const referenceDrawerPages = [
+    { id: "briefing", label: t("Case file") },
+    { id: "rules", label: t("Rules") },
+  ]
+  const detectiveActionPages = [
     { id: "search", label: t("Search") },
     { id: "question", label: t("Question") },
     { id: "evidence", label: t("Evidence") },
@@ -80,7 +85,7 @@
     { id: "accusation", label: t("Accusation") },
     { id: "history", label: t("History") },
   ]
-  const chiselDrawerPages = [
+  const chiselActionPages = [
     { id: "question", label: t("Response") },
     { id: "chisel", label: t("Private case") },
     { id: "history", label: t("History") },
@@ -107,9 +112,11 @@
   let availableFieldActionTypes = $derived(
     fieldActionTypes.filter((action) => availableActions.has(action)),
   )
-  let drawerPages = $derived(
-    privateState.role === "chisel" ? chiselDrawerPages : detectiveDrawerPages,
-  )
+  let drawerPages = $derived([
+    ...(publicState.result ? [{ id: "result", label: t("Verdict") }] : []),
+    ...referenceDrawerPages,
+    ...(privateState.role === "chisel" ? chiselActionPages : detectiveActionPages),
+  ])
   let drawerTitle = $derived(
     drawerPages.find((page) => page.id === drawerPage)?.label ?? t("Casebook"),
   )
@@ -239,7 +246,9 @@
     Boolean(chisel && connectionSnapshotReceived && onlinePlayerIds.includes(chisel.id)),
   )
   let chiselConnectionLabel = $derived(
-    !chisel
+    publicState.status === "finished"
+      ? "ARCHIVED"
+      : !chisel
       ? "UNASSIGNED"
       : !connectionSnapshotReceived
         ? "SYNCING"
@@ -281,6 +290,9 @@
   let casebookView = $derived.by(() => ({
     role: privateState.role,
     phase: publicState.phase,
+    briefing: publicState.briefing,
+    day: publicState.day,
+    daysRemaining: publicState.days_remaining,
     result: publicState.result,
     specialRules: publicState.special_rules ?? [],
     detectives,
@@ -391,6 +403,8 @@
   function applyPublic(nextState) {
     if (nextState.version < publicState.version) return
 
+    const caseJustFinished = publicState.status !== "finished" && nextState.status === "finished"
+
     const nextOwnPlayer = nextState.players.find(
       (player) => player.id === privateState.player_id,
     )
@@ -430,6 +444,8 @@
     publicState = nextState
     publicProjectionVersion = nextState.version
     publicProjectionReady = true
+
+    if (caseJustFinished && nextState.result) openDrawer("result")
   }
 
   function applyPrivate(nextState, version) {
@@ -996,7 +1012,7 @@
   }
 
   function openCasebook() {
-    openDrawer(drawerPages[0]?.id ?? "history")
+    openDrawer(publicState.result ? "result" : "briefing")
   }
 
   function submitInterrogation() {
@@ -1304,9 +1320,11 @@
     gameChannel.on("final_guess_submitted", (message) =>
       recordAccusationEvent(message, "A sealed final guess entered the casefile."),
     )
-    gameChannel.on("game_finished", (message) =>
-      recordAccusationEvent(message, "The case is closed and the solution is public."),
-    )
+    gameChannel.on("game_finished", (message) => {
+      if (recordPublicEvent(message, "The case is closed and the solution is public.")) {
+        openDrawer("result")
+      }
+    })
 
     userChannel.on("private_state", ({ game_id: eventGameId, state, version }) => {
       if (eventGameId === game_id) applyPrivate(state, version)
@@ -1365,6 +1383,7 @@
       .join()
       .receive("ok", ({ state }) => {
         applyPublic(state)
+        if (state.status === "finished") connectionState = "online"
         requestMissingProjectionSync()
       })
       .receive("error", () => invalidateConnectionSnapshot("unauthorized"))
@@ -1413,6 +1432,7 @@
           : null}
         {onlinePlayerIds}
         {connectionSnapshotReceived}
+        archived={publicState.status === "finished"}
         disconnectLabel={disconnectCountdown}
       />
     {/snippet}

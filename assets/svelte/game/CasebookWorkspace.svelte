@@ -1,6 +1,9 @@
 <script>
   import { tick } from "svelte"
   import { useI18n } from "../i18n"
+  import CaseClosedResult from "./CaseClosedResult.svelte"
+  import CaseFileReference from "./CaseFileReference.svelte"
+  import RulebookReference from "./RulebookReference.svelte"
 
   const { t } = useI18n()
 
@@ -143,7 +146,22 @@
   }
 </script>
 
-{#if page === "search"}
+{#if page === "result" && view.result}
+  <CaseClosedResult result={view.result} detectives={view.detectives ?? []} />
+
+{:else if page === "briefing"}
+  <CaseFileReference
+    briefing={view.briefing}
+    specialRules={view.specialRules ?? []}
+    day={view.day}
+    daysRemaining={view.daysRemaining}
+    role={view.role}
+  />
+
+{:else if page === "rules"}
+  <RulebookReference role={view.role} />
+
+{:else if page === "search"}
   <section id="casebook-action-page" class="casebook-workspace-page p-4 sm:p-5" aria-labelledby="casebook-search-heading">
     <div class="flex flex-wrap items-start justify-between gap-4 border-b border-[#a38b6e] pb-4">
       <div>
@@ -644,11 +662,7 @@
 
 {:else if page === "accusation"}
   {#if view.result}
-    <section id="case-closed-result" class="casebook-workspace-page border-2 border-[#71372f] bg-[#eadbbc] p-4 sm:p-5" aria-labelledby="case-result-heading">
-      <div class="flex flex-wrap items-start justify-between gap-4 border-b border-[#9d8669] pb-4"><div><p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">{t("Case closed")}</p><h3 id="case-result-heading" class="mt-1 font-serif text-2xl font-semibold">{t("The sealed solution")}</h3></div><p class="font-mono text-[10px] uppercase tracking-[0.12em] text-[#71372f]">{t("Winner: {role}", { role: t(view.result.winner.role) })}</p></div>
-      <dl class="mt-4 grid gap-3 sm:grid-cols-3"><div class="border-l-2 border-[#71372f] pl-3"><dt class="font-mono text-[9px] uppercase text-[#725e48]">{t("Suspect")}</dt><dd class="mt-1 font-serif text-base font-semibold">{view.result.solution.suspect_name}</dd></div><div class="border-l-2 border-[#71372f] pl-3"><dt class="font-mono text-[9px] uppercase text-[#725e48]">{t("Weapon")}</dt><dd class="mt-1 font-serif text-base font-semibold">{view.result.solution.weapon_label}</dd></div><div class="border-l-2 border-[#71372f] pl-3"><dt class="font-mono text-[9px] uppercase text-[#725e48]">{t("Motive")}</dt><dd class="mt-1 font-serif text-base font-semibold">{view.result.solution.motive_label}</dd></div></dl>
-      {#if view.result.epilogue}<p class="mt-4 max-w-3xl font-serif text-sm italic leading-6 text-[#4f3e30]">{view.result.epilogue}</p>{/if}
-    </section>
+    <CaseClosedResult result={view.result} detectives={view.detectives ?? []} />
   {:else if view.role === "detective" && (accusation.options?.motives?.length ?? 0) > 0 && (availableActions.has("accuse") || availableActions.has("submit_final_guess") || accusation.solveAttempt || accusation.finalGuess || view.phase === "accusation")}
     <section id="accusation-sheet" class="casebook-workspace-page border-2 border-[#71372f] bg-[#d7c6a6] p-4 sm:p-5" aria-labelledby="accusation-heading">
       <div class="flex flex-wrap items-start justify-between gap-3"><div><p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">{t("Sealed deduction")}</p><h3 id="accusation-heading" class="mt-1 font-serif text-xl font-semibold">{t("Suspect, weapon, motive")}</h3></div><span class="border border-[#8c3f33] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.1em] text-[#8c3f33]">{view.phase === "accusation" ? t("final guess") : t("solve token")}</span></div>
