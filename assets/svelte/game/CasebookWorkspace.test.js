@@ -145,6 +145,32 @@ describe("CasebookWorkspace", () => {
           weapon_label: "Piano Wire",
           motive_label: "Blackmail",
         },
+        investigation: {
+          days_elapsed: 4,
+          moves: 7,
+          searches: 5,
+          interrogations: 3,
+          challenges: 2,
+          successful_challenges: 1,
+          public_leads: 6,
+          evidence_taken: 1,
+        },
+        detectives: [
+          {
+            player_id: "d1",
+            display_name: "Marlowe",
+            seat: 1,
+            won: true,
+            solve_attempt: {
+              suspect_name: "Iona Pike",
+              weapon_label: "Piano Wire",
+              motive_label: "Blackmail",
+              correct_count: 3,
+            },
+            final_guess: null,
+            activity: { moves: 4, searches: 3, interrogations: 2, challenges: 1 },
+          },
+        ],
         epilogue: "The city finally heard the whole recording.",
       },
     }
@@ -157,6 +183,15 @@ describe("CasebookWorkspace", () => {
     expect(document.querySelector("#released-solution")).toHaveTextContent("Iona Pike")
     expect(document.querySelector("#released-solution")).toHaveTextContent("Piano Wire")
     expect(document.querySelector("#released-solution")).toHaveTextContent("Blackmail")
+    expect(document.querySelector("#investigation-debrief")).toHaveTextContent("7")
+    expect(document.querySelector("#investigation-debrief")).toHaveTextContent(
+      "Challenges sustained · 1/2",
+    )
+    expect(document.querySelector("#detective-debrief-d1")).toHaveTextContent(
+      "3 / 3 links matched the truth",
+    )
+    expect(document.querySelector("#detective-debrief-d1")).toHaveTextContent("WINNING FILE")
+    expect(document.querySelector("#detective-debrief-d1")).toHaveTextContent("Piano Wire")
     expect(document.querySelector("#case-result-dashboard-link")).toHaveAttribute(
       "href",
       "/dashboard",
@@ -173,6 +208,40 @@ describe("CasebookWorkspace", () => {
 
     expect(document.querySelector("#solution-release-error")).toBeInTheDocument()
     expect(document.querySelector("#released-solution")).not.toBeInTheDocument()
+    expect(document.querySelector("#detective-debrief-empty")).toBeInTheDocument()
+  })
+
+  it("does not invent an earlier Solve attempt for final-guess debriefs", () => {
+    const view = {
+      ...baseView,
+      detectives: [{ id: "d1", display_name: "Marlowe" }],
+      result: {
+        winner: { role: "detective", player_id: "d1", reason: "final_guess" },
+        detectives: [
+          {
+            player_id: "d1",
+            display_name: "Marlowe",
+            seat: 1,
+            won: true,
+            solve_attempt: null,
+            final_guess: {
+              suspect_name: "Iona Pike",
+              weapon_label: "Piano Wire",
+              motive_label: "Blackmail",
+              correct_count: 3,
+            },
+            activity: {},
+          },
+        ],
+      },
+    }
+
+    render(CasebookWorkspace, { page: "result", view, actions: noActions })
+
+    expect(document.querySelector("#detective-debrief-d1")).not.toHaveTextContent(
+      "Earlier Solve attempt",
+    )
+    expect(document.querySelector("#detective-debrief-d1")).not.toHaveTextContent("undefined")
   })
 
   it("selects an interrogation subject directly from the Question folio", async () => {

@@ -634,6 +634,13 @@ defmodule Detective.Games.RuntimeTest do
     assert public_result.result.solution["suspect_name"] == "Night Clerk"
     assert public_result.result.solution["weapon_label"] == "Sealed Ledger"
     assert public_result.result.solution["motive_label"] == "Cover up the altered register"
+
+    detective_debrief =
+      Enum.find(public_result.result.detectives, &(&1.player_id == restored.winner["player_id"]))
+
+    assert detective_debrief.won
+    assert detective_debrief.solve_attempt["correct_count"] == 3
+    assert detective_debrief.final_guess == nil
   end
 
   test "finished game projection remains available to a member" do

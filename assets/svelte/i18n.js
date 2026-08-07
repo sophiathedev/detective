@@ -610,6 +610,38 @@ const vi = {
   "The Day track expired": "Lịch điều tra đã cạn ngày",
   "The verdict was recorded, but this case version has no releasable solution sheet.":
     "Phán quyết đã được ghi nhận nhưng phiên bản vụ án này không có phiếu đáp án có thể công bố.",
+  "Post-case debrief": "Biên bản hậu án",
+  "Investigation ledger": "Nhật trình phá án",
+  "A server-audited record of the field work filed before the case was closed.":
+    "Biên bản hiện trường do máy chủ đối soát trước thời điểm chuyên án bị niêm phong.",
+  "Days worked": "Ngày bám án",
+  Moves: "Lượt điều xe",
+  Searches: "Lần khám xét",
+  Questions: "Cuộc thẩm vấn",
+  Challenges: "Lần vạch lời",
+  "Public leads": "Đầu mối công khai",
+  "Challenges sustained · {succeeded}/{total}":
+    "Lần vạch lời thành công · {succeeded}/{total}",
+  "Evidence taken · {count}": "Vật chứng đã thu · {count}",
+  "Sealed statements · released": "Khẩu cung niêm phong · đã giải mật",
+  "Detective deductions": "Hồ sơ suy luận của các Thám tử",
+  "Every theory below was resolved by the server against the locked case version after play ended.":
+    "Mỗi giả thuyết dưới đây được máy chủ đối chiếu với hồ sơ án đã khóa sau khi ván đấu kết thúc.",
+  "Detective {seat}": "Thám tử số {seat}",
+  "WINNING FILE": "HỒ SƠ PHÁ ÁN",
+  "Final sealed guess": "Kết luận cuối niêm phong",
+  "Solve accusation": "Cáo buộc Phá án",
+  "{count} / 3 links matched the truth": "{count} / 3 mắt xích trùng chân tướng",
+  "{count} of 3 correct": "Đúng {count} trên 3 mắt xích",
+  "Suspect named": "Nghi phạm chỉ mặt",
+  "Weapon named": "Hung khí kết luận",
+  "Motive alleged": "Động cơ quy kết",
+  "Earlier Solve attempt · {count}/3 correct": "Lần Phá án trước · đúng {count}/3 mắt xích",
+  "No valid deduction was filed in the recovered case record.":
+    "Không tìm thấy phiếu suy luận hợp lệ trong hồ sơ phục dựng.",
+  "Field record": "Thành tích hiện trường",
+  "No Detective debrief survived in this recovered case record.":
+    "Hồ sơ phục dựng không còn biên bản hậu án của Thám tử nào.",
   "Closing report": "Biên bản khép án",
   Epilogue: "Hậu truyện",
   "This solution comes from the server-owned case version and is now public to every member of this finished game.":

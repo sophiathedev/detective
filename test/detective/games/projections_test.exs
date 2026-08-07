@@ -467,6 +467,105 @@ defmodule Detective.Games.ProjectionsTest do
     refute public_json =~ "sealed-motive-choice"
   end
 
+  test "finished projection releases a server-derived debrief for every Detective" do
+    base = engine_state_fixture(accusation_case_definition())
+
+    players =
+      base.players
+      |> Map.update!(detective_id(), fn detective ->
+        %{
+          detective
+          | solve_attempt: %{
+              "suspect_id" => "suspect",
+              "weapon_id" => "wrong-weapon",
+              "motive_id" => "wrong-motive",
+              "correct_count" => 99
+            }
+        }
+      end)
+      |> Map.update!(second_detective_id(), fn detective ->
+        %{
+          detective
+          | final_guess: %{
+              "suspect_id" => "suspect",
+              "weapon_id" => "case-weapon",
+              "motive_id" => "case-motive",
+              "correct_count" => 0
+            }
+        }
+      end)
+
+    state = %{
+      base
+      | status: :finished,
+        phase: :finished,
+        day: 4,
+        current_detective_id: nil,
+        winner: %{
+          "role" => "detective",
+          "player_id" => second_detective_id(),
+          "reason" => "final_guess"
+        },
+        players: players,
+        public_case_card_ids: ["topic"],
+        taken_evidence: %{"topic" => %{"player_id" => detective_id()}},
+        public_history: [
+          %{type: "player_moved", player_id: detective_id()},
+          %{"type" => "location_searched", "player_id" => detective_id()},
+          %{"type" => "interrogation_started", "player_id" => detective_id()},
+          %{type: "challenge_succeeded", player_id: detective_id()},
+          %{type: "player_moved", player_id: second_detective_id()}
+        ]
+    }
+
+    result = Public.render(state).result
+    first = Enum.find(result.detectives, &(&1.player_id == detective_id()))
+    second = Enum.find(result.detectives, &(&1.player_id == second_detective_id()))
+
+    assert result.solution["suspect_name"] == "Suspect"
+
+    assert result.investigation == %{
+             days_elapsed: 4,
+             moves: 2,
+             searches: 1,
+             interrogations: 1,
+             challenges: 1,
+             successful_challenges: 1,
+             public_leads: 1,
+             evidence_taken: 1
+           }
+
+    assert first.solve_attempt["correct_count"] == 1
+    assert first.solve_attempt["weapon_label"] == "False Weapon"
+    assert first.activity == %{moves: 1, searches: 1, interrogations: 1, challenges: 1}
+    refute first.won
+
+    assert second.final_guess["correct_count"] == 3
+    assert second.final_guess["motive_label"] == "Protect the witness"
+    assert second.won
+  end
+
+  test "finished projection ignores a malformed legacy deduction without crashing" do
+    base = engine_state_fixture(accusation_case_definition())
+
+    state = %{
+      base
+      | status: :finished,
+        phase: :finished,
+        winner: %{"role" => "chisel", "reason" => "time_expired"},
+        players:
+          Map.update!(base.players, detective_id(), fn detective ->
+            %{detective | final_guess: %{"suspect_id" => "deleted-record"}}
+          end)
+    }
+
+    result = Public.render(state).result
+    detective = Enum.find(result.detectives, &(&1.player_id == detective_id()))
+
+    assert detective.final_guess == nil
+    assert result.solution["weapon_label"] == "Case Weapon"
+  end
+
   test "active unplaced Detective receives only placement destination IDs" do
     state = engine_state_fixture()
     placement_ids = state |> Rules.police_stations() |> Enum.map(& &1.id)
@@ -801,6 +900,26 @@ defmodule Detective.Games.ProjectionsTest do
         "all_other_locations" => search_result("Nothing relevant.", false)
       }
     }
+  end
+
+  defp accusation_case_definition do
+    engine_case_definition()
+    |> Map.put("solution", %{
+      "suspect_id" => "suspect",
+      "weapon_id" => "case-weapon",
+      "motive_id" => "case-motive"
+    })
+    |> Map.put("accusation_options", %{
+      "weapons" => [
+        %{"id" => "case-weapon", "label" => "Case Weapon", "case_card_id" => "topic"},
+        %{"id" => "wrong-weapon", "label" => "False Weapon", "case_card_id" => "topic"}
+      ],
+      "motives" => [
+        %{"id" => "case-motive", "label" => "Protect the witness"},
+        %{"id" => "wrong-motive", "label" => "Destroy the files"}
+      ]
+    })
+    |> Map.put("epilogue", "The witness finally entered protective custody.")
   end
 
   defp hidden_suspect_case_definition do

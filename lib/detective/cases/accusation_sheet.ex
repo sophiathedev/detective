@@ -95,20 +95,29 @@ defmodule Detective.Cases.AccusationSheet do
 
   def revealed_solution(case_definition) do
     with {:ok, solution} <- solution(case_definition),
-         {:ok, %{weapons: weapons, motives: motives}} <- options(case_definition) do
+         {:ok, revealed} <- revealed_guess(case_definition, solution) do
+      {:ok, Map.delete(revealed, "correct_count")}
+    end
+  end
+
+  def revealed_guess(case_definition, guess) do
+    with {:ok, guess} <- build_guess(case_definition, guess),
+         {:ok, %{weapons: weapons, motives: motives}} <- options(case_definition),
+         {:ok, correct_count} <- correct_count(case_definition, guess) do
       suspect =
         case_definition
         |> Map.get("suspects", [])
-        |> Enum.find(&(&1["id"] == solution["suspect_id"]))
+        |> Enum.find(&(&1["id"] == guess["suspect_id"]))
 
-      weapon = Enum.find(weapons, &(&1["id"] == solution["weapon_id"]))
-      motive = Enum.find(motives, &(&1["id"] == solution["motive_id"]))
+      weapon = Enum.find(weapons, &(&1["id"] == guess["weapon_id"]))
+      motive = Enum.find(motives, &(&1["id"] == guess["motive_id"]))
 
       {:ok,
-       Map.merge(solution, %{
+       Map.merge(guess, %{
          "suspect_name" => suspect["name"],
          "weapon_label" => weapon["label"],
-         "motive_label" => motive["label"]
+         "motive_label" => motive["label"],
+         "correct_count" => correct_count
        })}
     end
   end

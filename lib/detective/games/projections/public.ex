@@ -203,18 +203,81 @@ defmodule Detective.Games.Projections.Public do
   defp public_snitch_request_count(_pending, _stage), do: nil
 
   defp public_result(%State{status: :finished} = state) do
+    debrief = %{
+      winner: state.winner,
+      detectives: detective_debriefs(state),
+      investigation: investigation_debrief(state)
+    }
+
     case AccusationSheet.revealed_solution(state.case_definition) do
       {:ok, solution} ->
-        %{
-          winner: state.winner,
+        Map.merge(debrief, %{
           solution: solution,
           epilogue: state.case_definition["epilogue"]
-        }
+        })
 
       {:error, _reason} ->
-        %{winner: state.winner}
+        debrief
     end
   end
 
   defp public_result(%State{}), do: nil
+
+  defp detective_debriefs(state) do
+    Enum.map(state.detective_order, fn player_id ->
+      detective = Map.fetch!(state.players, player_id)
+
+      %{
+        player_id: detective.id,
+        display_name: detective.display_name,
+        seat: detective.seat,
+        won: state.winner["player_id"] == detective.id,
+        solve_attempt: revealed_guess(state.case_definition, Map.get(detective, :solve_attempt)),
+        final_guess: revealed_guess(state.case_definition, Map.get(detective, :final_guess)),
+        activity: player_activity(state.public_history, detective.id)
+      }
+    end)
+  end
+
+  defp revealed_guess(case_definition, guess) when is_map(guess) do
+    case AccusationSheet.revealed_guess(case_definition, guess) do
+      {:ok, revealed} -> revealed
+      {:error, _reason} -> nil
+    end
+  end
+
+  defp revealed_guess(_case_definition, _guess), do: nil
+
+  defp investigation_debrief(state) do
+    %{
+      days_elapsed: state.day,
+      moves: count_history(state.public_history, ["player_moved"]),
+      searches: count_history(state.public_history, ["location_searched", "suspect_searched"]),
+      interrogations: count_history(state.public_history, ["interrogation_started"]),
+      challenges:
+        count_history(state.public_history, ["challenge_succeeded", "challenge_failed"]),
+      successful_challenges: count_history(state.public_history, ["challenge_succeeded"]),
+      public_leads: length(state.public_case_card_ids),
+      evidence_taken: map_size(state.taken_evidence)
+    }
+  end
+
+  defp player_activity(history, player_id) do
+    %{
+      moves: count_history(history, ["player_moved"], player_id),
+      searches: count_history(history, ["location_searched", "suspect_searched"], player_id),
+      interrogations: count_history(history, ["interrogation_started"], player_id),
+      challenges: count_history(history, ["challenge_succeeded", "challenge_failed"], player_id)
+    }
+  end
+
+  defp count_history(history, types, player_id \\ nil) do
+    Enum.count(history, fn entry ->
+      history_value(entry, :type) in types and
+        (is_nil(player_id) or history_value(entry, :player_id) == player_id)
+    end)
+  end
+
+  defp history_value(entry, key),
+    do: Map.get(entry, key) || Map.get(entry, Atom.to_string(key))
 end
