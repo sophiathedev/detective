@@ -106,6 +106,29 @@ defmodule DetectiveWeb.LobbyChannelTest do
     assert player_id == lobby.membership.id
   end
 
+  test "the Chisel cancels a waiting room for every connected member" do
+    host = user_fixture()
+    %{game: game} = game_fixture(host)
+
+    assert {:ok, %{lobby: lobby}, socket} =
+             host
+             |> authenticated_socket()
+             |> subscribe_and_join("lobby:#{game.id}", %{})
+
+    assert_push "presence_state", _presence
+
+    ref = push(socket, "cancel_lobby", %{"expected_version" => lobby.current_version})
+    assert_reply ref, :ok, %{path: "/dashboard", version: 1}
+
+    assert_broadcast "lobby_cancelled", %{
+      game_id: game_id,
+      path: "/dashboard",
+      version: 1
+    }
+
+    assert game_id == game.id
+  end
+
   test "the Chisel removes a Detective and the departure is broadcast" do
     host = user_fixture()
     detective = user_fixture()

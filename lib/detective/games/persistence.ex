@@ -193,11 +193,7 @@ defmodule Detective.Games.Persistence do
       end)
       |> Multi.insert(:snapshot, snapshot_changeset(game_id, next_state))
       |> Multi.update(:updated_game, fn %{game: game} ->
-        Game.transition_changeset(game, %{
-          status: Atom.to_string(next_state.status),
-          phase: Atom.to_string(next_state.phase),
-          current_version: next_state.version
-        })
+        Game.transition_changeset(game, transition_attrs(next_state, game))
       end)
 
     case Repo.transact(multi) do
@@ -247,11 +243,7 @@ defmodule Detective.Games.Persistence do
       end)
       |> Multi.insert(:snapshot, snapshot_changeset(game_id, next_state))
       |> Multi.update(:updated_game, fn %{game: game} ->
-        Game.transition_changeset(game, %{
-          status: Atom.to_string(next_state.status),
-          phase: Atom.to_string(next_state.phase),
-          current_version: next_state.version
-        })
+        Game.transition_changeset(game, transition_attrs(next_state, game))
       end)
 
     case Repo.transact(multi) do
@@ -355,6 +347,34 @@ defmodule Detective.Games.Persistence do
     |> GameSnapshot.insert_changeset()
   end
 
+  defp transition_attrs(%State{} = state, %Game{} = game) do
+    attrs = %{
+      status: Atom.to_string(state.status),
+      phase: Atom.to_string(state.phase),
+      current_version: state.version
+    }
+
+    if state.status == :finished and is_nil(game.finished_at) do
+      attrs
+      |> Map.put(:finished_at, DateTime.utc_now(:second))
+      |> Map.merge(result_attrs(state))
+    else
+      attrs
+    end
+  end
+
+  defp result_attrs(%State{winner: winner, players: players}) when is_map(winner) do
+    winner_player = Map.get(players, winner["player_id"])
+
+    %{
+      winner_role: winner["role"],
+      winner_user_id: winner_player && winner_player.user_id,
+      finish_reason: winner["reason"]
+    }
+  end
+
+  defp result_attrs(%State{}), do: %{}
+
   defp command_insert_error(changeset) do
     if Keyword.has_key?(changeset.errors, :command_id) do
       {:error, :duplicate_command}
@@ -364,6 +384,6 @@ defmodule Detective.Games.Persistence do
   end
 
   defp command_status_valid?("active", type) when type != :resume_game, do: true
-  defp command_status_valid?("paused", :resume_game), do: true
+  defp command_status_valid?("paused", type) when type in [:resume_game, :concede_game], do: true
   defp command_status_valid?(_status, _type), do: false
 end

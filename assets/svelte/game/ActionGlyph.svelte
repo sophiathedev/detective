@@ -59,6 +59,9 @@
   {:else if name === "end_turn"}
     <circle cx="11" cy="12" r="7" />
     <path d="M11 8v4l3 2M17 6h4v4M21 6l-3 3" />
+  {:else if name === "concede_game"}
+    <path d="M5 3h14v18H5zM8 7h8M8 11h8M8 15h5" />
+    <path d="m14.5 15 4 4M18.5 15l-4 4" />
   {:else}
     <path d="M3 5.5c3-1 6-.7 9 1.5v13c-3-2.2-6-2.5-9-1.5v-13ZM21 5.5c-3-1-6-.7-9 1.5v13c3-2.2 6-2.5 9-1.5v-13Z" />
     <path d="M6 9h3M6 12h3M15 9h3M15 12h3" />

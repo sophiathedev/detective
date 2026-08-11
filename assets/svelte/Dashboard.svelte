@@ -7,6 +7,8 @@
     display_name = "Detective",
     games = { waiting: 0, active: 0, finished: 0 },
     dossiers = { waiting: [], active: [], finished: [] },
+    rematch_room = null,
+    rematch_error = null,
     locale = "en",
   } = $props()
   const { t } = initializeI18n(() => locale)
@@ -20,6 +22,52 @@
     { key: "active", title: t("Active"), marker: t("In field"), rows: active },
     { key: "finished", title: t("Closed"), marker: t("Archive"), rows: finished },
   ])
+  let rematchCopied = $state(false)
+
+  async function copyRematchInvite() {
+    if (!rematch_room?.invite_url || !navigator.clipboard) return
+
+    await navigator.clipboard.writeText(rematch_room.invite_url)
+    rematchCopied = true
+    window.setTimeout(() => (rematchCopied = false), 1800)
+  }
+
+  function closedDate(value) {
+    if (!value) return t("Closure pending")
+
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return t("Closure pending")
+
+    return new Intl.DateTimeFormat(locale === "vi" ? "vi-VN" : "en-US", {
+      dateStyle: "medium",
+    }).format(date)
+  }
+
+  function duration(game) {
+    if (!game.started_at || !game.finished_at) return t("Duration unavailable")
+
+    const seconds = Math.max(
+      0,
+      Math.round((new Date(game.finished_at).getTime() - new Date(game.started_at).getTime()) / 1000),
+    )
+
+    if (!Number.isFinite(seconds)) return t("Duration unavailable")
+
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.max(1, Math.floor((seconds % 3600) / 60))
+    return hours > 0 ? t("{hours}h {minutes}m", { hours, minutes }) : t("{minutes}m", { minutes })
+  }
+
+  function finishReason(reason) {
+    const labels = {
+      case_solved: "Case solved",
+      final_guess: "Final deduction",
+      time_expired: "Trail went cold",
+      abandoned: "Investigation abandoned",
+    }
+
+    return t(labels[reason] ?? "Result recorded")
+  }
 </script>
 
 <div id="dashboard-shell" class="min-h-[calc(100dvh-3.5rem)] px-4 py-8 text-stone-100 sm:px-6 sm:py-12 lg:px-10">
@@ -68,6 +116,12 @@
       class="mt-8 overflow-hidden p-3 sm:p-5"
     >
       <h2 id="case-cabinet-title" class="sr-only">{t("Investigation case cabinet")}</h2>
+
+      {#if rematch_error}
+        <div id="dashboard-rematch-error" class="mb-3 border border-[var(--noir-red-500)] bg-[#2a1714] px-4 py-3 text-sm text-[#f0c2b7]" role="alert">
+          {t(rematch_error)}
+        </div>
+      {/if}
 
       {#if empty}
         <section id="dashboard-empty-state" class="noir-paper-sheet grid min-h-64 place-items-center p-8 text-center" aria-labelledby="dashboard-empty-title">
@@ -125,7 +179,56 @@
                           <dd class="mt-1 font-semibold text-[var(--noir-ink-900)]">{game.detective_count}/{game.max_detectives}</dd>
                         </div>
                       </dl>
+                      {#if game.status === "finished"}
+                        <div
+                          id={`dossier-result-${game.id}`}
+                          class="mt-4 border-t border-[#9b8465] pt-4"
+                        >
+                          <div class="flex items-start justify-between gap-3">
+                            <div>
+                              <p class="font-serif text-lg font-semibold text-[var(--noir-ink-900)]">
+                                {game.won ? t("Case closed in your favor") : t("The truth escaped your theory")}
+                              </p>
+                              <p class="mt-1 font-mono text-[0.6rem] uppercase tracking-[0.1em] text-[#725f48]">
+                                {finishReason(game.finish_reason)} · {t(game.winner_role ?? "Result recorded")}
+                              </p>
+                            </div>
+                            <StatusStamp tone={game.won ? "ready" : "danger"}>
+                              {game.won ? t("Won") : t("Lost")}
+                            </StatusStamp>
+                          </div>
+                          <p class="mt-3 font-mono text-[0.58rem] uppercase tracking-[0.08em] text-[#806b50]">
+                            {t("Closed {date} · {duration}", {
+                              date: closedDate(game.finished_at),
+                              duration: duration(game),
+                            })}
+                          </p>
+                        </div>
+                      {/if}
                     </a>
+                    {#if game.status === "finished"}
+                      <div class="grid gap-2 border-t border-[#9b8465] bg-[#c9b995] p-3" class:grid-cols-2={game.role === "chisel"}>
+                        <a
+                          id={`dossier-replay-${game.id}`}
+                          href={game.replay_path}
+                          class="noir-physical-button inline-flex items-center justify-center px-4 text-sm font-semibold"
+                        >
+                          {t("Review timeline")}
+                        </a>
+                        {#if game.role === "chisel"}
+                          <button
+                            id={`dossier-rematch-${game.id}`}
+                            type="button"
+                            phx-click="rematch"
+                            phx-value-id={game.id}
+                            phx-disable-with={t("Opening rematch…")}
+                            class="noir-physical-button w-full px-4 text-sm font-semibold"
+                          >
+                            {t("Open rematch")}
+                          </button>
+                        {/if}
+                      </div>
+                    {/if}
                   </article>
                 {:else}
                   <p class="px-2 py-5 font-serif text-sm italic text-stone-500">{t("No files in this drawer.")}</p>
@@ -136,5 +239,67 @@
         </div>
       {/if}
     </WoodFrame>
+
+    {#if rematch_room}
+      <div
+        id="rematch-created-overlay"
+        class="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rematch-created-title"
+      >
+        <WoodFrame as="section" class="w-full max-w-xl p-3 sm:p-4">
+          <section class="noir-paper-sheet p-6 sm:p-8">
+            <div class="flex items-start justify-between gap-4">
+              <StatusStamp tone="ready">{t("Room {code}", { code: rematch_room.room_code })}</StatusStamp>
+              <button
+                id="dismiss-rematch"
+                type="button"
+                phx-click="dismiss_rematch"
+                class="font-mono text-xs uppercase tracking-[0.12em] text-[#6f5a42] hover:text-[var(--noir-red-700)]"
+              >
+                {t("Close")}
+              </button>
+            </div>
+            <h2 id="rematch-created-title" class="mt-5 font-serif text-3xl font-semibold text-[var(--noir-ink-900)]">
+              {rematch_room.duplicate ? t("Rematch already on file") : t("Fresh rematch sealed")}
+            </h2>
+            <p class="mt-3 text-sm leading-6 text-[#66513c]">
+              {rematch_room.invite_url
+                ? t("A fresh invitation was issued. Copy it before leaving this page.")
+                : t("This rematch was already created. Enter it to review or regenerate its invitation.")}
+            </p>
+
+            {#if rematch_room.invite_url}
+              <div class="mt-5 grid gap-2">
+                <input
+                  id="rematch-invite-url"
+                  aria-label={t("Invitation URL")}
+                  readonly
+                  value={rematch_room.invite_url}
+                  class="noir-field px-3 py-2 font-mono text-xs"
+                />
+                <button
+                  id="copy-rematch-invite"
+                  type="button"
+                  onclick={copyRematchInvite}
+                  class="noir-physical-button px-4 text-sm font-semibold"
+                >
+                  {rematchCopied ? t("Copied") : t("Copy invitation")}
+                </button>
+              </div>
+            {/if}
+
+            <a
+              id="enter-rematch"
+              href={rematch_room.path}
+              class="mt-5 inline-flex min-h-12 w-full items-center justify-center bg-[var(--noir-red-700)] px-5 text-sm font-semibold text-[var(--noir-paper-100)] transition hover:bg-[var(--noir-red-500)] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[var(--noir-focus)]"
+            >
+              {t("Enter rematch")}
+            </a>
+          </section>
+        </WoodFrame>
+      </div>
+    {/if}
   </main>
 </div>

@@ -3,11 +3,15 @@
 
   const { t } = useI18n()
 
+  const caseCardCodes = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"]
+  const boardSlotCenters = [4.7, 12.85, 21.15, 29.55, 37.7, 46, 54.25, 62.5, 70.9, 79.1, 87.4, 95.7]
+
   let {
     slots = [],
     players = [],
     inspectableCaseCardCodes = [],
     selectedCaseCardCode = null,
+    zoom = 1,
     disabled = false,
     onSelectCaseCard = () => {},
   } = $props()
@@ -36,7 +40,47 @@
   }
 
   function slotPosition(slot) {
-    return Math.min(Math.max(Number(slot.position) || 1, 1), 12)
+    const codePosition = caseCardCodes.indexOf(String(slot.code ?? "").toUpperCase()) + 1
+    return Math.min(Math.max(codePosition || Number(slot.position) || 1, 1), 12)
+  }
+
+  function slotCenter(slot) {
+    return boardSlotCenters[slotPosition(slot) - 1]
+  }
+
+  function cardBackUrl(code) {
+    const normalized = String(code ?? "A").toLowerCase()
+    return `/images/cards/dcoa/backs/${normalized}.webp`
+  }
+
+  function cardTemplateUrl(type) {
+    if (type === "evidence") return "/images/cards/dcoa/templates/evidence.webp"
+    if (type === "information" || type === "crime") return "/images/cards/dcoa/templates/information.webp"
+    return "/images/cards/dcoa/templates/suspect.webp"
+  }
+
+  function cardFaceUrl(slot) {
+    return slot.artwork_url || cardTemplateUrl(slot.type)
+  }
+
+  function retinaUrl(url) {
+    return String(url).replace(/\.webp$/, "@2x.webp")
+  }
+
+  function compactUrl(url) {
+    return String(url).replace(/\.webp$/, "-220.webp")
+  }
+
+  function cardImageDelivery(url) {
+    const optimized = String(url).startsWith("/images/cards/dcoa/") && String(url).endsWith(".webp")
+
+    return {
+      src: url,
+      srcset: optimized
+        ? `${compactUrl(url)} 220w, ${url} 420w, ${retinaUrl(url)} 675w`
+        : undefined,
+      sizes: optimized ? `${(6.65 * Math.min(Math.max(Number(zoom) || 1, 1), 2.5)).toFixed(3)}vw` : undefined,
+    }
   }
 
   function slotLabel(slot) {
@@ -66,14 +110,31 @@
 
 {#snippet cardFace(slot)}
   {#if slot.status === "faceup"}
-    <div class="noir-case-card-face noir-case-card-faceup" data-card-type={slot.type ?? "case"}>
-      <i class="noir-case-card-staple" aria-hidden="true"></i>
-      <i class="noir-case-card-watermark" aria-hidden="true">
-        {(slot.type ?? "case").slice(0, 1).toUpperCase()}
-      </i>
-      <span>{slot.type}</span>
-      <strong>{slot.code}</strong>
-      <p>{slot.title}</p>
+    {@const image = cardImageDelivery(cardFaceUrl(slot))}
+    <div
+      class="noir-case-card-face noir-case-card-faceup"
+      data-card-type={slot.type ?? "case"}
+      data-card-code={slot.code}
+      data-has-artwork={Boolean(slot.artwork_url)}
+    >
+      <img
+        class="noir-case-card-art"
+        src={image.src}
+        srcset={image.srcset}
+        sizes={image.sizes}
+        decoding="async"
+        fetchpriority="low"
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+      />
+      <div class="noir-case-card-copy">
+        <span>{slot.type}</span>
+        <p>{slot.title}</p>
+        {#if (slot.type === "information" || slot.type === "crime") && slot.description}
+          <small>{slot.description}</small>
+        {/if}
+      </div>
     </div>
   {:else if slot.status === "removed"}
     <div class="noir-case-card-face noir-case-card-removed" data-card-type="evidence">
@@ -86,8 +147,22 @@
       </small>
     </div>
   {:else}
-    <div class="noir-case-card-face noir-case-card-facedown" aria-hidden="true">
-      <span>{slot.code}</span>
+    {@const image = cardImageDelivery(cardBackUrl(slot.code))}
+    <div
+      class="noir-case-card-face noir-case-card-facedown"
+      data-card-code={slot.code}
+      aria-hidden="true"
+    >
+      <img
+        class="noir-case-card-art"
+        src={image.src}
+        srcset={image.srcset}
+        sizes={image.sizes}
+        decoding="async"
+        fetchpriority="low"
+        alt=""
+        draggable={false}
+      />
     </div>
   {/if}
 {/snippet}
@@ -105,7 +180,7 @@
         data-testid={`case-card-slot-${slot.code}`}
         data-status={slot.status}
         class="noir-case-card-slot"
-        style={`--case-slot-position: ${slotPosition(slot)};`}
+        style={`--case-slot-position: ${slotPosition(slot)}; --case-slot-center: ${slotCenter(slot)};`}
         aria-label={slotLabel(slot)}
       >
         {#if inspectable}

@@ -270,7 +270,7 @@ defmodule Detective.Games.EngineTest do
     state = new_state()
     assert Rules.available_actions(state, user_id("detective-1")) == ["place"]
     assert Rules.available_actions(state, user_id("detective-2")) == []
-    assert Rules.available_actions(state, user_id("chisel")) == []
+    assert Rules.available_actions(state, user_id("chisel")) == ["concede_game"]
 
     state = placed_state()
     actions = Rules.available_actions(state, user_id("detective-1"))
@@ -549,6 +549,7 @@ defmodule Detective.Games.EngineTest do
                title: "Sealed Ledger",
                type: "evidence",
                description: "A ledger removed from the station records.",
+               artwork_url: nil,
                takeable: true,
                initially_known: false
              }
@@ -971,6 +972,7 @@ defmodule Detective.Games.EngineTest do
     chisel_before = player(state, "chisel")
 
     assert Rules.available_actions(state, chisel_before.user_id) == [
+             "concede_game",
              "block_question",
              "allow_question"
            ]
@@ -1035,7 +1037,11 @@ defmodule Detective.Games.EngineTest do
 
     assert awaiting_chisel.phase == :waiting_for_chisel
     assert awaiting_chisel.pending_action["stage"] == "snitch_block"
-    assert Rules.available_actions(awaiting_chisel, user_id("chisel")) == ["resolve_snitches"]
+
+    assert Rules.available_actions(awaiting_chisel, user_id("chisel")) == [
+             "concede_game",
+             "resolve_snitches"
+           ]
 
     assert {:ok, response_stage, [resolved]} =
              apply_command(awaiting_chisel, "chisel", :resolve_snitches, %{
@@ -1395,7 +1401,11 @@ defmodule Detective.Games.EngineTest do
     assert paused.pending_action == pending
     assert pause_event.type == :game_paused
     assert Rules.available_actions(paused, user_id("detective-1")) == []
-    assert Rules.available_actions(paused, user_id("chisel")) == ["resume_game"]
+
+    assert Rules.available_actions(paused, user_id("chisel")) == [
+             "concede_game",
+             "resume_game"
+           ]
 
     assert {:error, :game_paused} = apply_command(paused, "detective-1", :end_turn)
     assert {:error, :wrong_role} = apply_command(paused, "detective-1", :resume_game)
@@ -1406,6 +1416,34 @@ defmodule Detective.Games.EngineTest do
     assert resumed.phase == :waiting_for_chisel
     assert resumed.pending_action == pending
     assert resume_event.type == :game_resumed
+  end
+
+  test "only the Chisel may concede an active or paused case" do
+    state = new_state()
+
+    assert {:error, :wrong_role} = apply_command(state, "detective-1", :concede_game)
+
+    assert {:ok, finished, [event]} = apply_command(state, "chisel", :concede_game)
+    assert finished.status == :finished
+    assert finished.phase == :finished
+    assert finished.current_detective_id == nil
+
+    assert finished.winner == %{
+             "role" => "detective",
+             "player_id" => nil,
+             "reason" => "chisel_forfeit"
+           }
+
+    assert event.type == :game_finished
+    assert event.public_payload.winner == finished.winner
+
+    assert {:ok, paused, [_event]} =
+             Engine.apply_system(state, {:pause_for_disconnect, [player_id("detective-1")]})
+
+    assert {:ok, paused_finish, [_event]} = apply_command(paused, "chisel", :concede_game)
+    assert paused_finish.status == :finished
+    assert paused_finish.paused_from_phase == nil
+    assert paused_finish.pause_reason == nil
   end
 
   test "resume restores every pausable gameplay phase" do

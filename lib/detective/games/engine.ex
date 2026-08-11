@@ -18,7 +18,7 @@ defmodule Detective.Games.Engine do
     Validator
   }
 
-  alias Detective.Games.{Command, Event, Rules, State}
+  alias Detective.Games.{Command, Event, InvestigationStats, Rules, State}
 
   @actions_per_turn 4
   @starting_scratch [4, 5, 6, 9]
@@ -144,6 +144,13 @@ defmodule Detective.Games.Engine do
 
   defp dispatch(%State{status: :active}, _actor, %Command{type: :resume_game}),
     do: {:error, :game_not_paused}
+
+  defp dispatch(%State{status: status} = state, actor, %Command{type: :concede_game} = command)
+       when status in [:active, :paused] do
+    with :ok <- validate_resume_actor(actor) do
+      execute(state, actor, command)
+    end
+  end
 
   defp dispatch(%State{status: :paused} = state, actor, %Command{type: :resume_game} = command) do
     with :ok <- validate_resume_actor(actor) do
@@ -1177,6 +1184,22 @@ defmodule Detective.Games.Engine do
     }
 
     {:ok, next_state, [event]}
+  end
+
+  defp execute(state, _actor, %Command{type: :concede_game}) do
+    {finished, finished_event} = finish_game(state, "detective", nil, "chisel_forfeit")
+
+    next_state =
+      %{
+        finished
+        | paused_from_phase: nil,
+          pause_reason: nil,
+          paused_player_ids: []
+      }
+      |> advance_version()
+      |> append_history(%{type: "game_finished", winner_player_id: nil})
+
+    {:ok, next_state, [finished_event]}
   end
 
   defp execute(state, actor, %Command{type: :accuse, payload: payload}) do
@@ -2366,7 +2389,11 @@ defmodule Detective.Games.Engine do
   defp advance_version(state), do: %{state | version: state.version + 1}
 
   defp append_history(state, history_entry) do
-    %{state | public_history: Enum.take([history_entry | state.public_history], 100)}
+    %{
+      state
+      | investigation_stats: InvestigationStats.record(state.investigation_stats, history_entry),
+        public_history: Enum.take([history_entry | state.public_history], 100)
+    }
   end
 
   defp payload_value(payload, key), do: Map.get(payload, key)

@@ -80,7 +80,7 @@ defmodule Detective.Games.Projections.Detective do
 
   defp known_case_cards(state, card_ids) do
     {:ok, cards} = SearchDeck.case_cards(state.case_definition, card_ids)
-    Enum.map(cards, &Map.take(&1, [:id, :code, :title, :type, :description]))
+    Enum.map(cards, &Map.take(&1, [:id, :code, :title, :type, :description, :artwork_url]))
   end
 
   defp pending_stage(%{"stage" => stage}, _phase), do: stage

@@ -12,9 +12,11 @@ defmodule Detective.Games do
   alias Detective.Games.{
     Engine,
     Game,
+    GameEvent,
     GamePlayer,
     LobbyBroadcaster,
     Persistence,
+    PlayerNote,
     Projections,
     Session,
     SessionSupervisor,
@@ -27,6 +29,7 @@ defmodule Detective.Games do
   alias Ecto.Multi
 
   @default_invite_hours 24
+  @replay_page_size 30
 
   def create_game(%Scope{user: user}, attrs, opts \\ []) do
     now = Keyword.get(opts, :now, DateTime.utc_now(:second))
@@ -53,6 +56,7 @@ defmodule Detective.Games do
             %Game{
               room_code: room_code,
               host_user_id: user.id,
+              rematch_of_game_id: Keyword.get(opts, :rematch_of_game_id),
               status: "waiting",
               phase: "lobby",
               current_version: 0
@@ -99,6 +103,46 @@ defmodule Detective.Games do
       false -> {:error, :invalid_invite_expiry}
     end
   end
+
+  def rematch(scope, game_id, opts \\ [])
+
+  def rematch(%Scope{user: %{id: user_id}} = scope, game_id, opts) do
+    with {:ok, game_id} <- cast_game_id(game_id),
+         %Game{} = source <- Repo.get(Game, game_id),
+         :ok <- validate_rematch_source(source, user_id) do
+      case rematch_game(source.id, user_id) do
+        %Game{} = game ->
+          {:ok, %{game: game, invite_token: nil, duplicate: true}}
+
+        nil ->
+          attrs = %{
+            title: rematch_title(source.title),
+            case_version_id: source.case_version_id,
+            max_detectives: source.max_detectives,
+            invite_hours: 24
+          }
+
+          opts = Keyword.put(opts, :rematch_of_game_id, source.id)
+
+          case create_game(scope, attrs, opts) do
+            {:ok, result} ->
+              {:ok, Map.put(result, :duplicate, false)}
+
+            {:error, %Ecto.Changeset{} = changeset} ->
+              recover_rematch(changeset, source.id, user_id)
+
+            {:error, reason} ->
+              {:error, reason}
+          end
+      end
+    else
+      :error -> {:error, :invalid_game_id}
+      nil -> {:error, :not_rematchable}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def rematch(%Scope{}, _game_id, _opts), do: {:error, :not_rematchable}
 
   def change_game(%Scope{user: user}, attrs \\ %{}) do
     game_attrs = %{
@@ -165,9 +209,16 @@ defmodule Detective.Games do
         status: game.status,
         phase: game.phase,
         role: player.role,
+        won:
+          game.winner_user_id == ^user.id or
+            (game.finish_reason == "chisel_forfeit" and player.role == "detective"),
+        winner_role: game.winner_role,
+        finish_reason: game.finish_reason,
         case_title: case_file.title,
         detective_count: fragment("COALESCE(?, 0)", counts.count),
         max_detectives: game.max_detectives,
+        started_at: game.started_at,
+        finished_at: game.finished_at,
         updated_at: game.updated_at
       })
       |> Repo.all()
@@ -177,6 +228,74 @@ defmodule Detective.Games do
       Map.update!(acc, bucket, &(&1 ++ [row]))
     end)
   end
+
+  def replay_page(%Scope{user: %{id: user_id}}, game_id, page)
+      when is_integer(page) and page >= 0 do
+    with {:ok, game_id} <- cast_game_id(game_id),
+         %{id: _id} = header <- replay_header(game_id, user_id),
+         event_count <- replay_event_count(game_id),
+         true <- replay_page_available?(page, event_count) do
+      events = replay_events(game_id, page)
+
+      {:ok,
+       header
+       |> Map.put(:events, Enum.take(events, @replay_page_size))
+       |> Map.put(:page, page)
+       |> Map.put(:has_previous, page > 0)
+       |> Map.put(:has_next, length(events) > @replay_page_size)
+       |> Map.put(:players, replay_players(game_id))
+       |> Map.put(:reference, replay_reference(game_id))}
+    else
+      :error -> {:error, :invalid_game_id}
+      nil -> {:error, :replay_unavailable}
+      false -> {:error, :replay_unavailable}
+    end
+  end
+
+  def replay_page(%Scope{}, _game_id, _page), do: {:error, :replay_unavailable}
+
+  def get_player_note(%Scope{user: %{id: user_id}}, game_id) do
+    with {:ok, game_id} <- cast_game_id(game_id),
+         %{status: status} when status in ["active", "paused", "finished"] <-
+           note_membership(game_id, user_id) do
+      case Repo.get_by(PlayerNote, game_id: game_id, user_id: user_id) do
+        %PlayerNote{} = note -> {:ok, note}
+        nil -> {:ok, %PlayerNote{game_id: game_id, user_id: user_id, content: ""}}
+      end
+    else
+      :error -> {:error, :invalid_game_id}
+      nil -> {:error, :not_a_member}
+      %{status: _status} -> {:error, :notes_unavailable}
+    end
+  end
+
+  def get_player_note(%Scope{}, _game_id), do: {:error, :not_a_member}
+
+  def save_player_note(%Scope{user: %{id: user_id}} = scope, game_id, content)
+      when is_binary(content) do
+    with {:ok, %PlayerNote{} = note} <- get_player_note(scope, game_id) do
+      if String.trim(content) == "" do
+        PlayerNote
+        |> where(
+          [player_note],
+          player_note.game_id == ^note.game_id and player_note.user_id == ^user_id
+        )
+        |> Repo.delete_all()
+
+        {:ok, %{note | id: nil, content: ""}}
+      else
+        %PlayerNote{game_id: note.game_id, user_id: user_id}
+        |> PlayerNote.changeset(%{content: content})
+        |> Repo.insert(
+          on_conflict: [set: [content: content, updated_at: DateTime.utc_now(:second)]],
+          conflict_target: [:game_id, :user_id],
+          returning: true
+        )
+      end
+    end
+  end
+
+  def save_player_note(%Scope{}, _game_id, _content), do: {:error, :invalid_note}
 
   def get_lobby(%Scope{user: user}, game_id) do
     with {:ok, game_id} <- cast_game_id(game_id),
@@ -232,6 +351,53 @@ defmodule Detective.Games do
   end
 
   def leave_lobby(%Scope{}, _game_id, _expected_version),
+    do: {:error, :invalid_command}
+
+  def cancel_lobby(scope, game_id, expected_version, opts \\ [])
+
+  def cancel_lobby(%Scope{user: %{id: user_id}}, game_id, expected_version, opts)
+      when is_integer(expected_version) and expected_version >= 0 do
+    now = Keyword.get(opts, :now, DateTime.utc_now(:second))
+
+    with {:ok, game_id} <- cast_game_id(game_id) do
+      Repo.transact(fn ->
+        game =
+          Game
+          |> where([game], game.id == ^game_id)
+          |> lock("FOR UPDATE")
+          |> Repo.one()
+
+        with %Game{} <- game,
+             :ok <- validate_waiting_lobby(game),
+             :ok <- validate_host(game, user_id),
+             :ok <- validate_version(game, expected_version) do
+          GameInvite
+          |> where([invite], invite.game_id == ^game.id and is_nil(invite.revoked_at))
+          |> Repo.update_all(set: [revoked_at: now, updated_at: now])
+
+          updated_game =
+            game
+            |> Game.transition_changeset(%{
+              status: "cancelled",
+              phase: "lobby",
+              current_version: game.current_version + 1,
+              finished_at: now,
+              finish_reason: "host_cancelled"
+            })
+            |> Repo.update!()
+
+          {:ok, %{game_id: updated_game.id, version: updated_game.current_version}}
+        else
+          nil -> {:error, :game_not_found}
+          {:error, reason} -> {:error, reason}
+        end
+      end)
+    else
+      :error -> {:error, :invalid_game_id}
+    end
+  end
+
+  def cancel_lobby(%Scope{}, _game_id, _expected_version, _opts),
     do: {:error, :invalid_command}
 
   def remove_player(%Scope{user: user}, game_id, player_id, expected_version)
@@ -361,6 +527,96 @@ defmodule Detective.Games do
   defp dashboard_bucket("waiting"), do: :waiting
   defp dashboard_bucket(status) when status in ["active", "paused"], do: :active
   defp dashboard_bucket("finished"), do: :finished
+
+  defp replay_header(game_id, user_id) do
+    GamePlayer
+    |> join(:inner, [player], game in assoc(player, :game))
+    |> join(:inner, [_player, game], version in assoc(game, :case_version))
+    |> join(:inner, [_player, _game, version], case_file in assoc(version, :case_file))
+    |> where(
+      [player, game],
+      player.game_id == ^game_id and player.user_id == ^user_id and
+        player.status == "active" and game.status == "finished"
+    )
+    |> select([player, game, _version, case_file], %{
+      id: game.id,
+      title: game.title,
+      case_title: case_file.title,
+      room_code: game.room_code,
+      role: player.role,
+      winner_role: game.winner_role,
+      won:
+        game.winner_user_id == ^user_id or
+          (game.finish_reason == "chisel_forfeit" and player.role == "detective"),
+      finish_reason: game.finish_reason,
+      started_at: game.started_at,
+      finished_at: game.finished_at
+    })
+    |> Repo.one()
+  end
+
+  defp replay_events(game_id, page) do
+    GameEvent
+    |> where([event], event.game_id == ^game_id)
+    |> order_by([event], asc: event.sequence)
+    |> offset(^(page * @replay_page_size))
+    |> limit(^(@replay_page_size + 1))
+    |> select([event], %{
+      id: event.id,
+      sequence: event.sequence,
+      event_type: event.event_type,
+      public_payload: event.public_payload,
+      inserted_at: event.inserted_at
+    })
+    |> Repo.all()
+  end
+
+  defp replay_event_count(game_id) do
+    GameEvent
+    |> where([event], event.game_id == ^game_id)
+    |> Repo.aggregate(:count)
+  end
+
+  defp replay_page_available?(0, _event_count), do: true
+
+  defp replay_page_available?(page, event_count) when event_count > 0,
+    do: page <= div(event_count - 1, @replay_page_size)
+
+  defp replay_page_available?(_page, _event_count), do: false
+
+  defp replay_players(game_id) do
+    GamePlayer
+    |> join(:inner, [player], user in assoc(player, :user))
+    |> where([player], player.game_id == ^game_id and player.status == "active")
+    |> select([player, user], {player.id, user.display_name})
+    |> Repo.all()
+    |> Map.new()
+  end
+
+  defp replay_reference(game_id) do
+    case Persistence.load_state(game_id) do
+      {:ok, %State{} = state} ->
+        %{
+          locations: Map.new(state.locations, fn {id, location} -> {id, location.name} end),
+          suspects: Map.new(state.suspects, fn {id, suspect} -> {id, suspect.name} end),
+          special_actors: Map.new(state.special_actors, fn {id, actor} -> {id, actor.name} end)
+        }
+
+      {:error, _reason} ->
+        %{locations: %{}, suspects: %{}, special_actors: %{}}
+    end
+  end
+
+  defp note_membership(game_id, user_id) do
+    GamePlayer
+    |> join(:inner, [player], game in assoc(player, :game))
+    |> where(
+      [player],
+      player.game_id == ^game_id and player.user_id == ^user_id and player.status == "active"
+    )
+    |> select([_player, game], %{status: game.status})
+    |> Repo.one()
+  end
 
   defp parse_integer(value) do
     case Integer.parse(value) do
@@ -576,7 +832,7 @@ defmodule Detective.Games do
     Game
     |> join(:inner, [game], version in assoc(game, :case_version))
     |> join(:inner, [_game, version], case_file in assoc(version, :case_file))
-    |> where([game], game.id == ^game_id)
+    |> where([game], game.id == ^game_id and game.status in ["waiting", "active"])
     |> select([game, version, case_file], %{
       id: game.id,
       title: game.title,
@@ -771,5 +1027,36 @@ defmodule Detective.Games do
     :crypto.strong_rand_bytes(5)
     |> Base.encode32(case: :upper, padding: false)
     |> binary_part(0, 6)
+  end
+
+  defp validate_rematch_source(%Game{status: "finished", host_user_id: user_id}, user_id),
+    do: :ok
+
+  defp validate_rematch_source(%Game{}, _user_id), do: {:error, :not_rematchable}
+
+  defp recover_rematch(changeset, source_game_id, user_id) do
+    if Keyword.has_key?(changeset.errors, :rematch_of_game_id) do
+      case rematch_game(source_game_id, user_id) do
+        %Game{} = game -> {:ok, %{game: game, invite_token: nil, duplicate: true}}
+        nil -> {:error, changeset}
+      end
+    else
+      {:error, changeset}
+    end
+  end
+
+  defp rematch_game(source_game_id, user_id) do
+    Game
+    |> where(
+      [game],
+      game.rematch_of_game_id == ^source_game_id and game.host_user_id == ^user_id
+    )
+    |> Repo.one()
+  end
+
+  defp rematch_title(title) do
+    suffix = " — Rematch"
+    max_prefix_length = 80 - String.length(suffix)
+    String.slice(title, 0, max_prefix_length) <> suffix
   end
 end

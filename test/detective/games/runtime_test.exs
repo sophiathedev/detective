@@ -113,6 +113,47 @@ defmodule Detective.Games.RuntimeTest do
     assert Repo.aggregate(GameEvent, :count) == 1
   end
 
+  test "a Chisel concession persists a team Detective victory and replays idempotently" do
+    %{host: host, detectives: detectives, game: game, version: version} = ready_game()
+
+    assert {:ok, %{lobby: lobby}} =
+             Games.start_game(
+               Scope.for_user(host),
+               game.id,
+               Ecto.UUID.generate(),
+               version
+             )
+
+    command = %Command{
+      command_id: Ecto.UUID.generate(),
+      type: :concede_game,
+      expected_version: lobby.current_version,
+      payload: %{}
+    }
+
+    assert {:ok, %{duplicate: false, events: [%Event{type: :game_finished}]}} =
+             Session.execute(game.id, host.id, command)
+
+    assert %Game{
+             status: "finished",
+             winner_role: "detective",
+             winner_user_id: nil,
+             finish_reason: "chisel_forfeit",
+             finished_at: %DateTime{}
+           } = Repo.get!(Game, game.id)
+
+    assert {:ok, %{duplicate: true, events: [%Event{type: :game_finished}]}} =
+             Session.execute(game.id, host.id, command)
+
+    Enum.each(detectives, fn detective ->
+      assert {:ok, %{public: public}} =
+               Games.game_projection(Scope.for_user(detective), game.id)
+
+      assert public.result.winner["reason"] == "chisel_forfeit"
+      assert Enum.all?(public.result.detectives, & &1.won)
+    end)
+  end
+
   test "Classic start requires at least two ready Detectives" do
     host = user_fixture()
     %{game: empty_game} = game_fixture(host)
@@ -617,8 +658,17 @@ defmodule Detective.Games.RuntimeTest do
 
     assert Enum.map(events, & &1.type) == [:accusation_submitted, :game_finished]
 
-    assert %Game{status: "finished", phase: "finished", current_version: ^finished_version} =
-             Repo.get!(Game, game.id)
+    assert %Game{
+             status: "finished",
+             phase: "finished",
+             current_version: ^finished_version,
+             finished_at: %DateTime{},
+             winner_role: "detective",
+             winner_user_id: winner_user_id,
+             finish_reason: "case_solved"
+           } = Repo.get!(Game, game.id)
+
+    assert winner_user_id == detective.id
 
     restart_session(game.id)
     assert {:ok, restored} = Session.get_state(game.id)

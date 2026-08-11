@@ -90,6 +90,35 @@ defmodule DetectiveWeb.GameLiveTest do
     assert is_list(private["available_actions"])
   end
 
+  test "a member seals and reloads a private handwritten note", %{conn: conn} do
+    %{host: host, game: game} = active_game()
+
+    {:ok, view, _html} =
+      conn
+      |> log_in_user(host)
+      |> live(~p"/games/#{game.id}")
+
+    component = get_svelte(view, id: "game-book-frontend")
+
+    assert component.props["personal_note"] == %{
+             "content" => "",
+             "error" => nil,
+             "saved" => false
+           }
+
+    _html =
+      render_submit(view, "save_note", %{
+        "note" => %{"content" => "The night clerk changed his story."}
+      })
+
+    component = get_svelte(view, id: "game-book-frontend")
+    assert component.props["personal_note"]["content"] == "The night clerk changed his story."
+    assert component.props["personal_note"]["saved"]
+
+    assert {:ok, note} = Games.get_player_note(Scope.for_user(host), game.id)
+    assert note.content == "The night clerk changed his story."
+  end
+
   test "waiting game and outsider fail closed", %{conn: conn} do
     host = user_fixture()
     outsider = user_fixture()

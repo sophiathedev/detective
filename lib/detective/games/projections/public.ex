@@ -2,7 +2,9 @@ defmodule Detective.Games.Projections.Public do
   @moduledoc false
 
   alias Detective.Cases.{AccusationSheet, ResponseMatrix, SpecialActors, SpecialRules}
-  alias Detective.Games.State
+  alias Detective.Games.{InvestigationStats, State}
+
+  @case_card_codes Enum.map(?A..?L, &<<&1>>)
 
   def render(%State{} = state) do
     %{
@@ -101,7 +103,7 @@ defmodule Detective.Games.Projections.Public do
     state.case_definition
     |> ResponseMatrix.topics()
     |> Enum.filter(&(&1.id in state.public_case_card_ids))
-    |> Enum.map(&Map.take(&1, [:id, :code, :title, :type, :description]))
+    |> Enum.map(&Map.take(&1, [:id, :code, :title, :type, :description, :artwork_url]))
   end
 
   defp public_case_card_slots(state) do
@@ -114,6 +116,10 @@ defmodule Detective.Games.Projections.Public do
     state.case_definition
     |> ResponseMatrix.topics()
     |> Enum.with_index(1)
+    |> Enum.map(fn {card, fallback_position} ->
+      {card, case_card_position(card.code, fallback_position)}
+    end)
+    |> Enum.sort_by(&elem(&1, 1))
     |> Enum.map(fn {card, position} ->
       faceup? = card.id in state.public_case_card_ids
       taken = Map.get(state.taken_evidence, card.id)
@@ -137,7 +143,12 @@ defmodule Detective.Games.Projections.Public do
       }
 
       if faceup? do
-        Map.merge(slot, %{title: card.title, type: card.type})
+        Map.merge(slot, %{
+          title: card.title,
+          type: card.type,
+          description: card.description,
+          artwork_url: card.artwork_url
+        })
       else
         slot
       end
@@ -147,6 +158,13 @@ defmodule Detective.Games.Projections.Public do
   defp case_card_status(_faceup?, taken) when is_map(taken), do: "removed"
   defp case_card_status(true, _taken), do: "faceup"
   defp case_card_status(false, _taken), do: "facedown"
+
+  defp case_card_position(code, fallback_position) do
+    case Enum.find_index(@case_card_codes, &(&1 == code)) do
+      nil -> fallback_position
+      index -> index + 1
+    end
+  end
 
   defp public_taken_evidence(state) do
     state.taken_evidence
@@ -231,10 +249,10 @@ defmodule Detective.Games.Projections.Public do
         player_id: detective.id,
         display_name: detective.display_name,
         seat: detective.seat,
-        won: state.winner["player_id"] == detective.id,
+        won: detective_won?(state.winner, detective.id),
         solve_attempt: revealed_guess(state.case_definition, Map.get(detective, :solve_attempt)),
         final_guess: revealed_guess(state.case_definition, Map.get(detective, :final_guess)),
-        activity: player_activity(state.public_history, detective.id)
+        activity: InvestigationStats.player_activity(state.investigation_stats, detective.id)
       }
     end)
   end
@@ -248,36 +266,21 @@ defmodule Detective.Games.Projections.Public do
 
   defp revealed_guess(_case_definition, _guess), do: nil
 
+  defp detective_won?(%{"role" => "detective", "reason" => "chisel_forfeit"}, _player_id),
+    do: true
+
+  defp detective_won?(winner, player_id) when is_map(winner),
+    do: winner["player_id"] == player_id
+
+  defp detective_won?(_winner, _player_id), do: false
+
   defp investigation_debrief(state) do
-    %{
+    state.investigation_stats
+    |> InvestigationStats.investigation()
+    |> Map.merge(%{
       days_elapsed: state.day,
-      moves: count_history(state.public_history, ["player_moved"]),
-      searches: count_history(state.public_history, ["location_searched", "suspect_searched"]),
-      interrogations: count_history(state.public_history, ["interrogation_started"]),
-      challenges:
-        count_history(state.public_history, ["challenge_succeeded", "challenge_failed"]),
-      successful_challenges: count_history(state.public_history, ["challenge_succeeded"]),
       public_leads: length(state.public_case_card_ids),
       evidence_taken: map_size(state.taken_evidence)
-    }
+    })
   end
-
-  defp player_activity(history, player_id) do
-    %{
-      moves: count_history(history, ["player_moved"], player_id),
-      searches: count_history(history, ["location_searched", "suspect_searched"], player_id),
-      interrogations: count_history(history, ["interrogation_started"], player_id),
-      challenges: count_history(history, ["challenge_succeeded", "challenge_failed"], player_id)
-    }
-  end
-
-  defp count_history(history, types, player_id \\ nil) do
-    Enum.count(history, fn entry ->
-      history_value(entry, :type) in types and
-        (is_nil(player_id) or history_value(entry, :player_id) == player_id)
-    end)
-  end
-
-  defp history_value(entry, key),
-    do: Map.get(entry, key) || Map.get(entry, Atom.to_string(key))
 end

@@ -9,14 +9,17 @@
     reason = null,
     offlinePlayers = [],
     canResume = false,
+    canConcede = false,
     commandPending = false,
     commandError = null,
     onResume = () => {},
+    onConcede = () => {},
   } = $props()
 
   let pauseDocument = $state(null)
   let returnFocus = null
   let wasActive = false
+  let concedeArmed = $state(false)
 
   function restoreFocus() {
     if (typeof window === "undefined") return
@@ -142,6 +145,45 @@
         >{commandPending ? t("Reopening case…") : t("Resume game")}</button>
       {:else}
         <p class="noir-pause-waiting">{t("The Chisel will reopen the case when every player is back.")}</p>
+      {/if}
+
+      {#if canConcede}
+        <div class="mt-4 border-t border-[#8c6d52] pt-4">
+          {#if concedeArmed}
+            <p class="mb-3 text-sm leading-6 text-[#6b211c]">
+              {t("Conceding awards the case to every Detective and releases the sealed solution.")}
+            </p>
+            <div class="grid grid-cols-2 gap-2">
+              <button
+                id="confirm-paused-concede"
+                type="button"
+                disabled={commandPending}
+                onclick={onConcede}
+                class="border border-[#8b3029] bg-[#6b241e] px-3 py-2 text-sm font-semibold text-[#f1dfbd] disabled:opacity-45"
+              >
+                {commandPending ? t("Conceding…") : t("Confirm concession")}
+              </button>
+              <button
+                type="button"
+                disabled={commandPending}
+                onclick={() => (concedeArmed = false)}
+                class="border border-[#8e7552] px-3 py-2 text-sm font-semibold text-[#624a36] disabled:opacity-45"
+              >
+                {t("Keep case paused")}
+              </button>
+            </div>
+          {:else}
+            <button
+              id="paused-concede-game"
+              type="button"
+              disabled={commandPending}
+              onclick={() => (concedeArmed = true)}
+              class="w-full border border-[#8b3029]/60 px-3 py-2 text-sm font-semibold text-[#752b25] disabled:opacity-45"
+            >
+              {t("Concede case")}
+            </button>
+          {/if}
+        </div>
       {/if}
     </div>
   </div>

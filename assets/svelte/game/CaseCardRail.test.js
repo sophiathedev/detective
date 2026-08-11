@@ -17,13 +17,15 @@ const slots = [
     status: "faceup",
     title: "Victim File",
     type: "victim",
+    description: "The public victim dossier.",
+    artwork_url: "/images/cards/dcoa/faces/female-business.webp",
     knowledge_player_ids: [],
     evidence_holder_player_id: null,
     evidence_release_day: null,
   },
   {
     code: "B",
-    position: 2,
+    position: 8,
     status: "facedown",
     knowledge_player_ids: ["detective-1", "detective-3"],
     evidence_holder_player_id: null,
@@ -45,10 +47,32 @@ describe("CaseCardRail", () => {
 
     expect(screen.getByLabelText("Case cards and public knowledge markers")).toBeInTheDocument()
     expect(screen.getByTestId("case-card-slot-A")).toHaveAttribute("data-status", "faceup")
+    expect(screen.getByTestId("case-card-slot-A")).toHaveStyle("--case-slot-center: 4.7")
     expect(screen.getByTestId("case-card-slot-A")).toHaveTextContent("Victim File")
     expect(screen.getByTestId("case-card-slot-A").querySelector("[data-card-type='victim']")).toBeInTheDocument()
-    expect(screen.getByTestId("case-card-slot-A").querySelector(".noir-case-card-watermark")).toHaveTextContent("V")
+    expect(screen.getByTestId("case-card-slot-A").querySelector(".noir-case-card-art")).toHaveAttribute(
+      "src",
+      "/images/cards/dcoa/faces/female-business.webp",
+    )
+    expect(screen.getByTestId("case-card-slot-A").querySelector(".noir-case-card-art")).toHaveAttribute(
+      "srcset",
+      "/images/cards/dcoa/faces/female-business-220.webp 220w, /images/cards/dcoa/faces/female-business.webp 420w, /images/cards/dcoa/faces/female-business@2x.webp 675w",
+    )
+    expect(screen.getByTestId("case-card-slot-A").querySelector(".noir-case-card-art")).toHaveAttribute("sizes", "6.650vw")
+    expect(screen.getByTestId("case-card-slot-A").querySelector(".noir-case-card-art")).toHaveAttribute("decoding", "async")
+    expect(screen.getByTestId("case-card-slot-A").querySelector(".noir-case-card-art")).toHaveAttribute("fetchpriority", "low")
+    expect(screen.getByTestId("case-card-slot-A").querySelector("strong")).not.toBeInTheDocument()
     expect(screen.getByTestId("case-card-slot-B")).toHaveAttribute("data-status", "facedown")
+    expect(screen.getByTestId("case-card-slot-B")).toHaveStyle("--case-slot-position: 2")
+    expect(screen.getByTestId("case-card-slot-B")).toHaveStyle("--case-slot-center: 12.85")
+    expect(screen.getByTestId("case-card-slot-B").querySelector(".noir-case-card-art")).toHaveAttribute(
+      "src",
+      "/images/cards/dcoa/backs/b.webp",
+    )
+    expect(screen.getByTestId("case-card-slot-B").querySelector(".noir-case-card-art")).toHaveAttribute(
+      "srcset",
+      "/images/cards/dcoa/backs/b-220.webp 220w, /images/cards/dcoa/backs/b.webp 420w, /images/cards/dcoa/backs/b@2x.webp 675w",
+    )
     expect(screen.getByTestId("case-card-slot-B")).not.toHaveTextContent("Hidden Fingerprint")
     expect(screen.getByTestId("case-card-slot-C")).toHaveTextContent("Removed")
     expect(screen.getByTestId("case-card-slot-C")).toHaveTextContent("Day 4")
@@ -111,5 +135,14 @@ describe("CaseCardRail", () => {
     expect(screen.queryByTestId("case-card-action-A")).not.toBeInTheDocument()
     expect(screen.queryByTestId("case-card-action-B")).not.toBeInTheDocument()
     expect(screen.queryByTestId("case-card-action-C")).not.toBeInTheDocument()
+  })
+
+  it("requests larger card candidates only when the board is zoomed", () => {
+    render(CaseCardRail, { slots, players, zoom: 2.5 })
+
+    expect(screen.getByTestId("case-card-slot-B").querySelector(".noir-case-card-art")).toHaveAttribute(
+      "sizes",
+      "16.625vw",
+    )
   })
 })

@@ -7,7 +7,7 @@ defmodule Detective.GamesTest do
 
   alias Detective.Accounts.Scope
   alias Detective.Games
-  alias Detective.Games.GamePlayer
+  alias Detective.Games.{GameEvent, GamePlayer, GamePrivateEvent}
   alias Detective.Invitations
   alias Detective.Invitations.GameInvite
 
@@ -161,6 +161,52 @@ defmodule Detective.GamesTest do
     assert Repo.get!(GamePlayer, player.id).status == "removed"
   end
 
+  test "the Chisel cancels a waiting room and revokes its invitation atomically" do
+    host = user_fixture()
+    detective = user_fixture()
+    %{game: game, invite_token: token} = game_fixture(host)
+
+    assert {:error, :not_chisel} =
+             Games.cancel_lobby(Scope.for_user(detective), game.id, 0)
+
+    now = ~U[2026-08-07 03:00:00Z]
+
+    assert {:ok, %{game_id: game_id, version: 1}} =
+             Games.cancel_lobby(Scope.for_user(host), game.id, 0, now: now)
+
+    assert game_id == game.id
+
+    assert %{status: "cancelled", finished_at: ^now, finish_reason: "host_cancelled"} =
+             Repo.get!(Detective.Games.Game, game.id)
+
+    assert Repo.one!(GameInvite).revoked_at == now
+    assert {:error, :game_not_waiting} = Games.cancel_lobby(Scope.for_user(host), game.id, 1)
+    assert {:error, :game_not_waiting} = Invitations.preview(Scope.for_user(detective), token)
+    assert {:error, :game_not_found} = Games.get_lobby(Scope.for_user(host), game.id)
+  end
+
+  test "cancelling a lobby rejects a stale version without changing the room" do
+    host = user_fixture()
+    detective = user_fixture()
+    %{game: game, invite_token: token} = game_fixture(host)
+    assert {:ok, _result} = Invitations.accept(Scope.for_user(detective), token)
+
+    assert {:ok, %{lobby: lobby}} =
+             Games.set_ready(Scope.for_user(detective), game.id, 0, true)
+
+    assert lobby.current_version == 1
+
+    assert {:error, :stale_version} =
+             Games.cancel_lobby(Scope.for_user(host), game.id, 0)
+
+    assert %{status: "waiting", current_version: 1, finished_at: nil} =
+             Repo.get!(Detective.Games.Game, game.id)
+
+    assert {:ok, current_lobby} = Games.get_lobby(Scope.for_user(host), game.id)
+    assert current_lobby.current_version == 1
+    assert current_lobby.invite.status == "active"
+  end
+
   test "the Chisel updates only published case files and a capacity that fits the room" do
     host = user_fixture()
     detective = user_fixture()
@@ -237,5 +283,137 @@ defmodule Detective.GamesTest do
     assert id == own_game.id
     refute Enum.any?(dossiers.waiting, &(&1.id == other_game.id))
     refute Map.has_key?(hd(dossiers.waiting), :case_content)
+  end
+
+  test "finished dashboard dossiers include compact result metadata" do
+    user = user_fixture()
+    %{game: game} = game_fixture(user, %{title: "Sealed File"})
+    started_at = ~U[2026-08-07 01:00:00Z]
+    finished_at = ~U[2026-08-07 02:30:00Z]
+
+    game
+    |> Ecto.Changeset.change(%{
+      status: "finished",
+      phase: "finished",
+      started_at: started_at,
+      finished_at: finished_at,
+      winner_role: "chisel",
+      winner_user_id: user.id,
+      finish_reason: "time_expired"
+    })
+    |> Repo.update!()
+
+    assert [%{won: true} = dossier] =
+             Games.list_game_dossiers(Scope.for_user(user)).finished
+
+    assert dossier.winner_role == "chisel"
+    assert dossier.finish_reason == "time_expired"
+    assert dossier.started_at == started_at
+    assert dossier.finished_at == finished_at
+    refute Map.has_key?(dossier, :case_content)
+  end
+
+  test "the Chisel creates one idempotent rematch from a finished game" do
+    host = user_fixture()
+    %{game: source, case_version: case_version} = game_fixture(host, %{title: "Cold Ledger"})
+
+    source
+    |> Ecto.Changeset.change(status: "finished", phase: "finished")
+    |> Repo.update!()
+
+    token = "fresh-rematch-token"
+
+    assert {:ok, first} =
+             Games.rematch(Scope.for_user(host), source.id,
+               room_code: "REM234",
+               invite_token: {token, :crypto.hash(:sha256, token)}
+             )
+
+    refute first.duplicate
+    assert first.invite_token == token
+    assert first.game.rematch_of_game_id == source.id
+    assert first.game.case_version_id == case_version.id
+    assert first.game.max_detectives == source.max_detectives
+    assert first.game.host_user_id == host.id
+    assert first.game.status == "waiting"
+
+    assert {:ok, duplicate} = Games.rematch(Scope.for_user(host), source.id)
+    assert duplicate.duplicate
+    assert duplicate.invite_token == nil
+    assert duplicate.game.id == first.game.id
+    assert Repo.aggregate(Detective.Games.Game, :count) == 2
+  end
+
+  test "only the original Chisel can rematch a finished game" do
+    host = user_fixture()
+    detective = user_fixture()
+    %{game: game, invite_token: token} = game_fixture(host)
+    assert {:ok, _result} = Invitations.accept(Scope.for_user(detective), token)
+
+    game
+    |> Ecto.Changeset.change(status: "finished", phase: "finished")
+    |> Repo.update!()
+
+    assert {:error, :not_rematchable} =
+             Games.rematch(Scope.for_user(detective), game.id)
+
+    active = game_fixture(host).game
+    assert {:error, :not_rematchable} = Games.rematch(Scope.for_user(host), active.id)
+  end
+
+  test "finished members page through only the public replay chronology" do
+    host = user_fixture()
+    outsider = user_fixture()
+    %{game: game} = game_fixture(host)
+
+    game
+    |> Ecto.Changeset.change(status: "finished", phase: "finished")
+    |> Repo.update!()
+
+    events =
+      Enum.map(1..31, fn sequence ->
+        %GameEvent{
+          game_id: game.id,
+          command_id: Ecto.UUID.generate(),
+          sequence: sequence,
+          event_type: "player_moved",
+          public_payload: %{"location_id" => "#{sequence}"}
+        }
+        |> GameEvent.insert_changeset()
+        |> Repo.insert!()
+      end)
+
+    first_event = hd(events)
+
+    %GamePrivateEvent{
+      game_id: game.id,
+      game_event_id: first_event.id,
+      recipient_user_id: host.id,
+      payload: %{"solution" => "must remain sealed"}
+    }
+    |> GamePrivateEvent.insert_changeset()
+    |> Repo.insert!()
+
+    assert {:ok, first_page} = Games.replay_page(Scope.for_user(host), game.id, 0)
+    assert length(first_page.events) == 30
+    assert first_page.has_next
+    refute first_page.has_previous
+    assert hd(first_page.events).sequence == 1
+    refute Map.has_key?(hd(first_page.events), :private_payloads)
+    refute Jason.encode!(first_page) =~ "must remain sealed"
+
+    assert {:ok, second_page} = Games.replay_page(Scope.for_user(host), game.id, 1)
+    assert Enum.map(second_page.events, & &1.sequence) == [31]
+    refute second_page.has_next
+    assert second_page.has_previous
+
+    assert {:error, :replay_unavailable} =
+             Games.replay_page(Scope.for_user(host), game.id, 2)
+
+    assert {:error, :replay_unavailable} =
+             Games.replay_page(Scope.for_user(host), game.id, 999_999_999_999)
+
+    assert {:error, :replay_unavailable} =
+             Games.replay_page(Scope.for_user(outsider), game.id, 0)
   end
 end

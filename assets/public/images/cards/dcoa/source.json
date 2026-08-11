@@ -1,0 +1,43 @@
+{
+  "title": "Detective: City of Angels official Case Design Kit card assets",
+  "publisher": "Van Ryder Games",
+  "artist_credit": "Vincent Dutrait",
+  "publisher_page": "https://vanrydergames.com/products/detective-city-of-angels",
+  "source_url": "https://drive.google.com/file/d/1Pv9FxFB6w_93m9mgF3ZQ63KPVORO3X_w/view",
+  "source_archive": "DCOA_CaseDesignKit.zip",
+  "source_archive_sha256": "2a55b4f02b78913fdb571d80b91167e4850f99906dbd43cfbb04354d807f9c8c",
+  "downloaded_at": "2026-08-10",
+  "project_use": "public_non_commercial_fan_project",
+  "rights_note": "Official fan-case design resources. Unofficial project; not affiliated with or endorsed by Van Ryder Games. Commercial use is outside the project scope.",
+  "runtime_derivatives": {
+    "paths": [
+      "/images/cards/dcoa/backs/a.webp through /images/cards/dcoa/backs/l.webp",
+      "/images/cards/dcoa/templates/suspect.webp",
+      "/images/cards/dcoa/templates/evidence.webp",
+      "/images/cards/dcoa/templates/information.webp",
+      "/images/cards/dcoa/faces/female-business.webp",
+      "/images/cards/dcoa/faces/truncheon.webp",
+      "/images/cards/dcoa/faces/bloody-ropes.webp"
+    ],
+    "format": "webp",
+    "variants": {
+      "compact": {
+        "suffix": "-220.webp",
+        "width": 220,
+        "quality": 86,
+        "encoder": "cwebp -m 6 -q 86 -sharp_yuv -resize 220 0"
+      },
+      "standard": {
+        "width": 420,
+        "quality": 88,
+        "encoder": "cwebp -m 6 -q 88 -sharp_yuv -resize 420 0"
+      },
+      "zoom": {
+        "suffix": "@2x.webp",
+        "width": 675,
+        "quality": 88,
+        "encoder": "cwebp -m 6 -q 88 -sharp_yuv -resize 675 0"
+      }
+    }
+  }
+}

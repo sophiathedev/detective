@@ -97,7 +97,23 @@ defmodule Detective.Games.SnapshotCodecTest do
           "release_day" => 5
         }
       },
-      triggered_special_rule_ids: ["late-witness"]
+      triggered_special_rule_ids: ["late-witness"],
+      investigation_stats: %{
+        "moves" => 2,
+        "searches" => 1,
+        "interrogations" => 3,
+        "challenges" => 1,
+        "successful_challenges" => 1,
+        "by_player" => %{
+          player_id => %{
+            "moves" => 2,
+            "searches" => 1,
+            "interrogations" => 3,
+            "challenges" => 1,
+            "successful_challenges" => 1
+          }
+        }
+      }
     }
 
     dumped = SnapshotCodec.dump(state)
@@ -125,6 +141,30 @@ defmodule Detective.Games.SnapshotCodecTest do
     assert restored.archived_searches == ["location:51"]
     assert restored.taken_evidence["signal-log"]["release_day"] == 5
     assert restored.triggered_special_rule_ids == ["late-witness"]
+    assert restored.investigation_stats == state.investigation_stats
+  end
+
+  test "migrates schema version 7 snapshots by rebuilding retained investigation stats" do
+    player_id = Ecto.UUID.generate()
+
+    dumped =
+      %State{
+        players: %{},
+        locations: %{},
+        suspects: %{},
+        public_history: [
+          %{type: "challenge_succeeded", player_id: player_id},
+          %{type: "player_moved", player_id: player_id}
+        ]
+      }
+      |> SnapshotCodec.dump()
+      |> Map.put("schema_version", 7)
+      |> Map.delete("investigation_stats")
+
+    assert {:ok, restored} = SnapshotCodec.load(dumped)
+    assert restored.investigation_stats["moves"] == 1
+    assert restored.investigation_stats["challenges"] == 1
+    assert restored.investigation_stats["successful_challenges"] == 1
   end
 
   test "migrates schema version 3 snapshots without triggered special rules" do

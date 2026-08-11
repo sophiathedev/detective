@@ -20,6 +20,7 @@
   let startCommandId = null
   let pendingRemovalId = $state(null)
   let leaveArmed = $state(false)
+  let cancelArmed = $state(false)
   let revokeArmed = $state(false)
   let inviteHours = $state(24)
   let inviteUrl = $state(null)
@@ -187,6 +188,29 @@
       })
   }
 
+  function cancelLobby() {
+    if (!cancelArmed) {
+      cancelArmed = true
+      return
+    }
+    if (!channel || commandPending) return
+
+    commandPending = true
+    commandError = null
+    channel
+      .push("cancel_lobby", { expected_version: room.current_version })
+      .receive("ok", ({ path }) => window.location.assign(path))
+      .receive("error", ({ code }) => {
+        commandPending = false
+        cancelArmed = false
+        commandError = commandFailure(code, "Could not cancel the room.")
+      })
+      .receive("timeout", () => {
+        commandPending = false
+        commandError = "Connection timed out. Try again."
+      })
+  }
+
   function removePlayer(playerId) {
     if (pendingRemovalId !== playerId) {
       pendingRemovalId = playerId
@@ -325,6 +349,7 @@
     channel.on("presence_state", syncPresenceState)
     channel.on("presence_diff", syncPresenceDiff)
     channel.on("game_started", ({ path }) => window.location.assign(path))
+    channel.on("lobby_cancelled", ({ path }) => window.location.assign(path))
     channel.on("player_removed", redirectRemovedPlayer)
 
     channel
@@ -771,6 +796,43 @@
                   class="w-full border border-[#8b3029]/55 px-3 py-2 font-mono text-[0.56rem] uppercase tracking-[0.1em] text-[#752b25] transition hover:bg-[#8b3029]/10 disabled:opacity-45"
                 >
                   {t("Leave investigation room")}
+                </button>
+              {/if}
+            </div>
+          {:else}
+            <div class="mt-5 border-t border-[#a98d63]/70 pt-4">
+              {#if cancelArmed}
+                <p class="mb-3 text-xs leading-5 text-[#6b211c]">
+                  {t("Cancelling revokes every invitation and permanently closes this waiting room.")}
+                </p>
+                <div class="grid grid-cols-2 gap-2">
+                  <button
+                    id="lobby-confirm-cancel"
+                    type="button"
+                    disabled={connectionState !== "online" || commandPending}
+                    onclick={cancelLobby}
+                    class="border border-[#8b3029] bg-[#6b241e] px-3 py-2 font-mono text-[0.56rem] font-semibold uppercase tracking-[0.1em] text-[#f1dfbd] transition hover:bg-[#812d25] disabled:opacity-45"
+                  >
+                    {commandPending ? t("Closing…") : t("Seal cancellation")}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={commandPending}
+                    onclick={() => (cancelArmed = false)}
+                    class="border border-[#8e7552] px-3 py-2 font-mono text-[0.56rem] uppercase tracking-[0.1em] text-[#624a36] transition hover:bg-[#d9c6a2]"
+                  >
+                    {t("Keep room")}
+                  </button>
+                </div>
+              {:else}
+                <button
+                  id="lobby-cancel-room"
+                  type="button"
+                  disabled={commandPending}
+                  onclick={cancelLobby}
+                  class="w-full border border-[#8b3029]/55 px-3 py-2 font-mono text-[0.56rem] uppercase tracking-[0.1em] text-[#752b25] transition hover:bg-[#8b3029]/10 disabled:opacity-45"
+                >
+                  {t("Cancel waiting room")}
                 </button>
               {/if}
             </div>

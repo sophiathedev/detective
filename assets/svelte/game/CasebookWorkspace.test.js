@@ -93,10 +93,28 @@ const baseView = {
     commandStatus: false,
     retryAvailable: false,
   },
+  notes: {
+    content: "The station ledger conflicts with the clerk.",
+    saved: true,
+    error: null,
+  },
   chisel: null,
 }
 
 describe("CasebookWorkspace", () => {
+  it("renders the member-only handwritten notebook as a LiveView form", () => {
+    render(CasebookWorkspace, { page: "notes", view: baseView, actions: noActions })
+
+    expect(document.querySelector("#personal-note-form")).toHaveAttribute(
+      "phx-submit",
+      "save_note",
+    )
+    expect(document.querySelector("#personal-note-content")).toHaveValue(
+      "The station ledger conflicts with the clerk.",
+    )
+    expect(document.querySelector("#personal-note-saved")).toBeInTheDocument()
+  })
+
   it("keeps the public case briefing and active directives readable", () => {
     const view = {
       ...baseView,

@@ -16,6 +16,7 @@
   let bribes = $derived(view?.bribes ?? {})
   let accusation = $derived(view?.accusation ?? {})
   let history = $derived(view?.history ?? {})
+  let notes = $derived(view?.notes ?? { content: "", saved: false, error: null })
   let accusationConfirming = $state(false)
   let bribeConfirming = $state(false)
   let selectedInterrogation = $derived(
@@ -722,6 +723,62 @@
   {:else}
     <p id="accusation-unavailable" class="casebook-empty-page">{t("No accusation sheet is authorized yet. The server opens this folio when a Solve attempt or final guess is legal.")}</p>
   {/if}
+
+{:else if page === "notes"}
+  <section id="personal-notes-page" class="casebook-workspace-page border-y border-[#91785c] bg-[#d4c3a3] p-4 sm:p-5" aria-labelledby="personal-notes-heading">
+    <div class="flex flex-wrap items-end justify-between gap-3 border-b border-[#9c8264] pb-4">
+      <div>
+        <p class="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8c3f33]">{t("Private handwriting")}</p>
+        <h3 id="personal-notes-heading" class="mt-1 font-serif text-2xl font-semibold">{t("Your sealed field notes")}</h3>
+      </div>
+      <span class="rotate-[-2deg] border-2 border-[#7f342e] px-2 py-1 font-mono text-[8px] font-bold uppercase tracking-[0.12em] text-[#7f342e]">
+        {t("Recipient only")}
+      </span>
+    </div>
+
+    <p class="mt-4 max-w-3xl text-sm leading-6 text-[#66513c]">
+      {t("These notes are stored separately from game events. They are never broadcast to the table or included in replay.")}
+    </p>
+
+    <form id="personal-note-form" phx-submit="save_note" class="mt-5">
+      <label for="personal-note-content" class="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-[#725e48]">
+        {t("Working theory")}
+      </label>
+      <textarea
+        id="personal-note-content"
+        name="note[content]"
+        rows="12"
+        maxlength="5000"
+        value={notes.content ?? ""}
+        aria-describedby="personal-note-guidance"
+        class="noir-field mt-2 min-h-64 w-full resize-y px-4 py-3 font-serif text-base leading-7"
+        placeholder={t("Record suspects, contradictions, routes, and the theory you do not want the table to hear.")}
+      ></textarea>
+      <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <p id="personal-note-guidance" class="text-xs leading-5 text-[#715a42]">
+          {t("Maximum 5000 characters. Saving an empty page clears the note.")}
+        </p>
+        <button
+          id="save-personal-note"
+          type="submit"
+          phx-disable-with={t("Sealing note…")}
+          class="noir-physical-button px-5 text-sm font-semibold"
+        >
+          {t("Seal private note")}
+        </button>
+      </div>
+    </form>
+
+    {#if notes.error}
+      <p id="personal-note-error" class="mt-4 border-l-2 border-[#8b3029] pl-3 text-sm text-[#6b211c]" role="alert">
+        {t(notes.error)}
+      </p>
+    {:else if notes.saved}
+      <p id="personal-note-saved" class="mt-4 border-l-2 border-[#355844] pl-3 text-sm text-[#355844]" role="status">
+        {t("Private note sealed.")}
+      </p>
+    {/if}
+  </section>
 
 {:else if page === "history"}
   <div class="grid gap-4">

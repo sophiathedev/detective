@@ -97,6 +97,7 @@
         {caseCardSlots}
         {inspectableCaseCardCodes}
         {selectedCaseCardCode}
+        {zoom}
         legalLocationIds={disabled ? [] : legalLocationIds}
         {selectedLocationId}
         {pendingLocationId}

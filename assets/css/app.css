@@ -292,7 +292,7 @@ body:has(#game-table-shell) .noir-game-table {
 .noir-game-phase {
   position: absolute;
   z-index: 30;
-  top: 1rem;
+  top: calc(11.9cqw + 0.75rem);
   left: 50%;
   display: grid;
   min-width: min(28rem, calc(100% - 24rem));
@@ -552,16 +552,16 @@ body:has(#game-pause-curtain) .noir-game-phase {
 .noir-game-detective-rail {
   position: absolute;
   z-index: 30;
-  top: 50%;
+  top: calc(11.9cqw + 0.75rem);
   left: 1rem;
-  translate: 0 -50%;
+  translate: 0 0;
   animation: noir-hud-settle-left 460ms 70ms cubic-bezier(0.18, 0.78, 0.22, 1) both;
 }
 
 .noir-game-chisel {
   position: absolute;
   z-index: 30;
-  top: 1rem;
+  top: calc(11.9cqw + 0.75rem);
   right: 1rem;
   animation: noir-hud-settle-right 460ms 120ms cubic-bezier(0.18, 0.78, 0.22, 1) both;
 }
@@ -569,7 +569,7 @@ body:has(#game-pause-curtain) .noir-game-phase {
 .noir-game-context {
   position: absolute;
   z-index: 29;
-  top: 14rem;
+  top: calc(11.9cqw + 16rem);
   right: 1rem;
 }
 
@@ -986,6 +986,13 @@ body:has(#game-pause-curtain) .noir-game-phase {
   font-weight: 400;
 }
 
+@media (min-width: 64rem) and (max-height: 50rem) {
+  .noir-game-detective-rail {
+    transform-origin: top left;
+    scale: 0.92;
+  }
+}
+
 @media (max-width: 63.999rem) {
   .noir-game-detective-rail {
     top: auto;
@@ -996,7 +1003,7 @@ body:has(#game-pause-curtain) .noir-game-phase {
   }
 
   .noir-game-chisel {
-    top: 0.75rem;
+    top: calc(11.9cqw + 0.5rem);
     right: 0.75rem;
     max-width: min(17rem, 55vw);
   }
@@ -1016,7 +1023,7 @@ body:has(#game-pause-curtain) .noir-game-phase {
   }
 
   .noir-game-phase {
-    top: 0.75rem;
+    top: calc(11.9cqw + 0.5rem);
     left: 0.75rem;
     width: min(22rem, 40vw);
     min-width: 0;
@@ -1238,7 +1245,7 @@ body:has(#game-pause-curtain) .noir-game-phase {
 .noir-map-status {
   position: absolute;
   z-index: 9;
-  top: clamp(7rem, 15vw, 15.5rem);
+  top: max(clamp(7rem, 15vw, 15.5rem), calc(11.9cqw + 4rem));
   left: 17rem;
   max-width: min(24rem, calc(100% - 41rem));
   pointer-events: none;
@@ -2037,30 +2044,28 @@ body:has(#game-pause-curtain) .noir-game-phase {
 .noir-case-card-rail {
   position: absolute;
   z-index: 4;
-  top: 1.15%;
-  left: 0.9%;
-  width: 98.2%;
-  height: 23.5%;
+  inset: 0;
   pointer-events: none;
 }
 
 .noir-case-card-grid {
-  display: grid;
+  position: relative;
   width: 100%;
   height: 100%;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
   list-style: none;
 }
 
 .noir-case-card-slot {
+  position: absolute;
+  top: 1.05cqw;
+  left: calc(var(--case-slot-center) * 1cqw);
   display: grid;
+  width: 6.65cqw;
   min-width: 0;
-  grid-column: var(--case-slot-position);
-  grid-row: 1;
+  translate: -50% 0;
   grid-template-rows: minmax(0, 1fr) 2.45cqw;
   align-items: start;
   justify-items: center;
-  padding-inline: 0.55cqw;
 }
 
 .noir-case-card-action {
@@ -2103,26 +2108,52 @@ body:has(#game-pause-curtain) .noir-game-phase {
 .noir-case-card-face {
   position: relative;
   isolation: isolate;
-  display: grid;
+  display: block;
   width: 6.65cqw;
   height: 10.65cqw;
   min-width: 0;
-  align-content: start;
   overflow: hidden;
   border: 0.14cqw solid #5f4a32;
   border-radius: 0.22cqw;
   box-shadow:
     0 0.45cqw 0.85cqw rgb(33 24 16 / 0.42),
     inset 0 0 0 0.12cqw rgb(255 244 215 / 0.32);
-  padding: 0.48cqw 0.42cqw;
   text-align: center;
 }
 
-.noir-case-card-face > span,
-.noir-case-card-face > small {
+.noir-case-card-art {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: auto;
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
+}
+
+.noir-case-card-copy {
+  position: absolute;
+  z-index: 2;
+  right: 5%;
+  bottom: 4%;
+  left: 7%;
+  display: grid;
+  min-height: 25%;
+  align-content: center;
+  overflow: hidden;
+  border-radius: 0.18cqw;
+  background: rgb(244 239 222 / 0.96);
+  box-shadow: 0 -0.08cqw 0.25cqw rgb(48 35 24 / 0.2);
+  padding: 0.26cqw 0.3cqw;
+}
+
+.noir-case-card-copy > span,
+.noir-case-card-copy > small {
   overflow: hidden;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: max(0.35rem, 0.45cqw);
+  font-size: max(0.34rem, 0.4cqw);
   letter-spacing: 0.08em;
   line-height: 1.15;
   text-overflow: ellipsis;
@@ -2130,34 +2161,89 @@ body:has(#game-pause-curtain) .noir-game-phase {
   white-space: nowrap;
 }
 
-.noir-case-card-face > strong {
-  margin-top: 0.35cqw;
-  font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
-  font-size: max(0.8rem, 1.45cqw);
-  line-height: 1;
-}
-
-.noir-case-card-face > p {
+.noir-case-card-copy > p {
   display: -webkit-box;
   overflow: hidden;
-  margin-top: 0.45cqw;
+  margin-top: 0.18cqw;
   font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
-  font-size: max(0.42rem, 0.62cqw);
+  font-size: max(0.44rem, 0.6cqw);
   font-weight: 600;
   line-height: 1.12;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
 }
 
 .noir-case-card-faceup {
+  transform-origin: left center;
+  animation: noir-case-card-reveal 420ms cubic-bezier(0.2, 0.72, 0.2, 1) both;
   background:
-    linear-gradient(90deg, rgb(117 42 34 / 0.8) 0 0.32cqw, transparent 0.32cqw),
-    linear-gradient(rgb(244 232 201 / 0.72), rgb(218 199 158 / 0.78)),
-    url("/images/ui/noir/paper-fiber.svg");
+    radial-gradient(circle at 50% 34%, rgb(184 139 87 / 0.72), transparent 32%),
+    linear-gradient(145deg, #2d211a, #8a6242 55%, #2a1d17);
   color: #35271d;
+  backface-visibility: hidden;
 }
 
-.noir-case-card-faceup::after,
+.noir-case-card-faceup:not([data-has-artwork="true"])::before {
+  position: absolute;
+  z-index: 0;
+  top: 27%;
+  right: -8%;
+  left: -8%;
+  color: rgb(238 222 190 / 0.18);
+  content: attr(data-card-type);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 1.15cqw;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  rotate: -8deg;
+  text-transform: uppercase;
+}
+
+.noir-case-card-faceup[data-card-type="information"] .noir-case-card-copy,
+.noir-case-card-faceup[data-card-type="crime"] .noir-case-card-copy {
+  top: 32%;
+  right: 9%;
+  bottom: 13%;
+  left: 14%;
+  min-height: 0;
+  align-content: start;
+  background: rgb(247 244 230 / 0.9);
+  box-shadow: none;
+  padding: 0.35cqw;
+  rotate: -2deg;
+}
+
+.noir-case-card-faceup[data-card-type="information"] .noir-case-card-copy > span,
+.noir-case-card-faceup[data-card-type="crime"] .noir-case-card-copy > span {
+  display: none;
+}
+
+.noir-case-card-faceup[data-card-type="information"] .noir-case-card-copy > small,
+.noir-case-card-faceup[data-card-type="crime"] .noir-case-card-copy > small {
+  display: -webkit-box;
+  margin-top: 0.25cqw;
+  color: #695441;
+  font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
+  font-size: max(0.34rem, 0.38cqw);
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-transform: none;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+}
+
+@keyframes noir-case-card-reveal {
+  from {
+    opacity: 0.35;
+    transform: perspective(36rem) rotateY(-82deg) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(36rem) rotateY(0deg) scale(1);
+  }
+}
+
 .noir-case-card-removed::after {
   position: absolute;
   z-index: -1;
@@ -2185,32 +2271,12 @@ body:has(#game-pause-curtain) .noir-game-phase {
 }
 
 .noir-case-card-watermark {
-  position: absolute;
-  z-index: -1;
-  right: 0.18cqw;
-  bottom: -0.55cqw;
-  color: rgb(112 55 43 / 0.11);
-  font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
-  font-size: 4.8cqw;
-  font-style: normal;
-  font-weight: 600;
-  line-height: 1;
-  rotate: -8deg;
-}
-
-.noir-case-card-faceup > span {
-  color: #774235;
-}
-
-.noir-case-card-faceup > strong {
-  position: relative;
-  width: 2.15cqw;
-  margin-inline: auto;
-  border-bottom: 0.1cqw solid rgb(93 58 39 / 0.36);
-  padding-bottom: 0.18cqw;
+  display: none;
 }
 
 .noir-case-card-removed {
+  display: grid;
+  align-content: start;
   border-color: #8d744c;
   background:
     linear-gradient(rgb(34 29 24 / 0.9), rgb(15 13 11 / 0.96)),
@@ -2219,11 +2285,39 @@ body:has(#game-pause-curtain) .noir-game-phase {
   box-shadow:
     0 0.45cqw 0.85cqw rgb(24 17 12 / 0.52),
     inset 0 0 0 0.12cqw rgb(194 163 95 / 0.15);
+  padding: 0.48cqw 0.42cqw;
 }
 
 .noir-case-card-removed > span,
 .noir-case-card-removed > small {
+  overflow: hidden;
   color: #c2a35f;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: max(0.35rem, 0.45cqw);
+  letter-spacing: 0.08em;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.noir-case-card-removed > strong {
+  margin-top: 0.35cqw;
+  font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
+  font-size: max(0.8rem, 1.45cqw);
+  line-height: 1;
+}
+
+.noir-case-card-removed > p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 0.45cqw;
+  font-family: "IBM Plex Serif", ui-serif, Georgia, serif;
+  font-size: max(0.42rem, 0.62cqw);
+  font-weight: 600;
+  line-height: 1.12;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 
 .noir-case-card-removed > small {
@@ -2231,13 +2325,17 @@ body:has(#game-pause-curtain) .noir-game-phase {
 }
 
 .noir-case-card-facedown {
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
+  border-color: #574331;
+  background: #b79258;
+  box-shadow:
+    0 0.45cqw 0.85cqw rgb(33 24 16 / 0.48),
+    inset 0 0 0 0.1cqw rgb(255 239 204 / 0.28);
 }
 
-.noir-case-card-facedown > span {
-  opacity: 0;
+@media (prefers-reduced-motion: reduce) {
+  .noir-case-card-faceup {
+    animation: none;
+  }
 }
 
 .noir-case-knowledge-rack {
@@ -2859,7 +2957,7 @@ body:has(#game-pause-curtain) .noir-game-phase {
 
 @media (max-width: 63.999rem) {
   .noir-map-status {
-    top: clamp(6.25rem, 15vw, 10rem);
+    top: max(clamp(6.25rem, 15vw, 10rem), calc(11.9cqw + 4rem));
     left: 0.75rem;
     max-width: min(22rem, calc(100% - 1.5rem));
   }
@@ -2888,7 +2986,7 @@ body:has(#game-pause-curtain) .noir-game-phase {
 
 @media (orientation: landscape) and (max-width: 63.999rem) and (max-height: 35rem) {
   .noir-game-phase {
-    top: 0.5rem;
+    top: calc(11.9cqw + 0.5rem);
     left: 11.75rem;
     width: clamp(9rem, calc(100% - 37.75rem), 22rem);
     grid-template-columns: minmax(0, 1fr);
@@ -2901,7 +2999,7 @@ body:has(#game-pause-curtain) .noir-game-phase {
   }
 
   .noir-game-detective-rail {
-    top: 3.65rem;
+    top: calc(11.9cqw + 0.5rem);
     right: auto;
     bottom: auto;
     left: 0.5rem;
@@ -2955,7 +3053,7 @@ body:has(#game-pause-curtain) .noir-game-phase {
   }
 
   .noir-game-chisel {
-    top: 0.5rem;
+    top: calc(11.9cqw + 0.5rem);
     right: 0.5rem;
     max-width: 12.5rem;
   }
@@ -3034,7 +3132,7 @@ body:has(#game-pause-curtain) .noir-game-phase {
   }
 
   .noir-map-status {
-    top: 3.8rem;
+    top: calc(11.9cqw + 4rem);
     left: 11.75rem;
     max-width: min(20rem, calc(100% - 25rem));
   }

@@ -12,7 +12,9 @@
     detectives.find((detective) => detective.id === winner.player_id) ?? null,
   )
   let verdict = $derived(
-    winner.role === "detective"
+    winner.reason === "chisel_forfeit"
+      ? t("The Detectives forced a concession")
+      : winner.role === "detective"
       ? t("{name} broke the case", { name: winningDetective?.display_name ?? t("A Detective") })
       : t("The Chisel buried the truth"),
   )
@@ -21,7 +23,9 @@
       ? t("Solved before the clock expired")
       : winner.reason === "final_guess"
         ? t("Solved by a sealed final guess")
-        : t("The Day track expired"),
+        : winner.reason === "chisel_forfeit"
+          ? t("The Chisel conceded and released the solution")
+          : t("The Day track expired"),
   )
 
   function filedDeduction(report) {

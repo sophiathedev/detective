@@ -6,6 +6,8 @@ defmodule DetectiveWeb.DashboardLiveTest do
   import LiveSvelte.Test
   import Phoenix.LiveViewTest
 
+  alias Detective.Repo
+
   test "requires an authenticated user", %{conn: conn} do
     assert {:error, {:redirect, %{to: "/users/log-in"}}} = live(conn, ~p"/dashboard")
   end
@@ -47,5 +49,29 @@ defmodule DetectiveWeb.DashboardLiveTest do
     assert dossier["path"] == ~p"/games/#{game.id}/lobby"
     refute Map.has_key?(dossier, "case_content")
     refute Map.has_key?(dossier, "solution")
+  end
+
+  test "the Chisel opens a rematch and receives the one-time invitation", %{conn: conn} do
+    user = user_fixture(display_name: "Mara Voss")
+    %{game: game} = game_fixture(user, %{title: "Closed Ledger"})
+
+    game
+    |> Ecto.Changeset.change(status: "finished", phase: "finished")
+    |> Repo.update!()
+
+    {:ok, view, _html} =
+      conn
+      |> log_in_user(user)
+      |> live(~p"/dashboard")
+
+    _html = render_click(view, "rematch", %{"id" => game.id})
+
+    component = get_svelte(view, id: "dashboard-frontend")
+    room = component.props["rematch_room"]
+
+    assert room["room_code"]
+    assert room["invite_url"] =~ "/invites/"
+    assert room["path"] =~ "/lobby"
+    refute room["duplicate"]
   end
 end

@@ -6,6 +6,8 @@ defmodule Detective.Cases.ResponseMatrix do
   never submit response text or whether the response is truthful.
   """
 
+  @case_card_codes Enum.map(?A..?L, &<<&1>>)
+
   def validate(case_definition) when is_map(case_definition) do
     case_cards = case_definition["case_cards"] || []
     suspects = case_definition["suspects"] || []
@@ -38,6 +40,7 @@ defmodule Detective.Cases.ResponseMatrix do
         title: card["title"],
         type: card["type"],
         description: card["description"] || "",
+        artwork_url: card["artwork_url"],
         takeable: card["takeable"] == true,
         initially_known: card["initially_known"] == true
       }
@@ -94,6 +97,7 @@ defmodule Detective.Cases.ResponseMatrix do
     codes = Enum.map(case_cards, & &1["code"]) |> Enum.reject(&is_nil/1)
 
     cond do
+      length(case_cards) > length(@case_card_codes) -> {:error, :too_many_case_cards}
       not Enum.all?(case_cards, &valid_case_card?/1) -> {:error, :invalid_case_cards}
       Enum.uniq(ids) != ids -> {:error, :duplicate_case_card_id}
       Enum.uniq(codes) != codes -> {:error, :duplicate_case_card_code}
@@ -108,8 +112,18 @@ defmodule Detective.Cases.ResponseMatrix do
       is_binary(card["title"]) and card["title"] != "" and is_binary(card["type"]) and
       is_boolean(card["initially_known"]) and
       (is_nil(card["takeable"]) or is_boolean(card["takeable"])) and
-      (is_nil(card["code"]) or (is_binary(card["code"]) and card["code"] != ""))
+      (is_nil(card["code"]) or card["code"] in @case_card_codes) and
+      valid_artwork_url?(card["artwork_url"])
   end
+
+  defp valid_artwork_url?(nil), do: true
+
+  defp valid_artwork_url?(url) when is_binary(url) do
+    String.starts_with?(url, "/images/") and
+      not String.contains?(url, ["..", "\\", "\0"])
+  end
+
+  defp valid_artwork_url?(_url), do: false
 
   defp validate_matrix(matrix) when is_map(matrix) do
     if Enum.all?(matrix, fn {_suspect_id, suspect_matrix} ->

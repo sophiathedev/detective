@@ -19,8 +19,12 @@ defmodule Detective.Games.Game do
     field :current_version, :integer, default: 0
     field :started_at, :utc_datetime
     field :finished_at, :utc_datetime
+    field :winner_role, :string
+    field :finish_reason, :string
 
     belongs_to :host_user, User
+    belongs_to :winner_user, User
+    belongs_to :rematch_of_game, __MODULE__
     belongs_to :case_version, CaseVersion
     has_many :players, GamePlayer
     has_many :invites, GameInvite
@@ -49,7 +53,9 @@ defmodule Detective.Games.Game do
     |> validate_number(:current_version, greater_than_or_equal_to: 0)
     |> foreign_key_constraint(:host_user_id)
     |> foreign_key_constraint(:case_version_id)
+    |> foreign_key_constraint(:rematch_of_game_id)
     |> unique_constraint(:room_code)
+    |> unique_constraint(:rematch_of_game_id)
   end
 
   def transition_changeset(game, attrs) do
@@ -61,5 +67,6 @@ defmodule Detective.Games.Game do
       ~w(lobby briefing detective_turn waiting_for_chisel waiting_for_snitches waiting_for_detective_decision resolving_challenge accusation paused finished)
     )
     |> validate_number(:current_version, greater_than_or_equal_to: 0)
+    |> validate_inclusion(:winner_role, ~w(detective chisel))
   end
 end

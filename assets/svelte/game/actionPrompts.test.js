@@ -28,4 +28,12 @@ describe("buildImmediateActionPrompt", () => {
       buildImmediateActionPrompt("end_turn", { actionsRemaining: 3 }).title,
     ).toBe("Forfeit 3 remaining Actions")
   })
+
+  it("requires an irreversible Chisel concession confirmation", () => {
+    const prompt = buildImmediateActionPrompt("concede_game")
+
+    expect(prompt.title).toBe("Concede the investigation")
+    expect(prompt.description).toContain("every Detective")
+    expect(prompt.confirmLabel).toBe("Concede and release solution")
+  })
 })

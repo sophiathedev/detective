@@ -28,6 +28,7 @@
     { id: "accuse", label: "Accuse", danger: true },
     { id: "submit_final_guess", label: "Seal Final Guess", danger: true },
     { id: "end_turn", label: "End Turn", danger: true },
+    { id: "concede_game", label: "Concede Case", danger: true },
   ]
 
   let availableActionSet = $derived(new Set(availableActions ?? []))

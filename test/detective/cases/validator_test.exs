@@ -132,6 +132,51 @@ defmodule Detective.Cases.ValidatorTest do
     assert {:error, :invalid_response_matrix} = Validator.validate(duplicate_response_card)
   end
 
+  test "limits Case cards to A-L and accepts only local artwork assets" do
+    card = %{
+      "id" => "victim",
+      "code" => "A",
+      "title" => "Victim",
+      "type" => "victim",
+      "artwork_url" => "/images/cards/dcoa/faces/female-business.webp",
+      "initially_known" => true
+    }
+
+    definition = %{"case_cards" => [card], "suspects" => [], "response_matrix" => %{}}
+
+    assert :ok = ResponseMatrix.validate(definition)
+
+    assert [%{artwork_url: "/images/cards/dcoa/faces/female-business.webp"}] =
+             ResponseMatrix.topics(definition)
+
+    invalid_code = put_in(definition, ["case_cards", Access.at(0), "code"], "M")
+    assert {:error, :invalid_case_cards} = ResponseMatrix.validate(invalid_code)
+
+    remote_artwork =
+      put_in(
+        definition,
+        ["case_cards", Access.at(0), "artwork_url"],
+        "https://tracker.example/card.png"
+      )
+
+    assert {:error, :invalid_case_cards} = ResponseMatrix.validate(remote_artwork)
+
+    traversal_artwork =
+      put_in(definition, ["case_cards", Access.at(0), "artwork_url"], "/images/../secret")
+
+    assert {:error, :invalid_case_cards} = ResponseMatrix.validate(traversal_artwork)
+
+    thirteen_cards =
+      Enum.map(0..12, fn index ->
+        card
+        |> Map.put("id", "card-#{index}")
+        |> Map.delete("code")
+      end)
+
+    assert {:error, :too_many_case_cards} =
+             ResponseMatrix.validate(%{definition | "case_cards" => thirteen_cards})
+  end
+
   test "validates server-owned Search cards and their reveal instructions" do
     valid =
       valid_case()

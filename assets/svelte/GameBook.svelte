@@ -19,6 +19,7 @@
     user_id,
     initial_public,
     initial_private,
+    personal_note = { content: "", saved: false, error: null },
     csrf_token = "",
     locale = "en",
     return_path = `/games/${game_id}`,
@@ -83,11 +84,13 @@
     { id: "evidence", label: t("Evidence") },
     { id: "bribes", label: t("Bribes") },
     { id: "accusation", label: t("Accusation") },
+    { id: "notes", label: t("Notes") },
     { id: "history", label: t("History") },
   ]
   const chiselActionPages = [
     { id: "question", label: t("Response") },
     { id: "chisel", label: t("Private case") },
+    { id: "notes", label: t("Notes") },
     { id: "history", label: t("History") },
   ]
   const fieldActionTypes = ["search_location", "analyze", "kickback", "bribe_officer"]
@@ -261,6 +264,9 @@
       allPlayersOnline &&
       availableActions.has("resume_game"),
   )
+  let canConcede = $derived(
+    privateState.role === "chisel" && availableActions.has("concede_game"),
+  )
   let selectedSuspectLeverage = $derived(
     privateState.leverage_on_suspects?.[selectedSuspectId] ?? 0,
   )
@@ -357,6 +363,7 @@
       commandStatus,
       retryAvailable: retryCommand !== null,
     },
+    notes: personal_note,
     chisel:
       privateState.role === "chisel"
         ? {
@@ -1544,12 +1551,14 @@
         reason={pauseReason}
         {offlinePlayers}
         {canResume}
+        {canConcede}
         {commandPending}
         commandError={publicState.status === "paused" ? commandError : null}
         onResume={() =>
           retryCommand?.type === "resume_game"
             ? retryLastCommand()
             : sendCommand("resume_game", {})}
+        onConcede={() => sendCommand("concede_game", {})}
       />
     {/snippet}
   </GameTableShell>

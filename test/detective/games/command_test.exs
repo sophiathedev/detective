@@ -45,6 +45,7 @@ defmodule Detective.Games.CommandTest do
         "weapon_id" => "ledger",
         "motive_id" => "blackmail"
       },
+      "concede_game" => %{},
       "resume_game" => %{},
       "end_turn" => %{}
     }

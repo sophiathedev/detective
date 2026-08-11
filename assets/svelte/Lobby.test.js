@@ -120,6 +120,14 @@ describe("Lobby", () => {
     expect(screen.getByRole("button", { name: "Stay in room" })).toBeInTheDocument()
   })
 
+  it("requires a second Chisel action before cancelling the waiting room", async () => {
+    render(Lobby, { lobby })
+
+    await fireEvent.click(screen.getByRole("button", { name: "Cancel waiting room" }))
+    expect(screen.getByRole("button", { name: "Seal cancellation" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Keep room" })).toBeInTheDocument()
+  })
+
   it("opens the Chisel room orders with published case and capacity controls", async () => {
     render(Lobby, {
       lobby,

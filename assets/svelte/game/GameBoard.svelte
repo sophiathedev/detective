@@ -23,6 +23,7 @@
     caseCardSlots = [],
     inspectableCaseCardCodes = [],
     selectedCaseCardCode = null,
+    zoom = 1,
     legalLocationIds = [],
     selectedLocationId = null,
     pendingLocationId = null,
@@ -515,6 +516,7 @@
     players={detectives}
     {inspectableCaseCardCodes}
     {selectedCaseCardCode}
+    {zoom}
     {disabled}
     {onSelectCaseCard}
   />

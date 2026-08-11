@@ -4,6 +4,7 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0;\n"
 
 #: lib/detective_web/live/game_new_live.ex:127
+#: lib/detective_web/live/lobby_live.ex:44
 #, elixir-autogen, elixir-format
 msgid "%{title} (version %{version})"
 msgstr "%{title} (phiên bản %{version})"
@@ -101,7 +102,7 @@ msgid "Creating account..."
 msgstr "Đang tạo tài khoản..."
 
 #: lib/detective_web/components/layouts/root.html.heex:71
-#: lib/detective_web/live/dashboard_live.ex:27
+#: lib/detective_web/live/dashboard_live.ex:29
 #, elixir-autogen, elixir-format
 msgid "Dashboard"
 msgstr "Tủ hồ sơ"
@@ -307,7 +308,7 @@ msgstr "Vụ án đó không còn khả dụng. Hãy chọn một vụ án đã 
 msgid "The link is invalid or it has expired."
 msgstr "Liên kết không hợp lệ hoặc đã hết hạn."
 
-#: lib/detective_web/live/game_live.ex:21
+#: lib/detective_web/live/game_live.ex:24
 #, elixir-autogen, elixir-format
 msgid "This casebook is unavailable."
 msgstr "Sổ vụ án này không khả dụng."
@@ -322,7 +323,7 @@ msgstr "Thư mời này không còn khả dụng."
 msgid "This room is full."
 msgstr "Phòng này đã đầy."
 
-#: lib/detective_web/live/lobby_live.ex:19
+#: lib/detective_web/live/lobby_live.ex:20
 #, elixir-autogen, elixir-format
 msgid "This room is unavailable."
 msgstr "Phòng này không khả dụng."
@@ -426,3 +427,289 @@ msgstr "Lưu mật khẩu"
 #, elixir-autogen, elixir-format
 msgid "Save Profile"
 msgstr "Lưu hồ sơ"
+
+#: lib/detective_web/live/game_replay_live.ex:261
+#, elixir-autogen, elixir-format
+msgid "%{actor} challenged a statement that held up."
+msgstr "%{actor} đã phản bác một lời khai không thể bị bẻ gãy."
+
+#: lib/detective_web/live/game_replay_live.ex:264
+#, elixir-autogen, elixir-format
+msgid "%{actor} committed to a formal accusation."
+msgstr "%{actor} đã lập cáo buộc chính thức."
+
+#: lib/detective_web/live/game_replay_live.ex:258
+#, elixir-autogen, elixir-format
+msgid "%{actor} exposed a false statement."
+msgstr "%{actor} đã lật tẩy một lời khai gian."
+
+#: lib/detective_web/live/game_replay_live.ex:238
+#, elixir-autogen, elixir-format
+msgid "%{actor} moved from %{from} to %{destination}."
+msgstr "%{actor} di chuyển từ %{from} tới %{destination}."
+
+#: lib/detective_web/live/game_replay_live.ex:251
+#, elixir-autogen, elixir-format
+msgid "%{actor} questioned %{suspect} about lead %{topic}."
+msgstr "%{actor} thẩm vấn %{suspect} về đầu mối %{topic}."
+
+#: lib/detective_web/live/game_replay_live.ex:232
+#, elixir-autogen, elixir-format
+msgid "%{actor} reported to %{location}."
+msgstr "%{actor} đã trình diện tại %{location}."
+
+#: lib/detective_web/live/game_replay_live.ex:245
+#, elixir-autogen, elixir-format
+msgid "%{actor} searched %{target} and filed the public result."
+msgstr "%{actor} khám xét %{target} và lập biên bản công khai."
+
+#: lib/detective_web/live/game_replay_live.ex:215
+#, elixir-autogen, elixir-format
+msgid "A new day began"
+msgstr "Ngày điều tra mới bắt đầu"
+
+#: lib/detective_web/live/game_replay_live.ex:270
+#, elixir-autogen, elixir-format
+msgid "A public action was entered into the official chronology."
+msgstr "Một hành động công khai đã được ghi vào biên bản chính thức."
+
+#: lib/detective_web/live/game_replay_live.ex:207
+#, elixir-autogen, elixir-format
+msgid "Accusation filed"
+msgstr "Cáo buộc đã lập"
+
+#: lib/detective_web/live/game_replay_live.ex:208
+#, elixir-autogen, elixir-format
+msgid "Accusation rejected"
+msgstr "Cáo buộc bị bác"
+
+#: lib/detective_web/live/game_replay_live.ex:210
+#, elixir-autogen, elixir-format
+msgid "Case closed"
+msgstr "Chuyên án khép lại"
+
+#: lib/detective_web/live/game_replay_live.ex:84
+#, elixir-autogen, elixir-format
+msgid "Case lost"
+msgstr "Thất bại"
+
+#: lib/detective_web/live/game_replay_live.ex:183
+#, elixir-autogen, elixir-format
+msgid "Case replay"
+msgstr "Xem lại chuyên án"
+
+#: lib/detective_web/live/game_replay_live.ex:84
+#, elixir-autogen, elixir-format
+msgid "Case won"
+msgstr "Phá án thắng lợi"
+
+#: lib/detective_web/live/game_replay_live.ex:206
+#, elixir-autogen, elixir-format
+msgid "Challenge rejected"
+msgstr "Phản bác thất bại"
+
+#: lib/detective_web/live/game_replay_live.ex:294
+#, elixir-autogen, elixir-format
+msgid "Chisel"
+msgstr "Chisel"
+
+#: lib/detective_web/live/game_replay_live.ex:160
+#, elixir-autogen, elixir-format
+msgid "Chronology page %{page}"
+msgstr "Trang biên bản %{page}"
+
+#: lib/detective_web/live/game_replay_live.ex:199
+#, elixir-autogen, elixir-format
+msgid "Detective deployed"
+msgstr "Thám tử xuất phát"
+
+#: lib/detective_web/live/game_replay_live.ex:293
+#, elixir-autogen, elixir-format
+msgid "Detectives"
+msgstr "Các Thám tử"
+
+#: lib/detective_web/live/game_replay_live.ex:123
+#, elixir-autogen, elixir-format
+msgid "Entry %{sequence}"
+msgstr "Mục số %{sequence}"
+
+#: lib/detective_web/live/game_replay_live.ex:214
+#, elixir-autogen, elixir-format
+msgid "Field turn closed"
+msgstr "Ca hiện trường kết thúc"
+
+#: lib/detective_web/live/game_replay_live.ex:212
+#, elixir-autogen, elixir-format
+msgid "Field work resumed"
+msgstr "Tái lập hoạt động hiện trường"
+
+#: lib/detective_web/live/game_replay_live.ex:211
+#, elixir-autogen, elixir-format
+msgid "Field work suspended"
+msgstr "Đình chỉ hoạt động hiện trường"
+
+#: lib/detective_web/live/game_replay_live.ex:209
+#, elixir-autogen, elixir-format
+msgid "Final deduction sealed"
+msgstr "Phán đoán cuối đã niêm phong"
+
+#: lib/detective_web/live/game_replay_live.ex:203
+#, elixir-autogen, elixir-format
+msgid "Interrogation opened"
+msgstr "Mở cuộc thẩm vấn"
+
+#: lib/detective_web/live/game_replay_live.ex:198
+#, elixir-autogen, elixir-format
+msgid "Investigation opened"
+msgstr "Chuyên án được khai mở"
+
+#: lib/detective_web/live/game_live.ex:45
+#, elixir-autogen, elixir-format
+msgid "Keep personal notes under 5000 characters."
+msgstr "Ghi chú cá nhân không được vượt quá 5000 ký tự."
+
+#: lib/detective_web/live/game_replay_live.ex:201
+#, elixir-autogen, elixir-format
+msgid "Location searched"
+msgstr "Đã khám xét địa điểm"
+
+#: lib/detective_web/live/game_replay_live.ex:200
+#, elixir-autogen, elixir-format
+msgid "Movement logged"
+msgstr "Đã ghi lệnh di chuyển"
+
+#: lib/detective_web/live/game_replay_live.ex:213
+#, elixir-autogen, elixir-format
+msgid "New field turn"
+msgstr "Ca hiện trường mới"
+
+#: lib/detective_web/live/game_replay_live.ex:170
+#, elixir-autogen, elixir-format
+msgid "Next entries"
+msgstr "Mục tiếp theo"
+
+#: lib/detective_web/live/game_replay_live.ex:115
+#, elixir-autogen, elixir-format
+msgid "No public events were recorded on this page."
+msgstr "Trang này không có diễn biến công khai nào."
+
+#: lib/detective_web/live/game_replay_live.ex:102
+#, elixir-autogen, elixir-format
+msgid "Official field chronology"
+msgstr "Biên bản hiện trường chính thức"
+
+#: lib/detective_web/live/game_replay_live.ex:106
+#, elixir-autogen, elixir-format
+msgid "Only public broadcasts are reproduced. Private notebooks remain sealed."
+msgstr "Chỉ diễn biến công khai được phục dựng. Sổ tay riêng vẫn bị niêm phong."
+
+#: lib/detective_web/live/dashboard_live.ex:58
+#, elixir-autogen, elixir-format
+msgid "Only the Chisel can reopen a closed case."
+msgstr "Chỉ Chisel mới có quyền tái lập hồ sơ đã khép."
+
+#: lib/detective_web/live/game_replay_live.ex:99
+#, elixir-autogen, elixir-format
+msgid "Page %{page}"
+msgstr "Trang %{page}"
+
+#: lib/detective_web/live/game_replay_live.ex:157
+#, elixir-autogen, elixir-format
+msgid "Previous entries"
+msgstr "Mục trước"
+
+#: lib/detective_web/live/game_replay_live.ex:61
+#, elixir-autogen, elixir-format
+msgid "Public evidence log"
+msgstr "Sổ vật chứng công khai"
+
+#: lib/detective_web/live/game_replay_live.ex:50
+#, elixir-autogen, elixir-format
+msgid "Replay navigation"
+msgstr "Điều hướng xem lại"
+
+#: lib/detective_web/live/game_replay_live.ex:147
+#, elixir-autogen, elixir-format
+msgid "Replay pages"
+msgstr "Các trang biên bản"
+
+#: lib/detective_web/live/game_replay_live.ex:58
+#, elixir-autogen, elixir-format
+msgid "Return to case result"
+msgstr "Quay lại kết quả chuyên án"
+
+#: lib/detective_web/live/game_replay_live.ex:69
+#, elixir-autogen, elixir-format
+msgid "Sealed chronology · Room %{code}"
+msgstr "Biên bản niêm phong · Phòng %{code}"
+
+#: lib/detective_web/live/game_replay_live.ex:205
+#, elixir-autogen, elixir-format
+msgid "Statement broken"
+msgstr "Lời khai bị bẻ gãy"
+
+#: lib/detective_web/live/game_replay_live.ex:204
+#, elixir-autogen, elixir-format
+msgid "Statement entered"
+msgstr "Lời khai đã ghi nhận"
+
+#: lib/detective_web/live/game_replay_live.ex:202
+#, elixir-autogen, elixir-format
+msgid "Subject searched"
+msgstr "Đã khám xét đối tượng"
+
+#: lib/detective_web/live/game_replay_live.ex:229
+#, elixir-autogen, elixir-format
+msgid "The case file was opened and the first field turn was assigned."
+msgstr "Hồ sơ được mở và ca hiện trường đầu tiên được chỉ định."
+
+#: lib/detective_web/live/game_replay_live.ex:278
+#, elixir-autogen, elixir-format
+msgid "The field team"
+msgstr "Tổ hiện trường"
+
+#: lib/detective_web/live/game_live.ex:52
+#: lib/detective_web/live/game_live.ex:61
+#, elixir-autogen, elixir-format
+msgid "The private note could not be saved."
+msgstr "Không thể niêm phong ghi chú mật."
+
+#: lib/detective_web/live/dashboard_live.ex:65
+#, elixir-autogen, elixir-format
+msgid "The rematch room could not be created."
+msgstr "Không thể tái lập phòng chuyên án."
+
+#: lib/detective_web/live/game_replay_live.ex:267
+#, elixir-autogen, elixir-format
+msgid "The server sealed the solution and declared the winning side."
+msgstr "Máy chủ đã niêm phong đáp án và tuyên bố bên thắng cuộc."
+
+#: lib/detective_web/live/game_replay_live.ex:18
+#, elixir-autogen, elixir-format
+msgid "This sealed timeline is unavailable."
+msgstr "Biên bản niêm phong này không khả dụng."
+
+#: lib/detective_web/live/game_replay_live.ex:295
+#, elixir-autogen, elixir-format
+msgid "Undetermined"
+msgstr "Chưa xác định"
+
+#: lib/detective_web/live/game_replay_live.ex:87
+#, elixir-autogen, elixir-format
+msgid "Winner: %{role}"
+msgstr "Bên thắng: %{role}"
+
+#: lib/detective_web/live/game_replay_live.ex:81
+#, elixir-autogen, elixir-format
+msgid "Your disposition"
+msgstr "Phán quyết dành cho bạn"
+
+#: lib/detective_web/live/game_replay_live.ex:288
+#, elixir-autogen, elixir-format
+msgid "an undisclosed location"
+msgstr "một địa điểm mật"
+
+#: lib/detective_web/live/game_replay_live.ex:291
+#, elixir-autogen, elixir-format
+msgid "an unnamed subject"
+msgstr "một đối tượng chưa định danh"

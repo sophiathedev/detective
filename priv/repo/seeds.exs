@@ -25,6 +25,21 @@ add_case_codes = fn case_cards ->
   |> Enum.map(fn {card, index} -> Map.put(card, "code", <<?A + index>>) end)
 end
 
+case_card_artwork_urls = %{
+  "mara-venn" => "/images/cards/dcoa/faces/female-business.webp",
+  "copper-tuning-key" => "/images/cards/dcoa/faces/truncheon.webp",
+  "receiver-cable" => "/images/cards/dcoa/faces/bloody-ropes.webp"
+}
+
+add_case_card_artwork = fn case_cards ->
+  Enum.map(case_cards, fn card ->
+    case Map.get(case_card_artwork_urls, card["id"]) do
+      nil -> Map.delete(card, "artwork_url")
+      artwork_url -> Map.put(card, "artwork_url", artwork_url)
+    end
+  end)
+end
+
 second_misdirections = %{
   "iona-pike" => %{
     "mara-venn" => "Mara was calm when I left; whatever happened came long after my shift ended.",
@@ -110,6 +125,7 @@ upgrade_case_cards = fn case_cards ->
     %{"id" => "copper-tuning-key"} = card -> Map.put(card, "takeable", true)
     card -> card
   end)
+  |> add_case_card_artwork.()
   |> add_case_codes.()
 end
 
@@ -446,6 +462,7 @@ special_actors = [
 
         content =
           content
+          |> Map.update!("case_cards", add_case_card_artwork)
           |> Map.update!("case_cards", add_case_codes)
           |> Map.update!("response_matrix", fn response_matrix ->
             response_matrix
@@ -463,10 +480,11 @@ special_actors = [
         version
 
       case_file ->
-        case Repo.get_by(CaseVersion, case_id: case_file.id, version: 12) do
+        case Repo.get_by(CaseVersion, case_id: case_file.id, version: 13) do
           nil ->
             legacy_version =
-              Repo.get_by(CaseVersion, case_id: case_file.id, version: 11) ||
+              Repo.get_by(CaseVersion, case_id: case_file.id, version: 12) ||
+                Repo.get_by(CaseVersion, case_id: case_file.id, version: 11) ||
                 Repo.get_by(CaseVersion, case_id: case_file.id, version: 9) ||
                 Repo.get_by(CaseVersion, case_id: case_file.id, version: 8) ||
                 Repo.get_by(CaseVersion, case_id: case_file.id, version: 7) ||
@@ -497,7 +515,7 @@ special_actors = [
 
             {:ok, version} =
               Cases.create_version(case_file, %{
-                version: 12,
+                version: 13,
                 content: upgraded_content,
                 published_at: DateTime.utc_now() |> DateTime.truncate(:second)
               })

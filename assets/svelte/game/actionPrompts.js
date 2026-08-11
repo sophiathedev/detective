@@ -46,6 +46,14 @@ export function buildImmediateActionPrompt(
       description: t("Control passes to the next Detective. After the final Detective, the Day advances."),
       confirmLabel: t("End turn"),
     },
+    concede_game: {
+      type: "concede_game",
+      stamp: t("CONCEDE"),
+      kicker: t("Chisel authority"),
+      title: t("Concede the investigation"),
+      description: t("This immediately closes the case and awards a team victory to every Detective. The action cannot be undone."),
+      confirmLabel: t("Concede and release solution"),
+    },
   }
 
   return prompts[action] ?? null

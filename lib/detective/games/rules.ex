@@ -7,35 +7,44 @@ defmodule Detective.Games.Rules do
   alias Detective.Games.State
 
   def available_actions(%State{} = state, actor_user_id) do
-    case State.player_by_user_id(state, actor_user_id) do
-      %{role: "detective"} when state.status == :paused ->
-        []
+    actor = State.player_by_user_id(state, actor_user_id)
 
-      %{role: "chisel"} when state.status == :paused ->
-        ["resume_game"]
+    actions =
+      case actor do
+        %{role: "detective"} when state.status == :paused ->
+          []
 
-      %{id: player_id, role: "detective"} = player
-      when player_id == state.current_detective_id and state.phase == :detective_turn ->
-        detective_actions(state, player)
+        %{role: "chisel"} when state.status == :paused ->
+          ["resume_game"]
 
-      %{id: player_id, role: "detective"} = player
-      when player_id == state.current_detective_id and
-             state.phase == :waiting_for_detective_decision ->
-        blocked_or_response_actions(state, player)
+        %{id: player_id, role: "detective"} = player
+        when player_id == state.current_detective_id and state.phase == :detective_turn ->
+          detective_actions(state, player)
 
-      %{role: "detective"} = player when state.phase == :waiting_for_snitches ->
-        snitch_actions(state, player)
+        %{id: player_id, role: "detective"} = player
+        when player_id == state.current_detective_id and
+               state.phase == :waiting_for_detective_decision ->
+          blocked_or_response_actions(state, player)
 
-      %{role: "detective"} = player when state.phase == :accusation ->
-        if is_nil(Map.get(player, :final_guess)) and accusation_ready?(state, player),
-          do: ["submit_final_guess"],
-          else: []
+        %{role: "detective"} = player when state.phase == :waiting_for_snitches ->
+          snitch_actions(state, player)
 
-      %{role: "chisel"} = player when state.phase == :waiting_for_chisel ->
-        chisel_actions(state, player)
+        %{role: "detective"} = player when state.phase == :accusation ->
+          if is_nil(Map.get(player, :final_guess)) and accusation_ready?(state, player),
+            do: ["submit_final_guess"],
+            else: []
 
-      _other ->
-        []
+        %{role: "chisel"} = player when state.phase == :waiting_for_chisel ->
+          chisel_actions(state, player)
+
+        _other ->
+          []
+      end
+
+    if match?(%{role: "chisel"}, actor) and state.status in [:active, :paused] do
+      Enum.uniq(["concede_game" | actions])
+    else
+      actions
     end
   end
 

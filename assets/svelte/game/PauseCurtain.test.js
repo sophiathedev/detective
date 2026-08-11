@@ -75,4 +75,22 @@ describe("PauseCurtain", () => {
     expect(screen.getByRole("button", { name: "Resume game" })).toHaveFocus()
     outside.remove()
   })
+
+  it("requires two Chisel actions to concede while paused", async () => {
+    const onConcede = vi.fn()
+
+    render(PauseCurtain, {
+      active: true,
+      reason: "player_disconnected",
+      offlinePlayers: [],
+      canResume: false,
+      canConcede: true,
+      commandPending: false,
+      onConcede,
+    })
+
+    await fireEvent.click(screen.getByRole("button", { name: "Concede case" }))
+    await fireEvent.click(screen.getByRole("button", { name: "Confirm concession" }))
+    expect(onConcede).toHaveBeenCalledTimes(1)
+  })
 })

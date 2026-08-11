@@ -347,6 +347,7 @@ defmodule Detective.Games.ProjectionsTest do
       "title" => "Hidden Fingerprint",
       "type" => "evidence",
       "description" => "A private clue.",
+      "artwork_url" => "/images/cards/dcoa/faces/truncheon.webp",
       "takeable" => true,
       "initially_known" => false
     }
@@ -359,7 +360,7 @@ defmodule Detective.Games.ProjectionsTest do
             Map.update!(detective, :knowledge, &["hidden-card" | &1])
           end),
         case_definition:
-          Map.update!(base.case_definition, "case_cards", fn cards -> cards ++ [hidden_card] end)
+          Map.update!(base.case_definition, "case_cards", fn cards -> [hidden_card | cards] end)
     }
 
     public = Public.render(state)
@@ -367,6 +368,7 @@ defmodule Detective.Games.ProjectionsTest do
     facedown = Enum.find(public.case_card_slots, &(&1.code == "B"))
 
     assert faceup.status == "faceup"
+    assert faceup.position == 1
     assert faceup.title == "Known Topic"
     assert faceup.knowledge_player_ids == []
 
@@ -383,6 +385,18 @@ defmodule Detective.Games.ProjectionsTest do
     refute facedown_json =~ "hidden-card"
     refute facedown_json =~ "Hidden Fingerprint"
     refute facedown_json =~ "private clue"
+    refute facedown_json =~ "truncheon.webp"
+
+    revealed =
+      state
+      |> Map.put(:public_case_card_ids, ["topic", "hidden-card"])
+      |> Public.render()
+      |> Map.fetch!(:case_card_slots)
+      |> Enum.find(&(&1.code == "B"))
+
+    assert revealed.status == "faceup"
+    assert revealed.description == "A private clue."
+    assert revealed.artwork_url == "/images/cards/dcoa/faces/truncheon.webp"
 
     removed =
       state
@@ -495,6 +509,14 @@ defmodule Detective.Games.ProjectionsTest do
         }
       end)
 
+    history = [
+      %{type: "player_moved", player_id: detective_id()},
+      %{"type" => "location_searched", "player_id" => detective_id()},
+      %{"type" => "interrogation_started", "player_id" => detective_id()},
+      %{type: "challenge_succeeded", player_id: detective_id()},
+      %{type: "player_moved", player_id: second_detective_id()}
+    ]
+
     state = %{
       base
       | status: :finished,
@@ -509,13 +531,8 @@ defmodule Detective.Games.ProjectionsTest do
         players: players,
         public_case_card_ids: ["topic"],
         taken_evidence: %{"topic" => %{"player_id" => detective_id()}},
-        public_history: [
-          %{type: "player_moved", player_id: detective_id()},
-          %{"type" => "location_searched", "player_id" => detective_id()},
-          %{"type" => "interrogation_started", "player_id" => detective_id()},
-          %{type: "challenge_succeeded", player_id: detective_id()},
-          %{type: "player_moved", player_id: second_detective_id()}
-        ]
+        investigation_stats: Detective.Games.InvestigationStats.from_history(history),
+        public_history: history
     }
 
     result = Public.render(state).result

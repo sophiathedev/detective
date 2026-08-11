@@ -1,7 +1,7 @@
 defmodule Detective.Games.SnapshotCodec do
   @moduledoc false
 
-  alias Detective.Games.State
+  alias Detective.Games.{InvestigationStats, State}
 
   @schema_version State.schema_version()
 
@@ -12,7 +12,7 @@ defmodule Detective.Games.SnapshotCodec do
   end
 
   def load(%{"schema_version" => schema_version} = data)
-      when schema_version in [1, 2, 3, 4, 5, 6, @schema_version] do
+      when schema_version in [1, 2, 3, 4, 5, 6, 7, @schema_version] do
     with {:ok, status} <- status(data["status"]),
          {:ok, phase} <- phase(data["phase"]),
          {:ok, paused_from_phase} <- optional_phase(data["paused_from_phase"]),
@@ -21,6 +21,14 @@ defmodule Detective.Games.SnapshotCodec do
          {:ok, locations} <- load_locations(data["locations"]),
          {:ok, suspects} <- load_suspects(data["suspects"]),
          {:ok, special_actors} <- load_special_actors(data["special_actors"] || %{}) do
+      public_history = data["public_history"] || []
+
+      investigation_stats =
+        case data["investigation_stats"] do
+          stats when is_map(stats) -> InvestigationStats.normalize(stats)
+          _missing -> InvestigationStats.from_history(public_history)
+        end
+
       {:ok,
        %State{
          schema_version: @schema_version,
@@ -48,7 +56,8 @@ defmodule Detective.Games.SnapshotCodec do
          triggered_special_rule_ids: data["triggered_special_rule_ids"] || [],
          pending_action: data["pending_action"],
          winner: data["winner"],
-         public_history: data["public_history"] || []
+         investigation_stats: investigation_stats,
+         public_history: public_history
        }}
     end
   end

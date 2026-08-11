@@ -92,6 +92,23 @@ defmodule DetectiveWeb.LobbyChannel do
     end)
   end
 
+  def handle_in("cancel_lobby", %{"expected_version" => expected_version}, socket) do
+    with_rate_limit(socket, fn ->
+      case Games.cancel_lobby(
+             socket.assigns.current_scope,
+             socket.assigns.game_id,
+             expected_version
+           ) do
+        {:ok, %{game_id: game_id, version: version}} ->
+          :ok = LobbyBroadcaster.broadcast_cancelled(game_id, version)
+          {:reply, {:ok, %{path: "/dashboard", version: version}}, socket}
+
+        {:error, reason} ->
+          {:reply, {:error, %{code: error_code(reason)}}, socket}
+      end
+    end)
+  end
+
   def handle_in(
         "remove_player",
         %{"player_id" => player_id, "expected_version" => expected_version},
@@ -201,6 +218,7 @@ defmodule DetectiveWeb.LobbyChannel do
   def handle_in("unready", _payload, socket), do: invalid_command(socket)
   def handle_in("start_game", _payload, socket), do: invalid_command(socket)
   def handle_in("leave_lobby", _payload, socket), do: invalid_command(socket)
+  def handle_in("cancel_lobby", _payload, socket), do: invalid_command(socket)
   def handle_in("remove_player", _payload, socket), do: invalid_command(socket)
   def handle_in("revoke_invite", _payload, socket), do: invalid_command(socket)
   def handle_in("regenerate_invite", _payload, socket), do: invalid_command(socket)
