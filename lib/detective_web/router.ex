@@ -18,6 +18,13 @@ defmodule DetectiveWeb.Router do
     plug :accepts, ["json"]
   end
 
+  scope "/health", DetectiveWeb do
+    pipe_through :api
+
+    get "/live", HealthController, :live
+    get "/ready", HealthController, :ready
+  end
+
   # Other scopes may use custom stacks.
   # scope "/api", DetectiveWeb do
   #   pipe_through :api
