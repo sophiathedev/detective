@@ -15,6 +15,7 @@ Logger.configure(level: :info)
 alias Detective.Cases
 alias Detective.Cases.CaseFile
 alias Detective.Cases.CaseVersion
+alias Detective.Cases.Validator
 alias Detective.Repo
 
 slug = "signal-at-midnight"
@@ -527,3 +528,40 @@ special_actors = [
         end
     end
   end)
+
+catalog_path = Path.expand("../cases/the-glass-alibi.json", __DIR__)
+catalog = catalog_path |> File.read!() |> Jason.decode!()
+case_attrs = Map.fetch!(catalog, "case")
+version_number = Map.fetch!(catalog, "version")
+content = Map.fetch!(catalog, "content")
+:ok = Validator.validate(content)
+
+case_file =
+  case Repo.get_by(CaseFile, slug: case_attrs["slug"]) do
+    nil ->
+      {:ok, case_file} =
+        Cases.create_case(%{
+          slug: case_attrs["slug"],
+          title: case_attrs["title"],
+          description: case_attrs["description"],
+          status: case_attrs["status"]
+        })
+
+      case_file
+
+    case_file ->
+      case_file
+  end
+
+case Repo.get_by(CaseVersion, case_id: case_file.id, version: version_number) do
+  nil ->
+    {:ok, _version} =
+      Cases.create_version(case_file, %{
+        version: version_number,
+        content: content,
+        published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+      })
+
+  _version ->
+    :ok
+end

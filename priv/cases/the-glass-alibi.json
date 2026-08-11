@@ -1,0 +1,465 @@
+{
+  "case": {
+    "slug": "the-glass-alibi",
+    "title": "The Glass Alibi",
+    "description": "A projectionist dies during a private premiere, leaving a poisoned reel and four alibis cut from the same strip of film.",
+    "status": "published"
+  },
+  "version": 1,
+  "content": {
+    "briefing": "At 01:10, projectionist Evelyn Ward was found dead behind the locked booth at the Marlowe Theatre. The premiere audience heard the projector running long after the final frame, but twelve minutes are missing from the reel. Trace who entered the booth, what killed Evelyn, and why the missing footage could ruin a studio empire.",
+    "max_days": 7,
+    "board_id": "dcoa_classic",
+    "special_rules": [
+      {
+        "id": "premiere-clock",
+        "title": "The Premiere Clock",
+        "text": "The studio buries bad press fast. Start with 7 days for two Detectives, 6 for three, or 5 for four.",
+        "visibility": "public",
+        "trigger": "setup",
+        "effect": {
+          "type": "starting_days",
+          "days_by_detective_count": {
+            "2": 7,
+            "3": 6,
+            "4": 5
+          }
+        }
+      },
+      {
+        "id": "fixer-enters-frame",
+        "title": "A Fixer Enters the Frame",
+        "text": "At the start of Day 2, Miles Cade and his studio tail surface near Vermont and Manchester.",
+        "visibility": "chisel",
+        "trigger": "day_started",
+        "effect": {
+          "type": "day_reveal",
+          "day": 2,
+          "reveal_case_card_ids": [],
+          "reveal_suspect_ids": ["miles-cade"],
+          "special_actor_updates": [
+            {
+              "actor_id": "studio-tail",
+              "visible": true,
+              "active": true,
+              "location_id": "82"
+            }
+          ]
+        }
+      }
+    ],
+    "special_actors": [
+      {
+        "id": "studio-tail",
+        "name": "Studio Tail",
+        "role": "Cade's counter-surveillance man",
+        "kind": "counter_surveillance",
+        "location_id": "82",
+        "initially_visible": false,
+        "initially_active": false,
+        "blocks": ["search_suspect", "interrogate"],
+        "options": [
+          {
+            "id": "buy-off-tail",
+            "label": "Buy off the studio tail",
+            "action_cost": 1,
+            "scratch_cost": 2,
+            "once": true,
+            "choice_group": "tail-approach",
+            "effects": [
+              {"type": "disable_actor"},
+              {"type": "public_case_cards", "case_card_ids": ["studio-contract"]}
+            ]
+          },
+          {
+            "id": "shadow-tail",
+            "label": "Shadow him back to Topsy's",
+            "action_cost": 2,
+            "scratch_cost": 0,
+            "once": true,
+            "choice_group": "tail-approach",
+            "effects": [
+              {"type": "move_actor", "location_id": "96"},
+              {"type": "private_case_cards", "case_card_ids": ["dock-manifest"]}
+            ]
+          }
+        ]
+      }
+    ],
+    "case_cards": [
+      {
+        "id": "evelyn-ward",
+        "code": "A",
+        "type": "victim",
+        "title": "Evelyn Ward",
+        "description": "The Marlowe projectionist, found dead beside a reel still warm from the lamp house.",
+        "initially_known": true
+      },
+      {
+        "id": "torn-playbill",
+        "code": "B",
+        "type": "information",
+        "title": "Torn Premiere Playbill",
+        "description": "A guest list with one studio seat removed cleanly before the doors opened.",
+        "initially_known": true
+      },
+      {
+        "id": "silver-cigarette-case",
+        "code": "C",
+        "type": "evidence",
+        "title": "Silver Cigarette Case",
+        "description": "A heavy monogrammed case recovered beneath the booth stairs, wiped except for rouge.",
+        "takeable": true,
+        "initially_known": false
+      },
+      {
+        "id": "charred-negative",
+        "code": "D",
+        "type": "evidence",
+        "title": "Charred Camera Negative",
+        "description": "A surviving frame shows a studio sedan outside the theatre after midnight.",
+        "initially_known": false
+      },
+      {
+        "id": "service-ledger",
+        "code": "E",
+        "type": "information",
+        "title": "Projection Booth Ledger",
+        "description": "The service book records a false lamp inspection twelve minutes before Evelyn died.",
+        "initially_known": true
+      },
+      {
+        "id": "projection-key",
+        "code": "F",
+        "type": "evidence",
+        "title": "Brass Projection Key",
+        "description": "A duplicate booth key filed recently enough to leave bright brass along its teeth.",
+        "takeable": true,
+        "initially_known": false
+      },
+      {
+        "id": "cyanide-vial",
+        "code": "G",
+        "type": "evidence",
+        "title": "Cyanide Developer Vial",
+        "description": "A darkroom vial relabeled as film cleaner; residue matches the burn around Evelyn's glass.",
+        "takeable": true,
+        "initially_known": false
+      },
+      {
+        "id": "red-silk-thread",
+        "code": "H",
+        "type": "evidence",
+        "title": "Red Silk Thread",
+        "description": "A thread snagged inside the booth latch, cut from an expensive evening glove.",
+        "initially_known": false
+      },
+      {
+        "id": "dock-manifest",
+        "code": "I",
+        "type": "information",
+        "title": "Dockside Film Manifest",
+        "description": "A shipping manifest hides undeclared reels under a chemical supply consignment.",
+        "initially_known": false
+      },
+      {
+        "id": "studio-contract",
+        "code": "J",
+        "type": "information",
+        "title": "Cade Studio Contract",
+        "description": "A morality clause gives the studio power to erase a star and anyone holding damaging footage.",
+        "initially_known": false
+      },
+      {
+        "id": "police-call-slip",
+        "code": "K",
+        "type": "information",
+        "title": "Police Call Slip",
+        "description": "Evelyn tried to reach Robbery-Homicide at 00:52, then hung up when a man entered the booth.",
+        "initially_known": false
+      },
+      {
+        "id": "blackmail-reel",
+        "code": "L",
+        "type": "evidence",
+        "title": "The Blackmail Reel",
+        "description": "Twelve missing minutes show a studio payoff at Horseshoe Pier and Miles Cade in frame.",
+        "takeable": true,
+        "initially_known": false
+      }
+    ],
+    "suspects": [
+      {
+        "id": "lucian-voss",
+        "name": "Lucian Voss",
+        "occupation": "nightclub proprietor",
+        "location_id": "96",
+        "initially_known": true
+      },
+      {
+        "id": "bea-mercer",
+        "name": "Bea Mercer",
+        "occupation": "press photographer",
+        "location_id": "38",
+        "initially_known": true
+      },
+      {
+        "id": "miles-cade",
+        "name": "Miles Cade",
+        "occupation": "studio fixer",
+        "location_id": "82",
+        "initially_known": false
+      },
+      {
+        "id": "nora-bell",
+        "name": "Dr. Nora Bell",
+        "occupation": "film laboratory chemist",
+        "location_id": "51",
+        "initially_known": true
+      }
+    ],
+    "response_matrix": {
+      "lucian-voss": {
+        "evelyn-ward": {
+          "most_useful": {
+            "id": "voss-evelyn-truth",
+            "text": "Evelyn brought the missing reel to my office, but she left when Cade's man arrived asking for it.",
+            "reveal_case_card_ids": ["silver-cigarette-case"]
+          },
+          "misdirections": [
+            {"id": "voss-evelyn-misdirection-1", "text": "I knew her only as the woman who changed reels at the theatre."},
+            {"id": "voss-evelyn-misdirection-2", "text": "She spent the entire premiere in the booth and never came near my club."}
+          ]
+        },
+        "service-ledger": {
+          "most_useful": {
+            "id": "voss-ledger-truth",
+            "text": "The false inspection used the same initials Cade signs on private studio orders.",
+            "reveal_case_card_ids": ["studio-contract"]
+          },
+          "misdirections": [
+            {"id": "voss-ledger-misdirection-1", "text": "Projectionists invent inspections whenever a reel tears."},
+            {"id": "voss-ledger-misdirection-2", "text": "Those initials belong to the theatre manager, not anyone from the studio."}
+          ]
+        },
+        "blackmail-reel": {
+          "most_useful": {
+            "id": "voss-reel-truth",
+            "text": "The reel shows Cade paying a dock foreman while his actress wore red silk gloves beside him.",
+            "reveal_case_card_ids": ["red-silk-thread"]
+          },
+          "misdirections": [
+            {"id": "voss-reel-misdirection-1", "text": "The film is a publicity test with hired extras and no real payoff."},
+            {"id": "voss-reel-misdirection-2", "text": "I never saw the reel; Evelyn was trying to sell me an empty can."}
+          ]
+        }
+      },
+      "bea-mercer": {
+        "evelyn-ward": {
+          "most_useful": {
+            "id": "mercer-evelyn-truth",
+            "text": "Evelyn asked me to photograph the booth door if she failed to leave by one o'clock.",
+            "reveal_case_card_ids": ["charred-negative"]
+          },
+          "misdirections": [
+            {"id": "mercer-evelyn-misdirection-1", "text": "I was covering the stars downstairs and never spoke with the projectionist."},
+            {"id": "mercer-evelyn-misdirection-2", "text": "Evelyn only wanted a portrait for the theatre union bulletin."}
+          ]
+        },
+        "service-ledger": {
+          "most_useful": {
+            "id": "mercer-ledger-truth",
+            "text": "I photographed the ledger before police arrived; the 00:58 line was still wet and Cade was already gone.",
+            "reveal_case_card_ids": ["police-call-slip"]
+          },
+          "misdirections": [
+            {"id": "mercer-ledger-misdirection-1", "text": "My flash washed out the page, so no timestamp can be trusted."},
+            {"id": "mercer-ledger-misdirection-2", "text": "The ledger was sealed by police before I entered the booth."}
+          ]
+        },
+        "blackmail-reel": {
+          "most_useful": {
+            "id": "mercer-reel-truth",
+            "text": "I developed three frames Evelyn clipped from the reel; one puts Cade at the pier payoff.",
+            "reveal_case_card_ids": ["blackmail-reel"]
+          },
+          "misdirections": [
+            {"id": "mercer-reel-misdirection-1", "text": "The frames were too fogged to identify any face."},
+            {"id": "mercer-reel-misdirection-2", "text": "The pier footage came from an old newsreel, not Evelyn's projector."}
+          ]
+        }
+      },
+      "miles-cade": {
+        "evelyn-ward": {
+          "most_useful": {
+            "id": "cade-evelyn-truth",
+            "text": "Evelyn demanded ten thousand dollars and threatened to screen the payoff after the premiere.",
+            "reveal_case_card_ids": ["projection-key"]
+          },
+          "misdirections": [
+            {"id": "cade-evelyn-misdirection-1", "text": "I met Evelyn once to discuss a union screening and never saw her again."},
+            {"id": "cade-evelyn-misdirection-2", "text": "She tried to blackmail Lucian Voss, not the studio."}
+          ]
+        },
+        "service-ledger": {
+          "most_useful": {
+            "id": "cade-ledger-truth",
+            "text": "I signed the inspection line to enter the booth, but Evelyn was alive when I left her drink on the bench.",
+            "reveal_case_card_ids": ["dock-manifest"]
+          },
+          "misdirections": [
+            {"id": "cade-ledger-misdirection-1", "text": "The initials are a coincidence; I was at the studio lot all night."},
+            {"id": "cade-ledger-misdirection-2", "text": "Evelyn forged my initials because she wanted the studio blamed."}
+          ]
+        },
+        "blackmail-reel": {
+          "most_useful": {
+            "id": "cade-reel-truth",
+            "text": "I replaced the reel can after dosing Evelyn's soda with developer cyanide, then sent the original toward the docks.",
+            "reveal_case_card_ids": ["cyanide-vial"]
+          },
+          "misdirections": [
+            {"id": "cade-reel-misdirection-1", "text": "The missing footage was destroyed before the premiere and could not threaten anyone."},
+            {"id": "cade-reel-misdirection-2", "text": "Bea Mercer stole the reel to manufacture a scandal for her newspaper."}
+          ]
+        }
+      },
+      "nora-bell": {
+        "evelyn-ward": {
+          "most_useful": {
+            "id": "bell-evelyn-truth",
+            "text": "The burns in Evelyn's mouth came from cyanide developer, not heat or projector smoke.",
+            "reveal_case_card_ids": ["cyanide-vial"]
+          },
+          "misdirections": [
+            {"id": "bell-evelyn-misdirection-1", "text": "Her heart failed under the heat; there was no poison in the booth."},
+            {"id": "bell-evelyn-misdirection-2", "text": "The chemical burns came from handling damaged nitrate film."}
+          ]
+        },
+        "service-ledger": {
+          "most_useful": {
+            "id": "bell-ledger-truth",
+            "text": "The call slip proves Evelyn named a man entering at 00:52, six minutes before the false inspection.",
+            "reveal_case_card_ids": ["police-call-slip"]
+          },
+          "misdirections": [
+            {"id": "bell-ledger-misdirection-1", "text": "Police logged the call after the body was found, so its time means nothing."},
+            {"id": "bell-ledger-misdirection-2", "text": "Evelyn called about a broken projector, not a visitor."}
+          ]
+        },
+        "blackmail-reel": {
+          "most_useful": {
+            "id": "bell-reel-truth",
+            "text": "The emulsion and perforations match Cade Studio stock listed on its restricted shipping contract.",
+            "reveal_case_card_ids": ["studio-contract"]
+          },
+          "misdirections": [
+            {"id": "bell-reel-misdirection-1", "text": "Every studio buys the same stock; the reel cannot be traced."},
+            {"id": "bell-reel-misdirection-2", "text": "The reel was copied months ago and has no connection to the premiere."}
+          ]
+        }
+      }
+    },
+    "search_results": {
+      "locations": {
+        "29": {
+          "text": "In a brushfire ash pile below the sign, one frame of Bea's negative survives.",
+          "archive": true,
+          "reveal_case_card_ids": ["charred-negative"],
+          "take_case_card_ids": [],
+          "reveal_suspect_ids": []
+        },
+        "38": {
+          "text": "Bea's rented darkroom holds a torn glove and the studio contract she photographed.",
+          "archive": true,
+          "reveal_case_card_ids": ["red-silk-thread", "studio-contract"],
+          "take_case_card_ids": [],
+          "reveal_suspect_ids": []
+        },
+        "51": {
+          "text": "Robbery-Homicide kept Evelyn's unfinished call slip and a lab report on the cyanide residue.",
+          "archive": true,
+          "reveal_case_card_ids": ["police-call-slip", "cyanide-vial"],
+          "take_case_card_ids": ["cyanide-vial"],
+          "reveal_suspect_ids": []
+        },
+        "82": {
+          "text": "A locksmith remembers filing Cade's duplicate booth key while his tail waited outside.",
+          "archive": true,
+          "reveal_case_card_ids": ["projection-key"],
+          "take_case_card_ids": ["projection-key"],
+          "reveal_suspect_ids": ["miles-cade"]
+        },
+        "96": {
+          "text": "Under Voss's office safe lie the silver cigarette case and the can that once held the missing reel.",
+          "archive": true,
+          "reveal_case_card_ids": ["silver-cigarette-case", "blackmail-reel"],
+          "take_case_card_ids": ["silver-cigarette-case"],
+          "reveal_suspect_ids": []
+        },
+        "99": {
+          "text": "A freight clerk produces the manifest for undeclared Cade Studio reels shipped before dawn.",
+          "archive": true,
+          "reveal_case_card_ids": ["dock-manifest"],
+          "take_case_card_ids": [],
+          "reveal_suspect_ids": []
+        }
+      },
+      "suspects": {
+        "lucian-voss": {
+          "text": "Voss carries the theatre's torn guest stub but no weapon connected to the booth.",
+          "archive": true,
+          "reveal_case_card_ids": ["torn-playbill"],
+          "take_case_card_ids": [],
+          "reveal_suspect_ids": []
+        },
+        "bea-mercer": {
+          "text": "Bea's camera bag contains the charred negative in a fireproof sleeve.",
+          "archive": true,
+          "reveal_case_card_ids": ["charred-negative"],
+          "take_case_card_ids": [],
+          "reveal_suspect_ids": []
+        },
+        "miles-cade": {
+          "text": "Cade's inside pocket holds a fresh brass shaving and a dock claim ticket.",
+          "archive": true,
+          "reveal_case_card_ids": ["projection-key", "dock-manifest"],
+          "take_case_card_ids": [],
+          "reveal_suspect_ids": []
+        },
+        "nora-bell": {
+          "text": "Nora's lab inventory shows one cyanide developer vial issued to Cade's studio runner.",
+          "archive": true,
+          "reveal_case_card_ids": ["cyanide-vial"],
+          "take_case_card_ids": [],
+          "reveal_suspect_ids": []
+        }
+      },
+      "all_other_locations": {
+        "text": "Nothing here connects the missing footage to Evelyn's death.",
+        "archive": false,
+        "reveal_case_card_ids": [],
+        "take_case_card_ids": [],
+        "reveal_suspect_ids": []
+      }
+    },
+    "accusation_options": {
+      "weapons": [
+        {"id": "cyanide-vial", "label": "Cyanide Developer Vial", "case_card_id": "cyanide-vial"},
+        {"id": "projection-key", "label": "Brass Projection Key", "case_card_id": "projection-key"},
+        {"id": "silver-cigarette-case", "label": "Silver Cigarette Case", "case_card_id": "silver-cigarette-case"}
+      ],
+      "motives": [
+        {"id": "silence-blackmail", "label": "Silence the holder of the blackmail reel"},
+        {"id": "protect-star", "label": "Protect a studio star from scandal"},
+        {"id": "steal-premiere", "label": "Steal the premiere footage for a rival studio"}
+      ]
+    },
+    "solution": {
+      "suspect_id": "miles-cade",
+      "weapon_id": "cyanide-vial",
+      "motive_id": "silence-blackmail"
+    },
+    "epilogue": "Evelyn copied Cade's dockside payoff and hid the footage inside the premiere reel. Cade forged a service entry, entered with a duplicate key, and poisoned her soda with cyanide developer before routing the original reel toward Horseshoe Pier. Bea's negative, the police call slip, and the manifest cut through every alibi."
+  }
+}
