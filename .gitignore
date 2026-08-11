@@ -35,3 +35,10 @@ npm-debug.log
 # LiveSvelte build artifacts.
 /assets/svelte/_build/
 /priv/svelte/
+
+# Local browser QA and agent tooling artifacts.
+/.playwright-cli/
+/output/
+/.agents/
+/.superpowers/
+/skills-lock.json
