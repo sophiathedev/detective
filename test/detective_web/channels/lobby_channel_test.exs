@@ -69,6 +69,66 @@ defmodule DetectiveWeb.LobbyChannelTest do
     refute Map.has_key?(broadcast_lobby, :content)
   end
 
+  test "Detective can return to unready through the versioned channel" do
+    host = user_fixture()
+    detective = user_fixture()
+    %{game: game, invite_token: token} = game_fixture(host)
+
+    assert {:ok, %{player: joined_player}} =
+             Invitations.accept(Scope.for_user(detective), token)
+
+    assert {:ok, %{lobby: lobby}, socket} =
+             detective
+             |> authenticated_socket()
+             |> subscribe_and_join("lobby:#{game.id}", %{})
+
+    assert_push "presence_state", _presence
+
+    ready_ref = push(socket, "ready", %{"expected_version" => lobby.current_version})
+    assert_reply ready_ref, :ok, %{version: 1}
+    assert_broadcast "lobby_state", %{version: 1}
+
+    unready_ref = push(socket, "unready", %{"expected_version" => 1})
+    assert_reply unready_ref, :ok, %{version: 2}
+    assert_broadcast "lobby_state", %{version: 2, lobby: next_lobby}
+
+    player = Enum.find(next_lobby.players, &(&1.id == joined_player.id))
+    refute player.ready
+  end
+
+  test "malformed lobby commands are rejected and rate limited" do
+    host = user_fixture()
+    %{game: game} = game_fixture(host)
+
+    assert {:ok, %{lobby: _lobby}, socket} =
+             host
+             |> authenticated_socket()
+             |> subscribe_and_join("lobby:#{game.id}", %{})
+
+    assert_push "presence_state", _presence
+
+    events = [
+      "ready",
+      "unready",
+      "start_game",
+      "leave_lobby",
+      "cancel_lobby",
+      "remove_player",
+      "revoke_invite",
+      "regenerate_invite",
+      "update_lobby_settings",
+      "unexpected_event"
+    ]
+
+    Enum.each(events, fn event ->
+      ref = push(socket, event, %{})
+      assert_reply ref, :error, %{code: "invalid_command"}
+    end)
+
+    limited_ref = push(socket, "unexpected_event", %{})
+    assert_reply limited_ref, :error, %{code: "rate_limited"}
+  end
+
   test "Chisel cannot send a Detective readiness command" do
     host = user_fixture()
     %{game: game} = game_fixture(host)
@@ -106,6 +166,22 @@ defmodule DetectiveWeb.LobbyChannelTest do
     assert player_id == lobby.membership.id
   end
 
+  test "the Chisel cannot leave through the Detective command" do
+    host = user_fixture()
+    %{game: game} = game_fixture(host)
+
+    assert {:ok, %{lobby: lobby}, socket} =
+             host
+             |> authenticated_socket()
+             |> subscribe_and_join("lobby:#{game.id}", %{})
+
+    assert_push "presence_state", _presence
+
+    ref = push(socket, "leave_lobby", %{"expected_version" => lobby.current_version})
+    assert_reply ref, :error, %{code: "not_detective"}
+    refute_broadcast "player_left", _payload
+  end
+
   test "the Chisel cancels a waiting room for every connected member" do
     host = user_fixture()
     %{game: game} = game_fixture(host)
@@ -127,6 +203,40 @@ defmodule DetectiveWeb.LobbyChannelTest do
     }
 
     assert game_id == game.id
+  end
+
+  test "a Detective cannot run Chisel lobby administration commands" do
+    host = user_fixture()
+    detective = user_fixture()
+    %{game: game, invite_token: token} = game_fixture(host)
+    assert {:ok, %{player: player}} = Invitations.accept(Scope.for_user(detective), token)
+
+    assert {:ok, %{lobby: lobby}, socket} =
+             detective
+             |> authenticated_socket()
+             |> subscribe_and_join("lobby:#{game.id}", %{})
+
+    assert_push "presence_state", _presence
+
+    commands = [
+      {"cancel_lobby", %{}},
+      {"remove_player", %{"player_id" => player.id}},
+      {"revoke_invite", %{}},
+      {"regenerate_invite", %{"invite_hours" => 6}},
+      {"update_lobby_settings",
+       %{
+         "case_version_id" => lobby.case_version_id,
+         "max_detectives" => lobby.max_detectives
+       }}
+    ]
+
+    for {event, payload} <- commands do
+      ref = push(socket, event, Map.put(payload, "expected_version", lobby.current_version))
+      assert_reply ref, :error, %{code: "not_chisel"}
+    end
+
+    refute_broadcast "lobby_cancelled", _payload
+    refute_broadcast "lobby_state", _payload
   end
 
   test "the Chisel removes a Detective and the departure is broadcast" do
