@@ -10,7 +10,7 @@
 
 <div id="invite-shell" class="min-h-[calc(100dvh-3.5rem)] px-4 py-10 text-stone-100 sm:px-6 sm:py-16">
   <WoodFrame
-    as="main"
+    as="div"
     labelledby="invite-title"
     class="mx-auto grid max-w-5xl overflow-hidden p-3 sm:p-5 lg:grid-cols-[minmax(18rem,0.7fr)_minmax(0,1fr)]"
   >

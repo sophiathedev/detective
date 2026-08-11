@@ -32,7 +32,9 @@ describe("GameTableShell", () => {
 
     expect(document.querySelector("#game-table-shell.noir-game-table")).toBeInTheDocument()
     expect(document.querySelector(".noir-table-lighting")).toHaveAttribute("aria-hidden", "true")
-    expect(screen.getByRole("main")).toContainElement(document.querySelector("#game-map-region"))
+    expect(document.querySelector("#game-table-shell")).toContainElement(
+      document.querySelector("#game-map-region"),
+    )
     expect(document.querySelector("#game-detective-rail-region")).toHaveTextContent("players")
     expect(document.querySelector("#game-chisel-region")).toHaveTextContent("chisel")
     expect(document.querySelector("#game-context-region")).toHaveTextContent("context")

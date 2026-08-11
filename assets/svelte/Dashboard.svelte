@@ -71,7 +71,7 @@
 </script>
 
 <div id="dashboard-shell" class="min-h-[calc(100dvh-3.5rem)] px-4 py-8 text-stone-100 sm:px-6 sm:py-12 lg:px-10">
-  <main id="dashboard-main" class="mx-auto max-w-[92rem]">
+  <div id="dashboard-main" class="mx-auto max-w-[92rem]">
     <header class="grid gap-8 border-b border-[var(--noir-gold-700)] pb-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
       <div>
         <p class="font-mono text-xs uppercase tracking-[0.22em] text-[var(--noir-gold-500)]">{t("Private case cabinet")}</p>
@@ -301,5 +301,5 @@
         </WoodFrame>
       </div>
     {/if}
-  </main>
+  </div>
 </div>

@@ -15,7 +15,7 @@
   </div>
 
   <WoodFrame
-    as="main"
+    as="div"
     id="home-case-desk"
     labelledby="home-case-title"
     class="relative mx-auto grid min-h-[calc(100dvh-8.5rem)] max-w-[92rem] overflow-hidden p-3 sm:p-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(22rem,0.7fr)]"

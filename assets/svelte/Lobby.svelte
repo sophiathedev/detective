@@ -373,7 +373,7 @@
 </script>
 
 <div id="lobby-shell" class="min-h-[calc(100dvh-3.5rem)] bg-[#090807] text-[#eadbbd]">
-  <main class="mx-auto max-w-[90rem] px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+  <div class="mx-auto max-w-[90rem] px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
     <header class="mb-5 flex flex-wrap items-end justify-between gap-4 px-1">
       <div>
         <p class="font-mono text-[0.65rem] uppercase tracking-[0.24em] text-[#c2a35f]">
@@ -840,5 +840,5 @@
         </section>
       </aside>
     </div>
-  </main>
+  </div>
 </div>

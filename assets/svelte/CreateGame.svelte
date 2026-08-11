@@ -35,7 +35,7 @@
 </script>
 
 <div id="create-game-shell" class="min-h-[calc(100dvh-3.5rem)] px-4 py-8 text-stone-100 sm:px-6 sm:py-12 lg:px-10">
-  <main class="mx-auto max-w-[92rem]">
+  <div class="mx-auto max-w-[92rem]">
     <nav id="create-game-header" class="mb-6 flex items-center justify-between gap-4" aria-label={t("Create game navigation")}>
       <a
         id="create-game-back"
@@ -263,5 +263,5 @@
         {/if}
       </aside>
     </WoodFrame>
-  </main>
+  </div>
 </div>
